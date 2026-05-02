@@ -1,0 +1,272 @@
+import { useEffect, useRef, useState } from 'react'
+import { Toast } from '@douyinfe/semi-ui'
+import { MarkdownEditor } from '../modules/editor/MarkdownEditor'
+import type { CursorPosition } from '../modules/editor/model/types'
+import { useDocument } from '../features/document/useDocument'
+import { useEditorSettings } from '../features/settings/useEditorSettings'
+import {
+  applyThemeToDocument,
+  resolveAppearanceMode,
+  resolveThemeAccent,
+  subscribeToSystemAppearance,
+  type ResolvedAppearanceMode
+} from '../features/theme/theme'
+import { SettingsPage } from './SettingsPanel'
+import { Sidebar } from './Sidebar'
+import { StatusBar } from './StatusBar'
+import { TitleBar } from './TitleBar'
+
+type AppView = 'editor' | 'settings'
+
+export function MainLayout(): React.JSX.Element {
+  const [activeView, setActiveView] = useState<AppView>('editor')
+  const [platform, setPlatform] = useState<string>('')
+  const [resolvedAppearanceMode, setResolvedAppearanceMode] =
+    useState<ResolvedAppearanceMode>('light')
+  const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ line: 1, column: 1 })
+  const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
+  const workspacePersistTimerRef = useRef<number | undefined>(undefined)
+  const sessionPersistTimerRef = useRef<number | undefined>(undefined)
+  const { settings: editorSettings, updateSettings, resetSettings } = useEditorSettings()
+  const {
+    document,
+    editorMode,
+    workspaceRoot,
+    workspaceTree,
+    recentFiles,
+    pendingAnchor,
+    wordCount,
+    setEditorMode,
+    setContent,
+    createDocument,
+    openDocument,
+    openPath,
+    openPathFromLink,
+    clearPendingAnchor,
+    saveDocument,
+    openWorkspace
+  } = useDocument()
+
+  useEffect(() => {
+    let cancelled = false
+
+    window.api.app.getInfo().then((result) => {
+      if (!cancelled && result.ok) {
+        setPlatform(result.data.platform)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    setEditorMode(editorSettings.defaultMode)
+  }, [editorSettings.defaultMode, setEditorMode])
+
+  useEffect(() => {
+    const updateResolvedMode = (): void => {
+      setResolvedAppearanceMode(resolveAppearanceMode(editorSettings.appearanceMode))
+    }
+
+    updateResolvedMode()
+
+    if (editorSettings.appearanceMode !== 'system') {
+      return
+    }
+
+    return subscribeToSystemAppearance(updateResolvedMode)
+  }, [editorSettings.appearanceMode])
+
+  useEffect(() => {
+    applyThemeToDocument({
+      accentColor: resolveThemeAccent(editorSettings),
+      appearanceMode: editorSettings.appearanceMode,
+      resolvedMode: resolvedAppearanceMode
+    })
+  }, [editorSettings, resolvedAppearanceMode])
+
+  useEffect(() => {
+    if (!workspaceRoot) {
+      return
+    }
+
+    let cancelled = false
+
+    window.api.workspace.getState(workspaceRoot).then((result) => {
+      if (cancelled) {
+        return
+      }
+
+      if (result.ok && result.data) {
+        setExpandedWorkspacePaths(result.data.expandedPaths)
+        updateSettings({ showSidebar: result.data.sidebarVisible })
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [updateSettings, workspaceRoot])
+
+  useEffect(() => {
+    if (!document.path) {
+      return
+    }
+
+    let cancelled = false
+
+    window.api.session.getDocument(document.path).then((result) => {
+      if (cancelled) {
+        return
+      }
+
+      if (result.ok && result.data) {
+        setEditorMode(result.data.mode)
+        setCursorPosition({ line: result.data.cursorLine, column: result.data.cursorColumn })
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [document.path, setEditorMode])
+
+  useEffect(() => {
+    if (!workspaceRoot) {
+      return
+    }
+
+    window.clearTimeout(workspacePersistTimerRef.current)
+    workspacePersistTimerRef.current = window.setTimeout(() => {
+      void window.api.workspace.updateState({
+        workspacePath: workspaceRoot,
+        expandedPaths: expandedWorkspacePaths,
+        sidebarVisible: editorSettings.showSidebar
+      })
+    }, 250)
+  }, [editorSettings.showSidebar, expandedWorkspacePaths, workspaceRoot])
+
+  useEffect(() => {
+    if (!document.path) {
+      return
+    }
+
+    window.clearTimeout(sessionPersistTimerRef.current)
+    sessionPersistTimerRef.current = window.setTimeout(() => {
+      void window.api.session.updateDocument({
+        path: document.path!,
+        mode: editorMode,
+        cursorLine: cursorPosition.line,
+        cursorColumn: cursorPosition.column
+      })
+    }, 250)
+  }, [cursorPosition.column, cursorPosition.line, document.path, editorMode])
+
+  useEffect(() => {
+    if (!pendingAnchor) {
+      return
+    }
+
+    const timer = window.setTimeout(clearPendingAnchor, 500)
+
+    return () => window.clearTimeout(timer)
+  }, [clearPendingAnchor, pendingAnchor])
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(workspacePersistTimerRef.current)
+      window.clearTimeout(sessionPersistTimerRef.current)
+    }
+  }, [])
+
+  const openEditorView = (): void => {
+    setActiveView('editor')
+  }
+
+  const openSettingsView = (): void => {
+    setActiveView('settings')
+  }
+
+  return (
+    <div
+      className="app-shell"
+      data-color-mode={resolvedAppearanceMode}
+      data-appearance-mode={editorSettings.appearanceMode}
+      data-platform={platform}
+      data-sidebar-visible={editorSettings.showSidebar}
+      data-view={activeView}
+    >
+      <Sidebar
+        activeView={activeView}
+        visible={editorSettings.showSidebar}
+        workspaceRoot={workspaceRoot}
+        workspaceTree={workspaceTree}
+        recentFiles={recentFiles}
+        selectedPath={document.path}
+        expandedPaths={expandedWorkspacePaths}
+        onNew={() => {
+          openEditorView()
+          void createDocument()
+        }}
+        onClose={() => updateSettings({ showSidebar: false })}
+        onOpenEditor={openEditorView}
+        onOpenSettings={openSettingsView}
+        onOpenWorkspace={() => void openWorkspace()}
+        onOpenFile={(path) => {
+          openEditorView()
+          void openPath(path)
+        }}
+        onExpandedPathsChange={setExpandedWorkspacePaths}
+      />
+      <main className="main-panel">
+        {activeView === 'editor' ? (
+          <>
+            <TitleBar
+              title={document.title}
+              dirty={document.dirty}
+              mode={editorMode}
+              platform={platform}
+              showSidebar={editorSettings.showSidebar}
+              onModeChange={setEditorMode}
+              onToggleSidebar={() => updateSettings({ showSidebar: !editorSettings.showSidebar })}
+              onOpen={() => void openDocument()}
+              onSave={() => void saveDocument()}
+            />
+            <section className="editor-host">
+              <MarkdownEditor
+                mode={editorMode}
+                content={document.content}
+                settings={editorSettings}
+                currentPath={document.path}
+                workspaceRoot={workspaceRoot}
+                anchorTarget={pendingAnchor}
+                onChange={setContent}
+                onCursorChange={setCursorPosition}
+                onOpenDocumentLink={openPathFromLink}
+                onLinkError={(message) => Toast.error(message)}
+              />
+            </section>
+            <StatusBar
+              mode={editorMode}
+              wordCount={wordCount}
+              dirty={document.dirty}
+              cursorPosition={cursorPosition}
+              showLineNumbers={editorSettings.showLineNumbers}
+            />
+          </>
+        ) : (
+          <SettingsPage
+            settings={editorSettings}
+            onBack={openEditorView}
+            onChange={(nextSettings) => {
+              updateSettings(nextSettings)
+            }}
+            onReset={() => void resetSettings()}
+          />
+        )}
+      </main>
+    </div>
+  )
+}

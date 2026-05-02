@@ -1,0 +1,128 @@
+import { ipcChannels } from './channels'
+import { schemas } from './contracts'
+import { registerIpcHandler } from './router'
+import { BrowserWindow } from 'electron'
+import { AppService } from '../services/app-service'
+import { DocumentService } from '../services/document-service'
+import { DocumentSessionService } from '../services/document-session-service'
+import { PreferencesService } from '../services/preferences-service'
+import { RecentService } from '../services/recent-service'
+import { SettingsService } from '../services/settings-service'
+import { ShellService } from '../services/shell-service'
+import { WorkspaceService } from '../services/workspace-service'
+import { WorkspaceStateService } from '../services/workspace-state-service'
+
+export interface MainServices {
+  appService: AppService
+  documentService: DocumentService
+  settingsService: SettingsService
+  preferencesService: PreferencesService
+  recentService: RecentService
+  workspaceStateService: WorkspaceStateService
+  documentSessionService: DocumentSessionService
+  shellService: ShellService
+  workspaceService: WorkspaceService
+}
+
+export function registerIpc(services: MainServices): void {
+  registerIpcHandler(ipcChannels.app.getInfo, schemas.empty, () => services.appService.getInfo())
+
+  registerIpcHandler(ipcChannels.window.minimize, schemas.empty, (_input, event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize()
+  })
+  registerIpcHandler(ipcChannels.window.toggleMaximize, schemas.empty, (_input, event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (!window) {
+      return
+    }
+
+    if (window.isMaximized()) {
+      window.unmaximize()
+    } else {
+      window.maximize()
+    }
+  })
+  registerIpcHandler(ipcChannels.window.close, schemas.empty, (_input, event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close()
+  })
+
+  registerIpcHandler(ipcChannels.settings.get, schemas.empty, () => services.settingsService.get())
+  registerIpcHandler(ipcChannels.settings.update, schemas.settingsPatch, (input) =>
+    services.settingsService.update(input)
+  )
+
+  registerIpcHandler(ipcChannels.preferences.getEditor, schemas.empty, () =>
+    services.preferencesService.getEditorPreferences()
+  )
+  registerIpcHandler(
+    ipcChannels.preferences.updateEditor,
+    schemas.editorPreferencesPatch,
+    (input) => services.preferencesService.updateEditorPreferences(input)
+  )
+  registerIpcHandler(ipcChannels.preferences.resetEditor, schemas.empty, () =>
+    services.preferencesService.resetEditorPreferences()
+  )
+
+  registerIpcHandler(ipcChannels.recent.listFiles, schemas.empty, () =>
+    services.recentService.listFiles()
+  )
+  registerIpcHandler(ipcChannels.recent.listWorkspaces, schemas.empty, () =>
+    services.recentService.listWorkspaces()
+  )
+  registerIpcHandler(ipcChannels.recent.clear, schemas.empty, () => {
+    services.recentService.clear()
+  })
+
+  registerIpcHandler(ipcChannels.document.createUntitled, schemas.empty, () =>
+    services.documentService.createUntitled()
+  )
+  registerIpcHandler(ipcChannels.document.open, schemas.empty, () =>
+    services.documentService.open()
+  )
+  registerIpcHandler(ipcChannels.document.openPath, schemas.path, (path) =>
+    services.documentService.openPath(path)
+  )
+  registerIpcHandler(ipcChannels.document.resolveLink, schemas.resolveDocumentLink, (input) =>
+    services.documentService.resolveLink(input)
+  )
+  registerIpcHandler(ipcChannels.document.previewLink, schemas.resolveDocumentLink, (input) =>
+    services.documentService.previewLink(input)
+  )
+  registerIpcHandler(ipcChannels.document.save, schemas.saveDocument, (input) =>
+    services.documentService.save(input)
+  )
+  registerIpcHandler(ipcChannels.document.saveAs, schemas.saveDocumentAs, (input) =>
+    services.documentService.saveAs(input)
+  )
+
+  registerIpcHandler(ipcChannels.workspace.openFolder, schemas.empty, () =>
+    services.workspaceService.openFolder()
+  )
+  registerIpcHandler(ipcChannels.workspace.getTree, schemas.path, (path) =>
+    services.workspaceService.getTree(path)
+  )
+  registerIpcHandler(ipcChannels.workspace.getState, schemas.path, (path) =>
+    services.workspaceStateService.get(path)
+  )
+  registerIpcHandler(ipcChannels.workspace.updateState, schemas.workspaceState, (input) =>
+    services.workspaceStateService.update(input)
+  )
+
+  registerIpcHandler(ipcChannels.session.getDocument, schemas.path, (path) =>
+    services.documentSessionService.get(path)
+  )
+  registerIpcHandler(ipcChannels.session.getLastDocument, schemas.empty, () =>
+    services.documentSessionService.getLast()
+  )
+  registerIpcHandler(ipcChannels.session.updateDocument, schemas.documentSession, (input) =>
+    services.documentSessionService.update(input)
+  )
+
+  registerIpcHandler(ipcChannels.shell.openExternal, schemas.url, (url) =>
+    services.shellService.openExternal(url)
+  )
+  registerIpcHandler(ipcChannels.shell.showItemInFolder, schemas.path, (path) => {
+    services.shellService.showItemInFolder(path)
+  })
+}

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+out/
+release/
+*.tsbuildinfo
+
+# Logs and caches
+.eslintcache
+*.log
+*.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+.npmrc
+*.local
+
+# Editor and assistant local state
+.vscode/
+.idea/
+.claude/
+.codex/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Signing material
+*.p12
+*.pem
+*.cer
+*.mobileprovision

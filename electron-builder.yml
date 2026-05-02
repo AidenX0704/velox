@@ -1,0 +1,55 @@
+appId: app.velox.desktop
+productName: Velox
+copyright: Copyright © 2026 Velox
+directories:
+  buildResources: build
+files:
+  - out/**
+  - resources/**
+  - package.json
+asarUnpack:
+  - '**/*.node'
+  - resources/**
+win:
+  icon: build/icon.ico
+  executableName: Velox
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+mac:
+  icon: build/icon.icns
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSDocumentsFolderUsageDescription: Velox needs access to open and save Markdown documents.
+    NSDownloadsFolderUsageDescription: Velox needs access to export documents into Downloads.
+    NSDesktopFolderUsageDescription: Velox needs access to open and save documents on Desktop.
+    NSRemovableVolumesUsageDescription: Velox needs access to files on removable drives.
+  notarize: false
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+linux:
+  icon: build/icon.png
+  target:
+    - AppImage
+    - deb
+  maintainer: Velox
+  category: Utility
+appImage:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+deb:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+npmRebuild: true
+compression: maximum
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

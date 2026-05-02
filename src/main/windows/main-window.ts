@@ -1,0 +1,49 @@
+import { BrowserWindow } from 'electron'
+import { join } from 'node:path'
+import { environment } from '../bootstrap/environment'
+import { getMainWindowBounds, saveMainWindowState, shouldMaximizeMainWindow } from './window-state'
+import icon from '../../../resources/icon.png?asset'
+
+export function createMainWindow(): BrowserWindow {
+  const mainWindow = new BrowserWindow({
+    ...getMainWindowBounds(),
+    minWidth: 760,
+    minHeight: 520,
+    show: false,
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 16, y: 18 }
+        }
+      : { frame: false }),
+    autoHideMenuBar: true,
+    title: 'Velox',
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  })
+
+  mainWindow.on('ready-to-show', () => {
+    if (shouldMaximizeMainWindow()) {
+      mainWindow.maximize()
+    }
+
+    mainWindow.show()
+  })
+
+  mainWindow.on('close', () => {
+    saveMainWindowState(mainWindow)
+  })
+
+  if (environment.isDev && environment.rendererUrl) {
+    mainWindow.loadURL(environment.rendererUrl)
+  } else {
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  return mainWindow
+}
