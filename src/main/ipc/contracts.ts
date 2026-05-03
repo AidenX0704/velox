@@ -50,7 +50,8 @@ export const schemas = {
         .regex(/^#[0-9a-fA-F]{6}$/)
         .optional(),
       defaultMode: z.enum(['source', 'split', 'preview-edit']).optional(),
-      hasSeenWelcome: z.boolean().optional()
+      hasSeenWelcome: z.boolean().optional(),
+      shortcutOverrides: z.record(z.string(), z.string()).optional()
     })
     .strict(),
   workspaceState: z

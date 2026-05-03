@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import katex from 'katex'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -8,8 +8,10 @@ import {
   createParagraphNear,
   liftEmptyBlock,
   newlineInCode,
+  setBlockType,
   splitBlock,
-  toggleMark
+  toggleMark,
+  wrapIn
 } from 'prosemirror-commands'
 import { history, redo, undo } from 'prosemirror-history'
 import {
@@ -35,6 +37,7 @@ import { openEditorLink, scrollToEditorAnchor } from '../services/linkNavigation
 import type { EditorLinkNavigationOptions } from '../services/linkNavigation'
 import { getCodeBlockActionButton, handleCodeBlockAction } from '../rendering/blockActions'
 import { createCodeBlockNodeView } from './nodeViews/codeBlockNodeView'
+import { FormatToolbar } from './FormatToolbar'
 import type { CursorPosition, MarkdownEditorPreferences } from '../model/types'
 
 interface RichMarkdownEditorProps {
@@ -71,6 +74,8 @@ export function RichMarkdownEditor({
   const onChangeRef = useRef(onChange)
   const onCursorChangeRef = useRef(onCursorChange)
   const linkNavigationRef = useRef<EditorLinkNavigationOptions>({})
+  const [fontSize, setFontSize] = useState(settings.previewFontSize)
+  const [editorView, setEditorView] = useState<EditorView | null>(null)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -124,6 +129,7 @@ export function RichMarkdownEditor({
     })
 
     viewRef.current = view
+    setEditorView(view)
     contentRef.current = initialContentRef.current
     onCursorChangeRef.current(getCursorPosition(view.state.doc, view.state.selection.from))
 
@@ -142,6 +148,7 @@ export function RichMarkdownEditor({
       hostElement.removeEventListener('click', handleClick, true)
       view.destroy()
       viewRef.current = null
+      setEditorView(null)
     }
   }, [])
 
@@ -175,7 +182,7 @@ export function RichMarkdownEditor({
       style={
         {
           '--preview-max-width': `${settings.previewMaxWidth}px`,
-          '--preview-font-size': `${settings.previewFontSize}px`,
+          '--preview-font-size': `${fontSize}px`,
           '--preview-line-height': String(settings.previewLineHeight)
         } as React.CSSProperties
       }
@@ -183,6 +190,7 @@ export function RichMarkdownEditor({
       data-width-mode={settings.previewEditWidthMode}
     >
       {settings.customPreviewCss ? <style>{settings.customPreviewCss}</style> : null}
+      <FormatToolbar view={editorView} fontSize={fontSize} onFontSizeChange={setFontSize} />
       <div ref={hostRef} className="preview-edit-prosemirror" />
     </div>
   )
@@ -214,6 +222,15 @@ function createMarkdownSchema(): Schema {
         })
       ),
     marks: markdownSchema.spec.marks.append({
+      strikethrough: {
+        parseDOM: [
+          { tag: 's' },
+          { tag: 'del' },
+          { tag: 'strike' },
+          { style: 'text-decoration=line-through' }
+        ],
+        toDOM: () => ['del']
+      },
       math_inline: {
         inclusive: false,
         code: true,
@@ -240,6 +257,27 @@ function createMarkdownParser(): MarkdownParser {
       }
     })
 
+  tokenizer.inline.ruler.push('strikethrough', (state, silent) => {
+    if (state.src.charCodeAt(state.pos) !== 0x7e || state.src.charCodeAt(state.pos + 1) !== 0x7e) return false
+    const start = state.pos + 2
+    let end = start
+    while (end < state.posMax) {
+      if (state.src.charCodeAt(end) === 0x7e && state.src.charCodeAt(end + 1) === 0x7e) break
+      end++
+    }
+    if (end >= state.posMax) return false
+    if (!silent) {
+      const token = state.push('s_open', 's', 1)
+      token.markup = '~~'
+      const token2 = state.push('text', '', 0)
+      token2.content = state.src.slice(start, end)
+      const token3 = state.push('s_close', 's', -1)
+      token3.markup = '~~'
+    }
+    state.pos = end + 2
+    return true
+  })
+
   tokenizer.core.ruler.push('velox_normalize_math', (state) => {
     for (const token of state.tokens) {
       if (token.type === 'math_block') {
@@ -256,6 +294,7 @@ function createMarkdownParser(): MarkdownParser {
     td: { block: 'table_cell' },
     thead: { ignore: true },
     tbody: { ignore: true },
+    s: { mark: 'strikethrough' },
     math_block: { block: 'math_block', noCloseToken: true },
     math_inline: { mark: 'math_inline', noCloseToken: true }
   })
@@ -279,6 +318,11 @@ function createMarkdownSerializer(): MarkdownSerializer {
     },
     {
       ...defaultMarkdownSerializer.marks,
+      strikethrough: {
+        open: '~~',
+        close: '~~',
+        escape: false
+      },
       math_inline: {
         open: '$',
         close: '$',
@@ -286,6 +330,36 @@ function createMarkdownSerializer(): MarkdownSerializer {
       }
     }
   )
+}
+
+const insertLinkCommand = (state: EditorState, dispatch?: (tr: import('prosemirror-state').Transaction) => void): boolean => {
+  const { selection } = state
+  const mark = state.schema.marks.link
+  const existingLink = state.doc.rangeHasMark(selection.from, selection.to, mark)
+
+  if (existingLink) {
+    if (dispatch) {
+      dispatch(state.tr.removeMark(selection.from, selection.to, mark))
+    }
+    return true
+  }
+
+  const url = window.prompt('请输入链接地址:', 'https://')
+  if (!url) return false
+
+  if (dispatch) {
+    if (selection.empty) {
+      const text = window.prompt('请输入链接文本:', '')
+      if (!text) return false
+      const linkMark = mark.create({ href: url })
+      const tr = state.tr.insertText(text, selection.from, selection.to)
+      tr.addMark(selection.from, selection.from + text.length, linkMark)
+      dispatch(tr)
+    } else {
+      dispatch(state.tr.addMark(selection.from, selection.to, mark.create({ href: url })))
+    }
+  }
+  return true
 }
 
 function createEditorState(markdown: string): EditorState {
@@ -302,10 +376,19 @@ function createEditorState(markdown: string): EditorState {
         'Mod-y': redo,
         'Mod-b': toggleMark(schema.marks.strong),
         'Mod-i': toggleMark(schema.marks.em),
+        'Mod-`': toggleMark(schema.marks.code),
+        'Mod-d': toggleMark(schema.marks.strikethrough),
+        'Mod-k': insertLinkCommand,
         'Shift-Mod-7': wrapInList(schema.nodes.ordered_list),
         'Shift-Mod-8': wrapInList(schema.nodes.bullet_list),
         'Mod-[': liftListItem(schema.nodes.list_item),
         'Mod-]': sinkListItem(schema.nodes.list_item),
+        'Mod-Shift-1': setBlockType(schema.nodes.heading, { level: 1 }),
+        'Mod-Shift-2': setBlockType(schema.nodes.heading, { level: 2 }),
+        'Mod-Shift-3': setBlockType(schema.nodes.heading, { level: 3 }),
+        'Mod-Shift-4': setBlockType(schema.nodes.heading, { level: 4 }),
+        'Mod-Shift-5': setBlockType(schema.nodes.heading, { level: 5 }),
+        'Mod-Shift-9': wrapIn(schema.nodes.blockquote),
         Enter: chainCommands(
           splitListItem(schema.nodes.list_item),
           newlineInCode,

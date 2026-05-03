@@ -31,6 +31,10 @@ export const themeColorPresets: ThemeColorPreset[] = [
   { id: 'slate', label: '石墨', color: '#475569' }
 ]
 
+export interface ShortcutOverride {
+  [actionId: string]: string
+}
+
 export interface EditorPreferences {
   showSidebar: boolean
   showLineNumbers: boolean
@@ -49,6 +53,7 @@ export interface EditorPreferences {
   customThemeColor: string
   defaultMode: EditorMode
   hasSeenWelcome: boolean
+  shortcutOverrides: ShortcutOverride
 }
 
 export const defaultEditorPreferences: EditorPreferences = {
@@ -68,5 +73,6 @@ export const defaultEditorPreferences: EditorPreferences = {
   themeColorPreset: 'indigo',
   customThemeColor: '#4f46e5',
   defaultMode: 'split',
-  hasSeenWelcome: false
+  hasSeenWelcome: false,
+  shortcutOverrides: {}
 }

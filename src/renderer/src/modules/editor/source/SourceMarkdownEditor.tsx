@@ -14,6 +14,63 @@ import {
 } from '@codemirror/view'
 import type { CursorPosition } from '../model/types'
 
+function wrapSelection(view: EditorView, before: string, after: string): boolean {
+  const { from, to } = view.state.selection.main
+  const selected = view.state.sliceDoc(from, to)
+  const replacement = `${before}${selected || '文本'}${after}`
+  view.dispatch({
+    changes: { from, to, insert: replacement },
+    selection: { anchor: from + before.length, head: from + before.length + (selected.length || 2) }
+  })
+  return true
+}
+
+function insertAtLineStart(view: EditorView, prefix: string): boolean {
+  const { from } = view.state.selection.main
+  const line = view.state.doc.lineAt(from)
+  const currentText = view.state.sliceDoc(line.from, line.to)
+
+  if (currentText.startsWith(prefix)) {
+    view.dispatch({
+      changes: { from: line.from, to: line.from + prefix.length, insert: '' }
+    })
+  } else {
+    view.dispatch({
+      changes: { from: line.from, insert: prefix }
+    })
+  }
+  return true
+}
+
+const markdownKeymap = keymap.of([
+  { key: 'Mod-b', run: (v) => wrapSelection(v, '**', '**') },
+  { key: 'Mod-i', run: (v) => wrapSelection(v, '*', '*') },
+  { key: 'Mod-d', run: (v) => wrapSelection(v, '~~', '~~') },
+  { key: 'Mod-`', run: (v) => wrapSelection(v, '`', '`') },
+  { key: 'Mod-k', run: (v) => {
+    const { from, to } = v.state.selection.main
+    const selected = v.state.sliceDoc(from, to)
+    const url = window.prompt('请输入链接地址:', 'https://')
+    if (!url) return false
+    const text = selected || window.prompt('请输入链接文本:', '') || ''
+    if (!text) return false
+    const replacement = `[${text}](${url})`
+    v.dispatch({
+      changes: { from, to, insert: replacement },
+      selection: { anchor: from + 1, head: from + 1 + text.length }
+    })
+    return true
+  }},
+  { key: 'Mod-Shift-1', run: (v) => insertAtLineStart(v, '# ') },
+  { key: 'Mod-Shift-2', run: (v) => insertAtLineStart(v, '## ') },
+  { key: 'Mod-Shift-3', run: (v) => insertAtLineStart(v, '### ') },
+  { key: 'Mod-Shift-4', run: (v) => insertAtLineStart(v, '#### ') },
+  { key: 'Mod-Shift-5', run: (v) => insertAtLineStart(v, '##### ') },
+  { key: 'Mod-Shift-9', run: (v) => insertAtLineStart(v, '> ') },
+  { key: 'Mod-Shift-8', run: (v) => insertAtLineStart(v, '- ') },
+  { key: 'Mod-Shift-7', run: (v) => insertAtLineStart(v, '1. ') },
+])
+
 interface SourceMarkdownEditorProps {
   value: string
   wordWrap: boolean
@@ -135,6 +192,7 @@ export const SourceMarkdownEditor = forwardRef<
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         highlightActiveLine(),
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+        markdownKeymap,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const nextValue = update.state.doc.toString()

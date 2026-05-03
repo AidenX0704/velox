@@ -189,6 +189,53 @@ export function MainLayout(): React.JSX.Element {
     setActiveView('settings')
   }
 
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent): void => {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return
+
+      if (e.key === 's') {
+        e.preventDefault()
+        void saveDocument()
+        return
+      }
+      if (e.key === 'o') {
+        e.preventDefault()
+        void openDocument()
+        return
+      }
+      if (e.key === 'n') {
+        e.preventDefault()
+        openEditorView()
+        void createDocument()
+        return
+      }
+      if (e.key === '1' && e.shiftKey) {
+        e.preventDefault()
+        setEditorMode('source')
+        return
+      }
+      if (e.key === '2' && e.shiftKey) {
+        e.preventDefault()
+        setEditorMode('split')
+        return
+      }
+      if (e.key === '3' && e.shiftKey) {
+        e.preventDefault()
+        setEditorMode('preview-edit')
+        return
+      }
+      if (e.key === '\\') {
+        e.preventDefault()
+        updateSettings({ showSidebar: !editorSettings.showSidebar })
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [saveDocument, openDocument, createDocument, setEditorMode, editorSettings.showSidebar, updateSettings])
+
   return (
     <div
       className="app-shell"

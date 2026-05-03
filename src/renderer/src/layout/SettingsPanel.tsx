@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, InputNumber, Select, Switch, TextArea, Typography } from '@douyinfe/semi-ui'
 import {
   IconArrowLeft,
@@ -21,6 +21,13 @@ import {
 import { BrandLogo } from '../components/BrandLogo'
 import type { EditorMode, MarkdownEditorPreferences } from '../modules/editor/model/types'
 import { editorModeLabels } from '../modules/editor/model/types'
+import {
+  shortcutDefinitions,
+  shortcutCategories,
+  getShortcutKey,
+  formatKeyForDisplaySpans,
+  detectKeyFromEvent
+} from '../features/shortcuts/shortcutDefinitions'
 
 interface SettingsPageProps {
   settings: MarkdownEditorPreferences
@@ -30,7 +37,7 @@ interface SettingsPageProps {
 }
 
 type SettingsPatch = Partial<MarkdownEditorPreferences>
-type PreferenceSection = 'interface' | 'source' | 'preview' | 'export'
+type PreferenceSection = 'interface' | 'source' | 'preview' | 'shortcuts' | 'export'
 
 const appearanceModeOptions: Array<{
   value: AppearanceMode
@@ -50,6 +57,7 @@ const preferenceSections: Array<{
   { id: 'interface', label: '界面偏好', icon: <IconDesktop /> },
   { id: 'source', label: '源码编辑', icon: <IconCode /> },
   { id: 'preview', label: '预览渲染', icon: <IconArticle /> },
+  { id: 'shortcuts', label: '快捷键', icon: <IconSettingStroked /> },
   { id: 'export', label: '导出默认项', icon: <IconExport /> }
 ]
 
@@ -358,6 +366,18 @@ export function SettingsPage({
           </SettingsCard>
 
           <SettingsCard
+            id="settings-shortcuts"
+            icon={<IconSettingStroked />}
+            title="快捷键"
+            description="查看和自定义编辑器快捷键，点击快捷键可重新绑定。"
+          >
+            <ShortcutSettings
+              overrides={settings.shortcutOverrides}
+              onChange={(overrides) => updateSettings({ shortcutOverrides: overrides })}
+            />
+          </SettingsCard>
+
+          <SettingsCard
             id="settings-export"
             icon={<IconExport />}
             title="导出默认项"
@@ -443,4 +463,139 @@ function SettingRow({
 
 function SettingSeparator(): React.JSX.Element {
   return <div className="setting-separator" />
+}
+
+function ShortcutSettings({
+  overrides,
+  onChange
+}: {
+  overrides: Record<string, string>
+  onChange: (overrides: Record<string, string>) => void
+}): React.JSX.Element {
+  const [recordingId, setRecordingId] = useState<string | null>(null)
+  const recordingRef = useRef<string | null>(null)
+
+  const handleStartRecord = useCallback((id: string) => {
+    recordingRef.current = id
+    setRecordingId(id)
+  }, [])
+
+  const handleStopRecord = useCallback(() => {
+    recordingRef.current = null
+    setRecordingId(null)
+  }, [])
+
+  const handleReset = useCallback(
+    (id: string) => {
+      const next = { ...overrides }
+      delete next[id]
+      onChange(next)
+    },
+    [overrides, onChange]
+  )
+
+  const handleResetAll = useCallback(() => {
+    onChange({})
+  }, [onChange])
+
+  useEffect(() => {
+    if (!recordingId) return
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (e.key === 'Escape') {
+        handleStopRecord()
+        return
+      }
+
+      const detected = detectKeyFromEvent(e)
+      if (!detected) return
+
+      const next = { ...overrides, [recordingId]: detected }
+      onChange(next)
+      handleStopRecord()
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [recordingId, overrides, onChange, handleStopRecord])
+
+  const hasOverrides = Object.keys(overrides).length > 0
+
+  return (
+    <div className="shortcut-settings">
+      {hasOverrides ? (
+        <div className="shortcut-reset-bar">
+          <Typography.Text type="tertiary">已自定义 {Object.keys(overrides).length} 个快捷键</Typography.Text>
+          <Button size="small" theme="borderless" type="tertiary" onClick={handleResetAll}>
+            全部恢复默认
+          </Button>
+        </div>
+      ) : null}
+
+      {shortcutCategories.map((cat) => {
+        const defs = shortcutDefinitions.filter((d) => d.category === cat.id)
+        if (defs.length === 0) return null
+
+        return (
+          <div key={cat.id} className="shortcut-category">
+            <div className="shortcut-category-header">
+              <Typography.Text strong>{cat.label}</Typography.Text>
+            </div>
+            {defs.map((def) => {
+              const currentKey = getShortcutKey(def, overrides)
+              const isCustom = overrides[def.id] !== undefined
+              const isRecording = recordingId === def.id
+
+              return (
+                <div key={def.id} className="shortcut-row">
+                  <div className="shortcut-row-info">
+                    <Typography.Text>{def.label}</Typography.Text>
+                    <Typography.Text type="tertiary" size="small">
+                      {def.description}
+                    </Typography.Text>
+                  </div>
+                  <div className="shortcut-row-key">
+                    {isRecording ? (
+                      <button
+                        className="shortcut-key-btn shortcut-key-recording"
+                        type="button"
+                        onClick={handleStopRecord}
+                      >
+                        <span className="shortcut-recording-dot" />
+                        请按下快捷键…
+                      </button>
+                    ) : (
+                      <button
+                        className={`shortcut-key-btn ${isCustom ? 'shortcut-key-custom' : ''}`}
+                        type="button"
+                        onClick={() => handleStartRecord(def.id)}
+                        title="点击修改快捷键"
+                      >
+                        {formatKeyForDisplaySpans(currentKey).map((part, i) => (
+                          <kbd key={i}>{part}</kbd>
+                        ))}
+                      </button>
+                    )}
+                    {isCustom && !isRecording ? (
+                      <button
+                        className="shortcut-reset-btn"
+                        type="button"
+                        title="恢复默认"
+                        onClick={() => handleReset(def.id)}
+                      >
+                        ↺
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
