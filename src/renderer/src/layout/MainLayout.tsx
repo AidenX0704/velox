@@ -234,7 +234,14 @@ export function MainLayout(): React.JSX.Element {
 
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [saveDocument, openDocument, createDocument, setEditorMode, editorSettings.showSidebar, updateSettings])
+  }, [
+    saveDocument,
+    openDocument,
+    createDocument,
+    setEditorMode,
+    editorSettings.showSidebar,
+    updateSettings
+  ])
 
   return (
     <div
@@ -281,9 +288,11 @@ export function MainLayout(): React.JSX.Element {
               onOpen={() => void openDocument()}
               onSave={() => void saveDocument()}
             />
-            <section className="editor-host">
+            <section className="editor-host" data-editor-mode={editorMode}>
               <MarkdownEditor
                 mode={editorMode}
+                documentTitle={document.title}
+                dirty={document.dirty}
                 content={document.content}
                 settings={editorSettings}
                 currentPath={document.path}

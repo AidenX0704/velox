@@ -566,6 +566,32 @@ textarea,
   background: var(--surface-base);
 }
 
+.editor-host[data-editor-mode='preview-edit'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.editor-host[data-editor-mode='preview-edit']::-webkit-scrollbar {
+  width: 12px;
+}
+
+.editor-host[data-editor-mode='preview-edit']::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-host[data-editor-mode='preview-edit']::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.34);
+  background-clip: padding-box;
+}
+
+.editor-host[data-editor-mode='preview-edit']::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.52);
+  background-clip: padding-box;
+}
+
 .empty-editor {
   display: grid;
   height: 100%;
@@ -1021,7 +1047,9 @@ textarea,
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   min-width: 80px;
   justify-content: center;
 }
@@ -1069,13 +1097,23 @@ textarea,
 }
 
 @keyframes shortcut-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--brand-soft); }
-  50% { box-shadow: 0 0 0 4px var(--brand-soft); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px var(--brand-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--brand-soft);
+  }
 }
 
 @keyframes shortcut-dot-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .shortcut-reset-btn {
@@ -1090,7 +1128,9 @@ textarea,
   color: var(--text-tertiary);
   font-size: 16px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .shortcut-reset-btn:hover {

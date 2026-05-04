@@ -38,7 +38,7 @@ export const schemas = {
       editorLineHeight: z.number().min(1.3).max(2.2).optional(),
       previewFontSize: z.number().int().min(13).max(24).optional(),
       previewLineHeight: z.number().min(1.4).max(2.4).optional(),
-      previewMaxWidth: z.number().int().min(680).max(1280).optional(),
+      previewMaxWidth: z.number().int().min(680).max(1800).optional(),
       previewCentered: z.boolean().optional(),
       previewEditWidthMode: z.enum(['wide', 'standard', 'narrow']).optional(),
       splitScrollSync: z.boolean().optional(),

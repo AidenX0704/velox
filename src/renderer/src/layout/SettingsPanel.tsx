@@ -302,14 +302,13 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览最大宽度" description="预览居中时生效的内容宽度">
+            <SettingRow title="预览最大宽度" description="控制分栏居中预览与预览编辑模式的内容宽度">
               <InputNumber
                 min={680}
-                max={1280}
+                max={1800}
                 step={20}
                 value={settings.previewMaxWidth}
                 suffix="px"
-                disabled={!settings.previewCentered}
                 onChange={(value) => updateSettings({ previewMaxWidth: Number(value) })}
               />
             </SettingRow>
@@ -528,7 +527,9 @@ function ShortcutSettings({
     <div className="shortcut-settings">
       {hasOverrides ? (
         <div className="shortcut-reset-bar">
-          <Typography.Text type="tertiary">已自定义 {Object.keys(overrides).length} 个快捷键</Typography.Text>
+          <Typography.Text type="tertiary">
+            已自定义 {Object.keys(overrides).length} 个快捷键
+          </Typography.Text>
           <Button size="small" theme="borderless" type="tertiary" onClick={handleResetAll}>
             全部恢复默认
           </Button>

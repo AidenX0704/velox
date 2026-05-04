@@ -12,6 +12,8 @@ import {
 
 interface MarkdownEditorProps {
   mode: EditorMode
+  documentTitle: string
+  dirty: boolean
   content: string
   settings: MarkdownEditorPreferences
   currentPath?: string
@@ -31,6 +33,8 @@ const scrollSyncReleaseDelay = 80
 
 export function MarkdownEditor({
   mode,
+  documentTitle,
+  dirty,
   content,
   settings,
   currentPath,
@@ -111,6 +115,8 @@ export function MarkdownEditor({
   if (mode === 'preview-edit') {
     return (
       <RichMarkdownEditor
+        documentTitle={documentTitle}
+        dirty={dirty}
         content={content}
         settings={settings}
         currentPath={currentPath}

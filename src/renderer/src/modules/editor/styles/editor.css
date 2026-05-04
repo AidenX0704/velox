@@ -168,48 +168,57 @@
 }
 
 .preview-edit-shell {
-  --preview-edit-content-width: 860px;
+  --preview-edit-content-width: var(--preview-max-width, 920px);
   --preview-edit-page-padding-x: clamp(32px, 6vw, 96px);
 
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+  position: relative;
+  display: block;
+  min-height: 100%;
+  overflow: visible;
   background: var(--surface-base);
   font-size: var(--preview-font-size, 16px);
   line-height: var(--preview-line-height, 1.82);
 }
 
 .preview-edit-prosemirror {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  width: min(
-    var(--preview-edit-content-width),
-    calc(100% - var(--preview-edit-page-padding-x) * 2)
-  );
-  margin: 0 auto;
+  width: 100%;
+  min-height: calc(100% - 40px);
+  overflow: visible;
 }
 
 .preview-edit-shell[data-width-mode='wide'] {
-  --preview-edit-content-width: 1080px;
-  --preview-edit-page-padding-x: clamp(24px, 4vw, 72px);
+  --preview-edit-content-width: calc(var(--preview-max-width, 920px) + 420px);
+  --preview-edit-page-padding-x: clamp(20px, 3vw, 56px);
 }
 
 .preview-edit-shell[data-width-mode='standard'] {
-  --preview-edit-content-width: 860px;
+  --preview-edit-content-width: var(--preview-max-width, 920px);
   --preview-edit-page-padding-x: clamp(32px, 6vw, 96px);
 }
 
 .preview-edit-shell[data-width-mode='narrow'] {
-  --preview-edit-content-width: 720px;
+  --preview-edit-content-width: max(680px, calc(var(--preview-max-width, 920px) - 220px));
   --preview-edit-page-padding-x: clamp(40px, 8vw, 128px);
 }
 
 .preview-edit-prosemirror .ProseMirror {
+  width: min(
+    var(--preview-edit-content-width),
+    calc(100% - var(--preview-edit-page-padding-x) * 2)
+  );
   min-height: 100%;
+  margin: 0 auto;
   padding: 24px 32px 96px;
   color: var(--text-primary);
+  font-family:
+    JetBrains Mono,
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    Liberation Mono,
+    monospace;
   outline: none;
   -webkit-text-decoration-skip: none;
   white-space: pre-wrap;
@@ -218,6 +227,149 @@
 
 .preview-edit-prosemirror .ProseMirror > :first-child {
   margin-top: 0;
+}
+
+.preview-edit-nav-card {
+  position: fixed;
+  z-index: 18;
+  top: calc(var(--titlebar-height) + 52px);
+  right: 18px;
+  display: flex;
+  width: min(340px, calc(100vw - 48px));
+  max-height: min(68vh, calc(100vh - var(--titlebar-height) - 136px));
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.preview-edit-nav-card[data-collapsed='true'] {
+  width: min(260px, calc(100vw - 48px));
+  max-height: none;
+  gap: 0;
+}
+
+.preview-edit-nav-header {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.preview-edit-nav-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-edit-nav-dirty {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand-active);
+}
+
+.preview-edit-nav-toggle {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.preview-edit-nav-toggle:hover {
+  background: var(--surface-hover);
+}
+
+.preview-edit-heading-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.preview-edit-heading-nav-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.preview-edit-heading-nav-item:hover {
+  background: var(--surface-hover);
+}
+
+.preview-edit-heading-nav-item[data-level='1'] {
+  padding-left: 8px;
+}
+
+.preview-edit-heading-nav-item[data-level='2'] {
+  padding-left: 18px;
+}
+
+.preview-edit-heading-nav-item[data-level='3'] {
+  padding-left: 28px;
+}
+
+.preview-edit-heading-nav-item[data-level='4'] {
+  padding-left: 38px;
+}
+
+.preview-edit-heading-nav-item[data-level='5'] {
+  padding-left: 48px;
+}
+
+.preview-edit-heading-nav-item[data-level='6'] {
+  padding-left: 58px;
+}
+
+.preview-edit-heading-nav-marker {
+  flex: 0 0 auto;
+  min-width: 24px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-edit-heading-nav-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-edit-heading-nav-empty {
+  padding: 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
 }
 
 .preview-edit-prosemirror .ProseMirror strong {
@@ -1060,12 +1212,18 @@ mjx-container {
   caret-color: var(--text-primary);
 }
 
-.preview-edit-prosemirror .ProseMirror .preview-edit-code-block:focus-within .markdown-code-editor-layer {
+.preview-edit-prosemirror
+  .ProseMirror
+  .preview-edit-code-block:focus-within
+  .markdown-code-editor-layer {
   opacity: 1;
   color: var(--text-primary);
 }
 
-.preview-edit-prosemirror .ProseMirror .preview-edit-code-block:focus-within .markdown-code-highlight-layer {
+.preview-edit-prosemirror
+  .ProseMirror
+  .preview-edit-code-block:focus-within
+  .markdown-code-highlight-layer {
   opacity: 0;
 }
 
@@ -1301,24 +1459,6 @@ mjx-container {
 .markdown-preview-edit,
 .preview-edit-shell {
   background: var(--surface-base);
-}
-
-.preview-edit-prosemirror {
-  --preview-edit-content-width: 720px;
-}
-
-.preview-edit-prosemirror .ProseMirror {
-  padding: 32px 12px 120px;
-  color: var(--text-primary);
-  font-family:
-    JetBrains Mono,
-    ui-monospace,
-    SFMono-Regular,
-    SF Mono,
-    Menlo,
-    Consolas,
-    Liberation Mono,
-    monospace;
 }
 
 /* ==================== Format Toolbar ==================== */
