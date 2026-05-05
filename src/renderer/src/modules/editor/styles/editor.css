@@ -1208,23 +1208,10 @@ mjx-container {
 }
 
 .preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-editor-layer {
-  opacity: 0.01;
+  color: transparent !important;
   caret-color: var(--text-primary);
-}
-
-.preview-edit-prosemirror
-  .ProseMirror
-  .preview-edit-code-block:focus-within
-  .markdown-code-editor-layer {
-  opacity: 1;
-  color: var(--text-primary);
-}
-
-.preview-edit-prosemirror
-  .ProseMirror
-  .preview-edit-code-block:focus-within
-  .markdown-code-highlight-layer {
-  opacity: 0;
+  outline: none;
+  text-shadow: none;
 }
 
 .preview-edit-prosemirror .ProseMirror .preview-edit-code-block:focus-within {
@@ -1237,7 +1224,7 @@ mjx-container {
   .ProseMirror
   .preview-edit-code-block
   .markdown-code-editor-layer::selection {
-  color: var(--text-primary);
+  color: transparent;
   background: rgba(var(--theme-accent-rgb, 79, 70, 229), 0.28);
 }
 
@@ -1257,6 +1244,7 @@ mjx-container {
 .preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-editor-layer {
   position: relative;
   z-index: 1;
+  -webkit-text-fill-color: transparent;
 }
 
 .preview-edit-prosemirror
@@ -1269,6 +1257,39 @@ mjx-container {
 .markdown-preview ul,
 .preview-edit-prosemirror .ProseMirror ul {
   list-style-type: disc;
+}
+
+.preview-edit-prosemirror .ProseMirror li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+  list-style: none;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-checkbox {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 0.35em 0 0;
+  accent-color: var(--brand-active);
+  cursor: pointer;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-edit-prosemirror .ProseMirror li:not(.task-list-item) > .task-list-item-content {
+  display: contents;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-content > :first-child {
+  margin-top: 0;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-content > :last-child {
+  margin-bottom: 0;
 }
 
 .markdown-preview ul ul,

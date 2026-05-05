@@ -27,6 +27,9 @@ export interface MainServices {
 export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.app.getInfo, schemas.empty, () => services.appService.getInfo())
 
+  registerIpcHandler(ipcChannels.window.getIsMaximized, schemas.empty, (_input, event) => {
+    return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized())
+  })
   registerIpcHandler(ipcChannels.window.minimize, schemas.empty, (_input, event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
   })

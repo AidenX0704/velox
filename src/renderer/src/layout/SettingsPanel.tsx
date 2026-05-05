@@ -286,7 +286,7 @@ export function SettingsPage({
             id="settings-preview"
             icon={<IconArticle />}
             title="预览渲染"
-            description="控制分栏预览和预览编辑模式的版心、字号与同步策略。"
+            description="控制分栏预览和预览模式的版心、字号与同步策略。"
           >
             <SettingRow title="滚动同步" description="分栏模式下同步源码与预览滚动位置">
               <Switch
@@ -302,7 +302,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览最大宽度" description="控制分栏居中预览与预览编辑模式的内容宽度">
+            <SettingRow title="预览最大宽度" description="控制分栏居中预览与预览模式的内容宽度">
               <InputNumber
                 min={680}
                 max={1800}
@@ -313,7 +313,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览字号" description="分栏预览与预览编辑共用字号">
+            <SettingRow title="预览字号" description="分栏预览与预览共用字号">
               <InputNumber
                 min={13}
                 max={24}
@@ -323,7 +323,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览行高" description="分栏预览与预览编辑共用行高">
+            <SettingRow title="预览行高" description="分栏预览与预览共用行高">
               <InputNumber
                 min={1.4}
                 max={2.4}
@@ -333,7 +333,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览编辑页宽" description="仅影响类 Typora 的预览编辑模式">
+            <SettingRow title="预览页宽" description="仅影响类 Typora 的预览模式">
               <Select
                 style={{ width: 165 }}
                 value={settings.previewEditWidthMode}
@@ -398,7 +398,7 @@ export function SettingsPage({
             <div className="settings-about-content">
               <Typography.Title heading={6}>Velox Markdown Editor</Typography.Title>
               <Typography.Paragraph type="tertiary" spacing="extended">
-                面向桌面写作场景的 Markdown 编辑器，提供源码、分栏预览和预览编辑体验。
+                面向桌面写作场景的 Markdown 编辑器，提供源码、分栏预览和预览体验。
               </Typography.Paragraph>
               <div className="settings-about-meta">
                 <span>版本 {appInfo?.version ?? '-'}</span>

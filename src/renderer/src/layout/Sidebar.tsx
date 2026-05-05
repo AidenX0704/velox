@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Divider, Typography } from '@douyinfe/semi-ui'
+import { Typography } from '@douyinfe/semi-ui'
 import {
   IconFile,
   IconFolder,
@@ -24,27 +24,12 @@ interface SidebarProps {
   selectedPath?: string
   expandedPaths?: string[]
   onNew: () => void
-  onClose: () => void
   onOpenEditor: () => void
   onOpenSettings: () => void
   onOpenWorkspace: () => void
   onOpenFile: (path: string) => void
   onExpandedPathsChange?: (paths: string[]) => void
 }
-
-const navigationItems = [
-  { label: '编辑器', icon: <IconFile />, action: 'editor' },
-  { label: '设置', icon: <IconSetting />, action: 'settings' }
-]
-
-const sidebarPanelTabs: Array<{
-  key: SidebarPanelTab
-  label: string
-  icon: React.ReactNode
-}> = [
-  { key: 'workspace', label: '工作区', icon: <IconFolder /> },
-  { key: 'recent', label: '最近文件', icon: <IconHistory /> }
-]
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
@@ -69,104 +54,148 @@ export function Sidebar({
 
   return (
     <aside className="sidebar" data-visible={visible}>
-      <div className="sidebar-brand">
-        <BrandLogo className="sidebar-brand-logo" size={40} />
-        <div className="sidebar-brand-text">
-          <Typography.Text strong>Velox</Typography.Text>
-          <Typography.Text type="tertiary">Markdown Editor</Typography.Text>
-        </div>
-      </div>
-      <div className="sidebar-cta">
-        <Button block className="sidebar-new-button" icon={<IconPlus />} onClick={onNew}>
-          新建文档
-        </Button>
-      </div>
-      <nav className="sidebar-navigation" aria-label="主导航">
-        {navigationItems.map((item) => (
+      <nav className="activity-bar" aria-label="功能导航">
+        <div className="activity-bar-top">
           <button
-            key={item.label}
-            className="sidebar-nav-item"
-            data-active={item.action === activeView}
+            className="activity-brand"
             type="button"
-            onClick={item.action === 'settings' ? onOpenSettings : onOpenEditor}
+            title="返回编辑器"
+            aria-label="返回编辑器"
+            onClick={onOpenEditor}
           >
-            {item.icon}
-            <span>{item.label}</span>
+            <BrandLogo className="activity-brand-logo" size={28} />
           </button>
-        ))}
+          <button
+            className="activity-item"
+            data-active={activeView === 'editor' && panelTab === 'workspace'}
+            type="button"
+            title="资源管理器"
+            aria-label="资源管理器"
+            onClick={() => {
+              setPanelTab('workspace')
+              onOpenEditor()
+            }}
+          >
+            <IconFolder />
+          </button>
+          <button
+            className="activity-item"
+            data-active={activeView === 'editor' && panelTab === 'recent'}
+            type="button"
+            title="最近文件"
+            aria-label="最近文件"
+            onClick={() => {
+              setPanelTab('recent')
+              onOpenEditor()
+            }}
+          >
+            <IconHistory />
+          </button>
+          <button
+            className="activity-item"
+            type="button"
+            title="新建文档"
+            aria-label="新建文档"
+            onClick={onNew}
+          >
+            <IconPlus />
+          </button>
+        </div>
+        <div className="activity-bar-bottom">
+          <button
+            className="activity-item"
+            data-active={activeView === 'settings'}
+            type="button"
+            title="设置"
+            aria-label="设置"
+            onClick={onOpenSettings}
+          >
+            <IconSetting />
+          </button>
+        </div>
       </nav>
 
-      <Divider margin="12px" />
-
-      <div className="sidebar-panel-tabs" role="tablist" aria-label="左侧面板内容">
-        {sidebarPanelTabs.map((tab) => (
-          <button
-            key={tab.key}
-            className="sidebar-panel-tab"
-            data-active={panelTab === tab.key}
-            type="button"
-            role="tab"
-            aria-selected={panelTab === tab.key}
-            onClick={() => setPanelTab(tab.key)}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {panelTab === 'workspace' ? (
-        <section className="sidebar-panel" role="tabpanel">
-          <div className="sidebar-workspace-actions">
-            <Button block icon={<IconFolderOpen />} theme="borderless" onClick={onOpenWorkspace}>
-              打开文件夹
-            </Button>
-          </div>
-          <div className="sidebar-section">
-            <Typography.Text strong>当前工作区</Typography.Text>
-            <Typography.Text
-              className="workspace-root"
-              type="tertiary"
-              ellipsis={{ showTooltip: true }}
+      <div className="sidebar-pane">
+        <header className="sidebar-pane-header">
+          <Typography.Text className="sidebar-pane-title" strong>
+            {panelTab === 'workspace' ? '资源管理器' : '最近文件'}
+          </Typography.Text>
+          {panelTab === 'workspace' ? (
+            <button
+              className="sidebar-pane-action"
+              type="button"
+              title="打开文件夹"
+              aria-label="打开文件夹"
+              onClick={onOpenWorkspace}
             >
-              {workspaceRoot ? basename(workspaceRoot) : '未打开文件夹'}
-            </Typography.Text>
-          </div>
-          <WorkspaceTree
-            entries={workspaceTree}
-            selectedPath={selectedPath}
-            expandedPaths={expandedPaths}
-            onOpenFile={onOpenFile}
-            onExpandedPathsChange={onExpandedPathsChange}
-          />
-        </section>
-      ) : (
-        <section className="sidebar-panel" role="tabpanel">
-          <div className="sidebar-section">
-            <Typography.Text strong>最近文件</Typography.Text>
-            <Typography.Text type="tertiary">快速回到最近打开的文档</Typography.Text>
-          </div>
-          <div className="recent-file-list">
-            {recentFiles.map((file) => (
-              <button
-                key={file.path}
-                className="recent-file-item"
-                type="button"
-                title={file.path}
-                onClick={() => onOpenFile(file.path)}
-              >
-                <span className="recent-file-title">{file.title}</span>
-                <span className="recent-file-path">{file.path}</span>
-              </button>
-            ))}
-            {recentFiles.length === 0 ? (
-              <Typography.Text className="recent-file-empty" type="tertiary">
-                暂无最近文件
-              </Typography.Text>
-            ) : null}
-          </div>
-        </section>
-      )}
+              <IconFolderOpen />
+            </button>
+          ) : null}
+        </header>
+
+        {panelTab === 'workspace' ? (
+          <section className="sidebar-panel" role="tabpanel" aria-label="资源管理器">
+            <div className="explorer-root-header">
+              <IconFolderOpen />
+              <div className="explorer-root-copy">
+                <Typography.Text
+                  className="explorer-root-name"
+                  ellipsis={{ showTooltip: true }}
+                >
+                  {workspaceRoot ? basename(workspaceRoot) : '未打开工作区'}
+                </Typography.Text>
+                <Typography.Text className="explorer-root-path" type="tertiary">
+                  {workspaceRoot ? '工作区目录' : '打开文件夹后显示目录树'}
+                </Typography.Text>
+              </div>
+            </div>
+            {workspaceRoot ? (
+              <WorkspaceTree
+                entries={workspaceTree}
+                selectedPath={selectedPath}
+                expandedPaths={expandedPaths}
+                onOpenFile={onOpenFile}
+                onExpandedPathsChange={onExpandedPathsChange}
+              />
+            ) : (
+              <div className="explorer-empty">
+                <IconFolder />
+                <Typography.Text strong>未打开文件夹</Typography.Text>
+                <Typography.Text type="tertiary">选择一个工作区来浏览 Markdown 文件。</Typography.Text>
+                <button className="explorer-empty-action" type="button" onClick={onOpenWorkspace}>
+                  打开文件夹
+                </button>
+              </div>
+            )}
+          </section>
+        ) : (
+          <section className="sidebar-panel" role="tabpanel" aria-label="最近文件">
+            <div className="recent-panel-header">
+              <IconFile />
+              <Typography.Text className="recent-panel-title">最近打开</Typography.Text>
+            </div>
+            <div className="recent-file-list">
+              {recentFiles.map((file) => (
+                <button
+                  key={file.path}
+                  className="recent-file-item"
+                  type="button"
+                  title={file.path}
+                  onClick={() => onOpenFile(file.path)}
+                >
+                  <span className="recent-file-title">{file.title}</span>
+                  <span className="recent-file-path">{file.path}</span>
+                </button>
+              ))}
+              {recentFiles.length === 0 ? (
+                <Typography.Text className="recent-file-empty" type="tertiary">
+                  暂无最近文件
+                </Typography.Text>
+              ) : null}
+            </div>
+          </section>
+        )}
+      </div>
     </aside>
   )
 }

@@ -31,9 +31,21 @@ const api: VeloxAPI = {
     getInfo: () => invoke<AppInfo>(ipcChannels.app.getInfo)
   },
   window: {
+    getIsMaximized: () => invoke<boolean>(ipcChannels.window.getIsMaximized),
     minimize: () => invoke<void>(ipcChannels.window.minimize),
     toggleMaximize: () => invoke<void>(ipcChannels.window.toggleMaximize),
-    close: () => invoke<void>(ipcChannels.window.close)
+    close: () => invoke<void>(ipcChannels.window.close),
+    onMaximizedChange: (callback) => {
+      const listener = (_event: IpcRendererEvent, isMaximized: boolean): void => {
+        callback(isMaximized)
+      }
+
+      ipcRenderer.on(ipcChannels.window.maximizedChanged, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.window.maximizedChanged, listener)
+      }
+    }
   },
   settings: {
     get: () => invoke<AppSettings>(ipcChannels.settings.get),

@@ -155,9 +155,11 @@ export interface VeloxAPI {
     getInfo: () => Promise<Result<AppInfo>>
   }
   window: {
+    getIsMaximized: () => Promise<Result<boolean>>
     minimize: () => Promise<Result<void>>
     toggleMaximize: () => Promise<Result<void>>
     close: () => Promise<Result<void>>
+    onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
   }
   settings: {
     get: () => Promise<Result<AppSettings>>

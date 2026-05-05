@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { ipcChannels } from '../../shared/channels'
 import { environment } from '../bootstrap/environment'
 import { getMainWindowBounds, saveMainWindowState, shouldMaximizeMainWindow } from './window-state'
 import icon from '../../../resources/icon.png?asset'
@@ -37,6 +38,14 @@ export function createMainWindow(): BrowserWindow {
 
   mainWindow.on('close', () => {
     saveMainWindowState(mainWindow)
+  })
+
+  mainWindow.on('maximize', () => {
+    mainWindow.webContents.send(ipcChannels.window.maximizedChanged, true)
+  })
+
+  mainWindow.on('unmaximize', () => {
+    mainWindow.webContents.send(ipcChannels.window.maximizedChanged, false)
   })
 
   if (environment.isDev && environment.rendererUrl) {

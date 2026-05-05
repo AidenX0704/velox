@@ -17,5 +17,5 @@ export type MarkdownEditorPreferences = EditorPreferences
 export const editorModeLabels: Record<EditorMode, string> = {
   source: '源码',
   split: '分栏',
-  'preview-edit': '预览编辑'
+  'preview-edit': '预览'
 }

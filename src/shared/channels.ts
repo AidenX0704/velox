@@ -3,9 +3,11 @@ export const ipcChannels = {
     getInfo: 'app:get-info'
   },
   window: {
+    getIsMaximized: 'window:get-is-maximized',
     minimize: 'window:minimize',
     toggleMaximize: 'window:toggle-maximize',
-    close: 'window:close'
+    close: 'window:close',
+    maximizedChanged: 'window:maximized-changed'
   },
   settings: {
     get: 'settings:get',

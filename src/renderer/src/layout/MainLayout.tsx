@@ -264,7 +264,6 @@ export function MainLayout(): React.JSX.Element {
           openEditorView()
           void createDocument()
         }}
-        onClose={() => updateSettings({ showSidebar: false })}
         onOpenEditor={openEditorView}
         onOpenSettings={openSettingsView}
         onOpenWorkspace={() => void openWorkspace()}
