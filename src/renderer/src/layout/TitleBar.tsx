@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Tooltip, Typography } from '@douyinfe/semi-ui'
+import { Button, Dropdown, Tooltip, Typography } from '@douyinfe/semi-ui'
 import {
   IconCode,
   IconColumnsStroked,
   IconEyeOpened,
+  IconExport,
+  IconFile,
   IconFolderOpen,
+  IconImage,
+  IconPdf,
   IconSave,
   IconSidebar
 } from '@douyinfe/semi-icons'
+import type { ExportFormat } from '../../../shared/export'
 import { Segment, type SegmentOption } from '../components/Segment'
 import type { EditorMode } from '../modules/editor/model/types'
 import { editorModeLabels } from '../modules/editor/model/types'
@@ -22,6 +27,7 @@ interface TitleBarProps {
   onToggleSidebar: () => void
   onOpen: () => void
   onSave: () => void
+  onExport: (format: ExportFormat) => void
 }
 
 const modeOptions: Array<SegmentOption<EditorMode>> = [
@@ -47,7 +53,8 @@ export function TitleBar({
   onModeChange,
   onToggleSidebar,
   onOpen,
-  onSave
+  onSave,
+  onExport
 }: TitleBarProps): React.JSX.Element {
   const [isMaximized, setIsMaximized] = useState(false)
 
@@ -98,30 +105,38 @@ export function TitleBar({
             <IconSidebar />
           </button>
         </Tooltip>
-        {!showSidebar ? (
-          <div className="titlebar-icon-group" aria-label="文档操作">
-            <Tooltip content="打开 Markdown 文件" position="bottom">
-              <button
-                className="titlebar-tool-button"
-                type="button"
-                aria-label="打开 Markdown 文件"
-                onClick={onOpen}
-              >
-                <IconFolderOpen />
-              </button>
-            </Tooltip>
-            <Tooltip content="保存当前文档" position="bottom">
-              <button
-                className="titlebar-tool-button"
-                type="button"
-                aria-label="保存当前文档"
-                onClick={onSave}
-              >
-                <IconSave />
-              </button>
-            </Tooltip>
-          </div>
-        ) : null}
+        <div className="titlebar-icon-group" aria-label="文件操作">
+          <Tooltip content="打开 Markdown 文件" position="bottom">
+            <Button icon={<IconFolderOpen />} size="small" theme="borderless" onClick={onOpen} />
+          </Tooltip>
+          <Tooltip content="保存当前文档" position="bottom">
+            <Button icon={<IconSave />} size="small" theme="borderless" onClick={onSave} />
+          </Tooltip>
+          <Dropdown
+            position="bottomLeft"
+            render={
+              <Dropdown.Menu>
+                <Dropdown.Item icon={<IconPdf />} onClick={() => onExport('pdf')}>
+                  导出 PDF
+                </Dropdown.Item>
+                <Dropdown.Item icon={<IconImage />} onClick={() => onExport('png')}>
+                  导出 PNG
+                </Dropdown.Item>
+                <Dropdown.Item icon={<IconImage />} onClick={() => onExport('jpeg')}>
+                  导出 JPEG
+                </Dropdown.Item>
+                <Dropdown.Item icon={<IconFile />} onClick={() => onExport('docx')}>
+                  导出 Word
+                </Dropdown.Item>
+                <Dropdown.Item icon={<IconFile />} onClick={() => onExport('html')}>
+                  导出 HTML
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            }
+          >
+            <Button icon={<IconExport />} size="small" theme="borderless" />
+          </Dropdown>
+        </div>
       </div>
       <Typography.Text className="titlebar-name" ellipsis={{ showTooltip: true }}>
         {title}

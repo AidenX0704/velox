@@ -65,6 +65,10 @@ export function useDocument(): {
   saveDocument: () => Promise<void>
   saveDocumentAs: () => Promise<void>
   openWorkspace: () => Promise<void>
+  refreshWorkspace: () => Promise<void>
+  createWorkspaceEntry: (parentPath: string, name: string, type: 'file' | 'directory') => Promise<string | null>
+  renameWorkspaceEntry: (path: string, newName: string) => Promise<string | null>
+  deleteWorkspaceEntry: (path: string) => Promise<boolean>
 } {
   const [document, setDocument] = useState<DocumentState>(() => createInitialDocument())
   const [editorMode, setEditorMode] = useState<EditorMode>('split')
@@ -128,6 +132,63 @@ export function useDocument(): {
       Toast.error(treeResult.error.message)
     }
   }, [])
+
+  const refreshWorkspace = useCallback(async () => {
+    if (workspaceRoot) {
+      const treeResult = await window.api.workspace.getTree(workspaceRoot)
+      if (treeResult.ok) {
+        setWorkspaceTree(treeResult.data)
+      }
+    }
+  }, [workspaceRoot])
+
+  useEffect(() => {
+    return window.api.workspace.onDidChange(() => {
+      void refreshWorkspace()
+    })
+  }, [refreshWorkspace])
+
+  const createWorkspaceEntry = useCallback(
+    async (parentPath: string, name: string, type: 'file' | 'directory'): Promise<string | null> => {
+      const result = await window.api.workspace.createEntry({ parentPath, name, type })
+      if (result.ok) {
+        return result.data
+      }
+      Toast.error(result.error.message)
+      return null
+    },
+    []
+  )
+
+  const renameWorkspaceEntry = useCallback(
+    async (path: string, newName: string): Promise<string | null> => {
+      const result = await window.api.workspace.renameEntry({ path, newName })
+      if (result.ok) {
+        if (document.path === path) {
+           setDocument(prev => ({...prev, path: result.data}))
+        }
+        return result.data
+      }
+      Toast.error(result.error.message)
+      return null
+    },
+    [document.path]
+  )
+
+  const deleteWorkspaceEntry = useCallback(
+    async (path: string): Promise<boolean> => {
+      const result = await window.api.workspace.deleteEntry({ path })
+      if (result.ok) {
+         if (document.path === path) {
+             setDocument(createInitialDocument())
+         }
+         return true
+      }
+      Toast.error(result.error.message)
+      return false
+    },
+    [document.path]
+  )
 
   const openPath = useCallback(
     async (path: string): Promise<boolean> => {
@@ -331,6 +392,10 @@ export function useDocument(): {
     clearPendingAnchor,
     saveDocument,
     saveDocumentAs,
-    openWorkspace
+    openWorkspace,
+    refreshWorkspace,
+    createWorkspaceEntry,
+    renameWorkspaceEntry,
+    deleteWorkspaceEntry
   }
 }

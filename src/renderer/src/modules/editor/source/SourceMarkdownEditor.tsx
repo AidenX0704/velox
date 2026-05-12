@@ -47,20 +47,23 @@ const markdownKeymap = keymap.of([
   { key: 'Mod-i', run: (v) => wrapSelection(v, '*', '*') },
   { key: 'Mod-d', run: (v) => wrapSelection(v, '~~', '~~') },
   { key: 'Mod-`', run: (v) => wrapSelection(v, '`', '`') },
-  { key: 'Mod-k', run: (v) => {
-    const { from, to } = v.state.selection.main
-    const selected = v.state.sliceDoc(from, to)
-    const url = window.prompt('请输入链接地址:', 'https://')
-    if (!url) return false
-    const text = selected || window.prompt('请输入链接文本:', '') || ''
-    if (!text) return false
-    const replacement = `[${text}](${url})`
-    v.dispatch({
-      changes: { from, to, insert: replacement },
-      selection: { anchor: from + 1, head: from + 1 + text.length }
-    })
-    return true
-  }},
+  {
+    key: 'Mod-k',
+    run: (v) => {
+      const { from, to } = v.state.selection.main
+      const selected = v.state.sliceDoc(from, to)
+      const url = window.prompt('请输入链接地址:', 'https://')
+      if (!url) return false
+      const text = selected || window.prompt('请输入链接文本:', '') || ''
+      if (!text) return false
+      const replacement = `[${text}](${url})`
+      v.dispatch({
+        changes: { from, to, insert: replacement },
+        selection: { anchor: from + 1, head: from + 1 + text.length }
+      })
+      return true
+    }
+  },
   { key: 'Mod-Shift-1', run: (v) => insertAtLineStart(v, '# ') },
   { key: 'Mod-Shift-2', run: (v) => insertAtLineStart(v, '## ') },
   { key: 'Mod-Shift-3', run: (v) => insertAtLineStart(v, '### ') },
@@ -68,7 +71,7 @@ const markdownKeymap = keymap.of([
   { key: 'Mod-Shift-5', run: (v) => insertAtLineStart(v, '##### ') },
   { key: 'Mod-Shift-9', run: (v) => insertAtLineStart(v, '> ') },
   { key: 'Mod-Shift-8', run: (v) => insertAtLineStart(v, '- ') },
-  { key: 'Mod-Shift-7', run: (v) => insertAtLineStart(v, '1. ') },
+  { key: 'Mod-Shift-7', run: (v) => insertAtLineStart(v, '1. ') }
 ])
 
 interface SourceMarkdownEditorProps {

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Toast } from '@douyinfe/semi-ui'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
+import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
 import { MarkdownEditor } from '../modules/editor/MarkdownEditor'
 import type { CursorPosition } from '../modules/editor/model/types'
 import { useDocument } from '../features/document/useDocument'
@@ -25,8 +26,10 @@ export function MainLayout(): React.JSX.Element {
     useState<ResolvedAppearanceMode>('light')
   const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ line: 1, column: 1 })
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
+  const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
   const { settings: editorSettings, updateSettings, resetSettings } = useEditorSettings()
   const {
     document,
@@ -44,7 +47,10 @@ export function MainLayout(): React.JSX.Element {
     openPathFromLink,
     clearPendingAnchor,
     saveDocument,
-    openWorkspace
+    openWorkspace,
+    createWorkspaceEntry,
+    renameWorkspaceEntry,
+    deleteWorkspaceEntry
   } = useDocument()
 
   useEffect(() => {
@@ -178,6 +184,7 @@ export function MainLayout(): React.JSX.Element {
     return () => {
       window.clearTimeout(workspacePersistTimerRef.current)
       window.clearTimeout(sessionPersistTimerRef.current)
+      window.clearTimeout(exportProgressCloseTimerRef.current)
     }
   }, [])
 
@@ -188,6 +195,64 @@ export function MainLayout(): React.JSX.Element {
   const openSettingsView = (): void => {
     setActiveView('settings')
   }
+
+  const handleExport = useCallback(
+    async (format: ExportFormat): Promise<void> => {
+      window.clearTimeout(exportProgressCloseTimerRef.current)
+      setExportProgress({
+        stage: 'resolving',
+        percent: 0,
+        message: '准备导出'
+      })
+
+      const result = await window.api.document.export({
+        title: document.title || 'Untitled',
+        content: document.content,
+        sourcePath: document.path,
+        format,
+        includeCustomCss: editorSettings.export.includeCustomCss,
+        customCss: editorSettings.customPreviewCss,
+        imageFormat: editorSettings.export.imageFormat,
+        imageScale: editorSettings.export.imageScale,
+        pdfPageSize: editorSettings.export.pdfPageSize
+      })
+
+      if (result.ok && result.data) {
+        setExportProgress({
+          stage: 'done',
+          percent: 100,
+          message: '导出完成'
+        })
+        exportProgressCloseTimerRef.current = window.setTimeout(() => {
+          setExportProgress(null)
+        }, 700)
+        Toast.success(`已导出 ${exportFormatLabels[result.data.format]}`)
+        return
+      }
+
+      setExportProgress(null)
+
+      if (!result.ok) {
+        Toast.error(result.error.message)
+      }
+    },
+    [
+      document.content,
+      document.path,
+      document.title,
+      editorSettings.customPreviewCss,
+      editorSettings.export.imageFormat,
+      editorSettings.export.imageScale,
+      editorSettings.export.includeCustomCss,
+      editorSettings.export.pdfPageSize
+    ]
+  )
+
+  useEffect(() => {
+    return window.api.document.onExportProgress((progress) => {
+      setExportProgress(progress)
+    })
+  }, [])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
@@ -243,6 +308,30 @@ export function MainLayout(): React.JSX.Element {
     updateSettings
   ])
 
+  useEffect(() => {
+    return window.api.menu.onCommand((command) => {
+      if (command === 'document:export-default') {
+        void handleExport(editorSettings.export.defaultFormat)
+      }
+
+      if (command === 'document:export-html') {
+        void handleExport('html')
+      }
+
+      if (command === 'document:export-pdf') {
+        void handleExport('pdf')
+      }
+
+      if (command === 'document:export-png') {
+        void handleExport(editorSettings.export.imageFormat)
+      }
+
+      if (command === 'document:export-docx') {
+        void handleExport('docx')
+      }
+    })
+  }, [editorSettings.export.defaultFormat, editorSettings.export.imageFormat, handleExport])
+
   return (
     <div
       className="app-shell"
@@ -272,6 +361,9 @@ export function MainLayout(): React.JSX.Element {
           void openPath(path)
         }}
         onExpandedPathsChange={setExpandedWorkspacePaths}
+        onCreateWorkspaceEntry={createWorkspaceEntry}
+        onRenameWorkspaceEntry={renameWorkspaceEntry}
+        onDeleteWorkspaceEntry={deleteWorkspaceEntry}
       />
       <main className="main-panel">
         {activeView === 'editor' ? (
@@ -286,11 +378,11 @@ export function MainLayout(): React.JSX.Element {
               onToggleSidebar={() => updateSettings({ showSidebar: !editorSettings.showSidebar })}
               onOpen={() => void openDocument()}
               onSave={() => void saveDocument()}
+              onExport={(format) => void handleExport(format)}
             />
             <section className="editor-host" data-editor-mode={editorMode}>
               <MarkdownEditor
                 mode={editorMode}
-                documentTitle={document.title}
                 dirty={document.dirty}
                 content={document.content}
                 settings={editorSettings}
@@ -322,6 +414,21 @@ export function MainLayout(): React.JSX.Element {
           />
         )}
       </main>
+      <Modal
+        visible={!!exportProgress}
+        title="正在导出"
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        width={420}
+      >
+        {exportProgress ? (
+          <div className="export-progress-modal">
+            <Progress percent={exportProgress.percent} showInfo />
+            <Typography.Text type="tertiary">{exportProgress.message}</Typography.Text>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   )
 }

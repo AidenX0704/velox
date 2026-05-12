@@ -3,6 +3,7 @@ import './styles/editor.css'
 import type { CursorPosition, EditorMode, MarkdownEditorPreferences } from './model/types'
 import { MarkdownPreview } from './preview/MarkdownPreview'
 import { RichMarkdownEditor } from './rich/RichMarkdownEditor'
+import { DocumentOutline } from './outline/DocumentOutline'
 import { collectHeadingAnchors, type HeadingAnchor } from './rendering/headingAnchors'
 import type { EditorLinkNavigationOptions } from './services/linkNavigation'
 import {
@@ -12,7 +13,6 @@ import {
 
 interface MarkdownEditorProps {
   mode: EditorMode
-  documentTitle: string
   dirty: boolean
   content: string
   settings: MarkdownEditorPreferences
@@ -33,7 +33,6 @@ const scrollSyncReleaseDelay = 80
 
 export function MarkdownEditor({
   mode,
-  documentTitle,
   dirty,
   content,
   settings,
@@ -51,7 +50,9 @@ export function MarkdownEditor({
   const scrollSyncSourceRef = useRef<'source' | 'preview' | null>(null)
   const [splitRatio, setSplitRatio] = useState(defaultSplitRatio)
   const [dragging, setDragging] = useState(false)
+  const [sourceVisibleLine, setSourceVisibleLine] = useState(1)
   const headingAnchors = useMemo(() => collectHeadingAnchors(content), [content])
+  const sourceActiveHeadingIndex = findHeadingIndexAtOrBeforeLine(headingAnchors, sourceVisibleLine)
   const linkNavigation = useMemo<EditorLinkNavigationOptions>(
     () => ({
       currentPath,
@@ -100,22 +101,33 @@ export function MarkdownEditor({
 
   if (mode === 'source') {
     return (
-      <SourceMarkdownEditor
-        value={content}
-        wordWrap={settings.wordWrap}
-        showLineNumbers={settings.showLineNumbers}
-        fontSize={settings.editorFontSize}
-        lineHeight={settings.editorLineHeight}
-        onChange={onChange}
-        onCursorChange={onCursorChange}
-      />
+      <div className="editor-with-outline" data-editor-view="source">
+        <DocumentOutline
+          headings={headingAnchors}
+          dirty={dirty}
+          activeHeadingIndex={sourceActiveHeadingIndex}
+          onHeadingSelect={(heading) => sourceEditorRef.current?.scrollToLine(heading.line)}
+        />
+        <SourceMarkdownEditor
+          ref={sourceEditorRef}
+          value={content}
+          wordWrap={settings.wordWrap}
+          showLineNumbers={settings.showLineNumbers}
+          fontSize={settings.editorFontSize}
+          lineHeight={settings.editorLineHeight}
+          onChange={onChange}
+          onCursorChange={onCursorChange}
+          onScrollRatioChange={() => {
+            setSourceVisibleLine(sourceEditorRef.current?.getVisibleLine() ?? 1)
+          }}
+        />
+      </div>
     )
   }
 
   if (mode === 'preview-edit') {
     return (
       <RichMarkdownEditor
-        documentTitle={documentTitle}
         dirty={dirty}
         content={content}
         settings={settings}
@@ -131,88 +143,92 @@ export function MarkdownEditor({
   }
 
   return (
-    <div
-      ref={splitRef}
-      className="split-editor"
-      style={
-        {
-          '--editor-source-pane-percent': `${splitRatio}%`,
-          '--preview-max-width': `${settings.previewMaxWidth}px`,
-          '--preview-font-size': `${settings.previewFontSize}px`,
-          '--preview-line-height': String(settings.previewLineHeight)
-        } as React.CSSProperties
-      }
-      data-preview-centered={settings.previewCentered}
-      data-resizing={dragging}
-    >
-      <div className="split-pane source-pane">
-        <SourceMarkdownEditor
-          ref={sourceEditorRef}
-          value={content}
-          wordWrap={settings.wordWrap}
-          showLineNumbers={settings.showLineNumbers}
-          fontSize={settings.editorFontSize}
-          lineHeight={settings.editorLineHeight}
-          onChange={onChange}
-          onCursorChange={onCursorChange}
-          onScrollRatioChange={(ratio) => {
+    <div className="editor-with-outline" data-editor-view="split">
+      <div
+        ref={splitRef}
+        className="split-editor"
+        style={
+          {
+            '--editor-source-pane-percent': `${splitRatio}%`,
+            '--preview-max-width': `${settings.previewMaxWidth}px`,
+            '--preview-font-size': `${settings.previewFontSize}px`,
+            '--preview-line-height': String(settings.previewLineHeight)
+          } as React.CSSProperties
+        }
+        data-preview-centered={settings.previewCentered}
+        data-resizing={dragging}
+      >
+        <div className="split-pane source-pane">
+          <SourceMarkdownEditor
+            ref={sourceEditorRef}
+            value={content}
+            wordWrap={settings.wordWrap}
+            showLineNumbers={settings.showLineNumbers}
+            fontSize={settings.editorFontSize}
+            lineHeight={settings.editorLineHeight}
+            onChange={onChange}
+            onCursorChange={onCursorChange}
+            onScrollRatioChange={(ratio) => {
+              setSourceVisibleLine(sourceEditorRef.current?.getVisibleLine() ?? 1)
+
+              if (settings.splitScrollSync) {
+                syncPreviewScroll({
+                  previewElement: previewPaneRef.current,
+                  sourceEditor: sourceEditorRef.current,
+                  headingAnchors,
+                  ratio,
+                  sourceRef: scrollSyncSourceRef
+                })
+              }
+            }}
+          />
+        </div>
+        <div
+          className="split-divider"
+          role="separator"
+          aria-orientation="vertical"
+          aria-valuemin={minSplitRatio}
+          aria-valuemax={maxSplitRatio}
+          aria-valuenow={Math.round(splitRatio)}
+          tabIndex={0}
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId)
+            setDragging(true)
+          }}
+          onDoubleClick={() => setSplitRatio(defaultSplitRatio)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault()
+              setSplitRatio((current) => clampSplitRatio(current - 2))
+            }
+
+            if (event.key === 'ArrowRight') {
+              event.preventDefault()
+              setSplitRatio((current) => clampSplitRatio(current + 2))
+            }
+          }}
+        />
+        <div
+          ref={previewPaneRef}
+          className="split-pane preview-pane"
+          onScroll={(event) => {
             if (settings.splitScrollSync) {
-              syncPreviewScroll({
-                previewElement: previewPaneRef.current,
+              syncSourceScroll({
+                previewElement: event.currentTarget,
                 sourceEditor: sourceEditorRef.current,
                 headingAnchors,
-                ratio,
                 sourceRef: scrollSyncSourceRef
               })
             }
           }}
-        />
-      </div>
-      <div
-        className="split-divider"
-        role="separator"
-        aria-orientation="vertical"
-        aria-valuemin={minSplitRatio}
-        aria-valuemax={maxSplitRatio}
-        aria-valuenow={Math.round(splitRatio)}
-        tabIndex={0}
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId)
-          setDragging(true)
-        }}
-        onDoubleClick={() => setSplitRatio(defaultSplitRatio)}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowLeft') {
-            event.preventDefault()
-            setSplitRatio((current) => clampSplitRatio(current - 2))
-          }
-
-          if (event.key === 'ArrowRight') {
-            event.preventDefault()
-            setSplitRatio((current) => clampSplitRatio(current + 2))
-          }
-        }}
-      />
-      <div
-        ref={previewPaneRef}
-        className="split-pane preview-pane"
-        onScroll={(event) => {
-          if (settings.splitScrollSync) {
-            syncSourceScroll({
-              previewElement: event.currentTarget,
-              sourceEditor: sourceEditorRef.current,
-              headingAnchors,
-              sourceRef: scrollSyncSourceRef
-            })
-          }
-        }}
-      >
-        <MarkdownPreview
-          content={content}
-          anchorTarget={anchorTarget}
-          linkNavigation={linkNavigation}
-          customCss={settings.customPreviewCss}
-        />
+        >
+          <MarkdownPreview
+            content={content}
+            anchorTarget={anchorTarget}
+            linkNavigation={linkNavigation}
+            customCss={settings.customPreviewCss}
+          />
+        </div>
       </div>
     </div>
   )

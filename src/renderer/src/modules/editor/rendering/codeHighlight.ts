@@ -33,16 +33,20 @@ async function highlightCodeWithShiki(code: string, language: string): Promise<s
   }
 
   try {
+    const isDark = document.documentElement.dataset.colorMode === 'dark' || document.body.classList.contains('dark') || document.body.getAttribute('theme-mode') === 'dark'
+    const theme = isDark ? 'github-dark' : 'github-light'
+
     const html = await codeToHtml(code || ' ', {
       lang: language,
-      theme: 'github-light'
+      theme: theme
     })
 
     return DOMPurify.sanitize(html, {
       USE_PROFILES: { html: true },
       ADD_ATTR: ['class', 'style']
     })
-  } catch {
+  } catch (error) {
+    console.error('Shiki highlighting failed:', error)
     return renderPlainCodeBlock(code)
   }
 }

@@ -5,6 +5,7 @@ import { BrowserWindow } from 'electron'
 import { AppService } from '../services/app-service'
 import { DocumentService } from '../services/document-service'
 import { DocumentSessionService } from '../services/document-session-service'
+import { ExportService } from '../services/export-service'
 import { PreferencesService } from '../services/preferences-service'
 import { RecentService } from '../services/recent-service'
 import { SettingsService } from '../services/settings-service'
@@ -15,6 +16,7 @@ import { WorkspaceStateService } from '../services/workspace-state-service'
 export interface MainServices {
   appService: AppService
   documentService: DocumentService
+  exportService: ExportService
   settingsService: SettingsService
   preferencesService: PreferencesService
   recentService: RecentService
@@ -98,12 +100,26 @@ export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.document.saveAs, schemas.saveDocumentAs, (input) =>
     services.documentService.saveAs(input)
   )
+  registerIpcHandler(ipcChannels.document.export, schemas.exportDocument, (input, event) =>
+    services.exportService.exportDocument(input, (progress) => {
+      event.sender.send(ipcChannels.document.exportProgress, progress)
+    })
+  )
 
   registerIpcHandler(ipcChannels.workspace.openFolder, schemas.empty, () =>
     services.workspaceService.openFolder()
   )
   registerIpcHandler(ipcChannels.workspace.getTree, schemas.path, (path) =>
     services.workspaceService.getTree(path)
+  )
+  registerIpcHandler(ipcChannels.workspace.createEntry, schemas.createWorkspaceEntry, (input) =>
+    services.workspaceService.createEntry(input.parentPath, input.name, input.type)
+  )
+  registerIpcHandler(ipcChannels.workspace.renameEntry, schemas.renameWorkspaceEntry, (input) =>
+    services.workspaceService.renameEntry(input.path, input.newName)
+  )
+  registerIpcHandler(ipcChannels.workspace.deleteEntry, schemas.deleteWorkspaceEntry, (input) =>
+    services.workspaceService.deleteEntry(input.path)
   )
   registerIpcHandler(ipcChannels.workspace.getState, schemas.path, (path) =>
     services.workspaceStateService.get(path)

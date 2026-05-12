@@ -32,6 +32,7 @@ textarea,
   --sidebar-width: calc(var(--activitybar-width) + var(--sidebar-pane-width));
   --titlebar-height: 48px;
   --statusbar-height: 24px;
+  --mac-traffic-light-safe-width: 94px;
   --brand: var(--theme-accent-strong, #4338ca);
   --brand-active: var(--theme-accent, #4f46e5);
   --brand-hover: var(--theme-accent-hover, #4338ca);
@@ -172,6 +173,23 @@ textarea,
   pointer-events: none;
 }
 
+.app-shell[data-platform='darwin'] .sidebar[data-visible='true'] {
+  padding-top: var(--titlebar-height);
+}
+
+.app-shell[data-platform='darwin'] .sidebar[data-visible='true']::before {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--titlebar-height);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-base);
+  content: '';
+  -webkit-app-region: drag;
+}
+
 .sidebar-pane {
   display: flex;
   flex: 1;
@@ -246,6 +264,34 @@ textarea,
   flex-direction: column;
   min-width: 0;
   gap: 1px;
+}
+
+.explorer-root-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.explorer-root-header:hover .explorer-root-actions {
+  display: flex;
+}
+
+.explorer-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.explorer-action-button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .explorer-root-name,
@@ -380,6 +426,24 @@ textarea,
   text-align: left;
 }
 
+.workspace-tree-node-inline-input {
+  background: var(--surface-hover);
+}
+
+.workspace-tree-node-inline-input .semi-input-wrapper {
+  margin-left: 4px;
+  background: var(--surface-base);
+  border-color: var(--brand-active);
+  border-radius: 4px;
+}
+
+.workspace-tree-node-inline-input .semi-input {
+  font-size: 13px;
+  height: 22px;
+  line-height: 22px;
+  padding: 0 6px;
+}
+
 .workspace-tree-item {
   width: 100%;
 }
@@ -454,6 +518,36 @@ textarea,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspace-tree-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.workspace-tree-node:hover .workspace-tree-actions {
+  display: flex;
+}
+
+.workspace-tree-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.workspace-tree-action-btn:hover {
+  background: var(--surface-raised);
+  color: var(--text-primary);
 }
 
 .workspace-tree-children {
@@ -782,16 +876,12 @@ textarea,
   font-size: 11px;
 }
 
-.app-shell[data-platform='darwin'][data-sidebar-visible='false'] .titlebar {
-  padding-left: 92px;
-}
-
 .titlebar[data-platform='darwin'] .window-controls {
   display: none;
 }
 
-.app-shell[data-platform='darwin'] .sidebar[data-visible='true'] {
-  padding-top: 0;
+.app-shell[data-platform='darwin'][data-sidebar-visible='false'] .titlebar {
+  padding-left: var(--mac-traffic-light-safe-width);
 }
 
 .settings-page {
@@ -830,7 +920,7 @@ textarea,
 }
 
 .app-shell[data-platform='darwin'][data-sidebar-visible='false'] .settings-page-header {
-  padding-left: 92px;
+  padding-left: var(--mac-traffic-light-safe-width);
 }
 
 .settings-page-content {
@@ -1283,6 +1373,13 @@ textarea,
   color: var(--text-primary);
 }
 
+.export-progress-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 0 4px;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     --activitybar-width: 44px;
@@ -1292,6 +1389,10 @@ textarea,
   .titlebar {
     grid-template-columns: minmax(110px, 1fr) minmax(80px, 1fr) auto;
     padding-left: 14px;
+  }
+
+  .app-shell[data-platform='darwin'][data-sidebar-visible='false'] .titlebar {
+    padding-left: var(--mac-traffic-light-safe-width);
   }
 
   .titlebar-name {
@@ -1343,6 +1444,6 @@ textarea,
   }
 
   .app-shell[data-platform='darwin'][data-sidebar-visible='false'] .settings-page-header {
-    padding-left: 92px;
+    padding-left: var(--mac-traffic-light-safe-width);
   }
 }

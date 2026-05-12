@@ -45,6 +45,33 @@ export class MenuService {
             click: () => this.sendCommand('document:save')
           },
           { type: 'separator' },
+          {
+            label: 'Export',
+            accelerator: 'CmdOrCtrl+Shift+E',
+            click: () => this.sendCommand('document:export-default')
+          },
+          {
+            label: 'Export As',
+            submenu: [
+              {
+                label: 'Export as PDF...',
+                click: () => this.sendCommand('document:export-pdf')
+              },
+              {
+                label: 'Export as Image...',
+                click: () => this.sendCommand('document:export-png')
+              },
+              {
+                label: 'Export as Word...',
+                click: () => this.sendCommand('document:export-docx')
+              },
+              {
+                label: 'Export as HTML...',
+                click: () => this.sendCommand('document:export-html')
+              }
+            ]
+          },
+          { type: 'separator' },
           process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' }
         ]
       },

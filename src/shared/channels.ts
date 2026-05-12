@@ -30,13 +30,19 @@ export const ipcChannels = {
     resolveLink: 'document:resolve-link',
     previewLink: 'document:preview-link',
     save: 'document:save',
-    saveAs: 'document:save-as'
+    saveAs: 'document:save-as',
+    export: 'document:export',
+    exportProgress: 'document:export-progress'
   },
   workspace: {
     openFolder: 'workspace:open-folder',
     getTree: 'workspace:get-tree',
     getState: 'workspace:get-state',
-    updateState: 'workspace:update-state'
+    updateState: 'workspace:update-state',
+    createEntry: 'workspace:create-entry',
+    renameEntry: 'workspace:rename-entry',
+    deleteEntry: 'workspace:delete-entry',
+    didChange: 'workspace:did-change'
   },
   session: {
     getDocument: 'session:get-document',

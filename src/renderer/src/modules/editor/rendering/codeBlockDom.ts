@@ -44,7 +44,7 @@ export function createCodeBlockShell(options: CreateCodeBlockShellOptions = {}):
   foldButton.setAttribute('aria-pressed', 'false')
   foldButton.append(document.createElement('span'))
   foldButton.querySelector('span')!.textContent = '折叠'
-  pre.className = 'markdown-code-pre hljs'
+  pre.className = 'markdown-code-pre'
 
   actions.append(copyButton)
 

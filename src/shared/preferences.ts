@@ -1,3 +1,5 @@
+import type { ExportPreferences } from './export'
+
 export type EditorMode = 'source' | 'split' | 'preview-edit'
 export type PreviewEditWidthMode = 'wide' | 'standard' | 'narrow'
 export type AppearanceMode = 'system' | 'light' | 'dark'
@@ -54,6 +56,11 @@ export interface EditorPreferences {
   defaultMode: EditorMode
   hasSeenWelcome: boolean
   shortcutOverrides: ShortcutOverride
+  export: ExportPreferences
+}
+
+export type EditorPreferencesPatch = Partial<Omit<EditorPreferences, 'export'>> & {
+  export?: Partial<ExportPreferences>
 }
 
 export const defaultEditorPreferences: EditorPreferences = {
@@ -74,5 +81,12 @@ export const defaultEditorPreferences: EditorPreferences = {
   customThemeColor: '#4f46e5',
   defaultMode: 'split',
   hasSeenWelcome: false,
-  shortcutOverrides: {}
+  shortcutOverrides: {},
+  export: {
+    includeCustomCss: true,
+    imageFormat: 'png',
+    imageScale: 2,
+    pdfPageSize: 'A4',
+    defaultFormat: 'pdf'
+  }
 }

@@ -18,6 +18,7 @@ import {
   type AppearanceMode,
   type ThemeColorSelection
 } from '../../../shared/preferences'
+import type { ExportFormat, ExportImageFormat, ExportPdfPageSize } from '../../../shared/export'
 import { BrandLogo } from '../components/BrandLogo'
 import type { EditorMode, MarkdownEditorPreferences } from '../modules/editor/model/types'
 import { editorModeLabels } from '../modules/editor/model/types'
@@ -380,16 +381,98 @@ export function SettingsPage({
             id="settings-export"
             icon={<IconExport />}
             title="导出默认项"
-            description="保留导出相关的默认行为入口，后续 HTML/PDF 能复用同一组偏好。"
+            description="控制 PDF、图片、HTML 和 Word 导出时使用的默认行为。"
           >
-            <SettingRow title="导出格式" description="当前项目已支持 Markdown 另存为">
-              <Select value="markdown" disabled style={{ width: 165 }}>
-                <Select.Option value="markdown">Markdown</Select.Option>
+            <SettingRow title="默认导出格式" description="用于后续快捷导出和菜单默认行为">
+              <Select
+                value={settings.export.defaultFormat}
+                style={{ width: 165 }}
+                onChange={(value) =>
+                  updateSettings({
+                    export: {
+                      ...settings.export,
+                      defaultFormat: value as ExportFormat
+                    }
+                  })
+                }
+              >
+                <Select.Option value="pdf">PDF</Select.Option>
+                <Select.Option value="png">PNG 图片</Select.Option>
+                <Select.Option value="jpeg">JPEG 图片</Select.Option>
+                <Select.Option value="docx">Word</Select.Option>
+                <Select.Option value="html">HTML</Select.Option>
               </Select>
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="包含自定义 CSS" description="后续导出 HTML/PDF 时可复用此开关">
-              <Switch checked={false} disabled />
+            <SettingRow
+              title="包含自定义 CSS"
+              description="导出 HTML、PDF 和图片时应用预览自定义 CSS"
+            >
+              <Switch
+                checked={settings.export.includeCustomCss}
+                onChange={(includeCustomCss) =>
+                  updateSettings({
+                    export: {
+                      ...settings.export,
+                      includeCustomCss
+                    }
+                  })
+                }
+              />
+            </SettingRow>
+            <SettingSeparator />
+            <SettingRow title="PDF 页面尺寸" description="控制 PDF 导出的分页纸张尺寸">
+              <Select
+                value={settings.export.pdfPageSize}
+                style={{ width: 165 }}
+                onChange={(value) =>
+                  updateSettings({
+                    export: {
+                      ...settings.export,
+                      pdfPageSize: value as ExportPdfPageSize
+                    }
+                  })
+                }
+              >
+                <Select.Option value="A4">A4</Select.Option>
+                <Select.Option value="Letter">Letter</Select.Option>
+              </Select>
+            </SettingRow>
+            <SettingSeparator />
+            <SettingRow title="图片格式" description="从菜单导出图片时使用的默认格式">
+              <Select
+                value={settings.export.imageFormat}
+                style={{ width: 165 }}
+                onChange={(value) =>
+                  updateSettings({
+                    export: {
+                      ...settings.export,
+                      imageFormat: value as ExportImageFormat
+                    }
+                  })
+                }
+              >
+                <Select.Option value="png">PNG</Select.Option>
+                <Select.Option value="jpeg">JPEG</Select.Option>
+              </Select>
+            </SettingRow>
+            <SettingSeparator />
+            <SettingRow title="图片倍率" description="提高导出图片的像素密度">
+              <InputNumber
+                min={1}
+                max={3}
+                step={0.25}
+                value={settings.export.imageScale}
+                suffix="x"
+                onChange={(value) =>
+                  updateSettings({
+                    export: {
+                      ...settings.export,
+                      imageScale: Number(value)
+                    }
+                  })
+                }
+              />
             </SettingRow>
           </SettingsCard>
 

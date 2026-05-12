@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Toast } from '@douyinfe/semi-ui'
-import { defaultEditorPreferences, type EditorPreferences } from '../../../../shared/preferences'
+import {
+  defaultEditorPreferences,
+  type EditorPreferences,
+  type EditorPreferencesPatch
+} from '../../../../shared/preferences'
 
 export function useEditorSettings(): {
   settings: EditorPreferences
   loading: boolean
-  updateSettings: (patch: Partial<EditorPreferences>) => void
+  updateSettings: (patch: EditorPreferencesPatch) => void
   resetSettings: () => Promise<void>
 } {
   const [settings, setSettings] = useState<EditorPreferences>(defaultEditorPreferences)
@@ -35,9 +39,16 @@ export function useEditorSettings(): {
     }
   }, [])
 
-  const updateSettings = useCallback((patch: Partial<EditorPreferences>) => {
+  const updateSettings = useCallback((patch: EditorPreferencesPatch) => {
     setSettings((current) => {
-      const next = { ...current, ...patch }
+      const next = {
+        ...current,
+        ...patch,
+        export: {
+          ...current.export,
+          ...patch.export
+        }
+      }
 
       window.clearTimeout(persistTimerRef.current)
       persistTimerRef.current = window.setTimeout(() => {

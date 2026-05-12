@@ -18,11 +18,11 @@ import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirr
 import { EditorState } from 'prosemirror-state'
 import { columnResizing, goToNextCell, tableEditing } from 'prosemirror-tables'
 import { EditorView } from 'prosemirror-view'
-import { IconChevronDown, IconChevronUp } from '@douyinfe/semi-icons'
 import { openEditorLink, scrollToEditorAnchor } from '../services/linkNavigation'
 import type { EditorLinkNavigationOptions } from '../services/linkNavigation'
 import { getCodeBlockActionButton, handleCodeBlockAction } from '../rendering/blockActions'
 import { collectHeadingAnchors, type HeadingAnchor } from '../rendering/headingAnchors'
+import { DocumentOutline } from '../outline/DocumentOutline'
 import { createCodeBlockNodeView } from './nodeViews/codeBlockNodeView'
 import { createTaskListItemNodeView } from './nodeViews/taskListItemNodeView'
 import { FormatToolbar } from './FormatToolbar'
@@ -35,7 +35,6 @@ import {
 } from './markdownModel'
 
 interface RichMarkdownEditorProps {
-  documentTitle: string
   dirty: boolean
   content: string
   settings: MarkdownEditorPreferences
@@ -49,7 +48,6 @@ interface RichMarkdownEditorProps {
 }
 
 export function RichMarkdownEditor({
-  documentTitle,
   dirty,
   content,
   settings,
@@ -71,7 +69,7 @@ export function RichMarkdownEditor({
   const headingAnchors = useMemo(() => collectHeadingAnchors(content), [content])
   const [fontSize, setFontSize] = useState(settings.previewFontSize)
   const [editorView, setEditorView] = useState<EditorView | null>(null)
-  const [navCollapsed, setNavCollapsed] = useState(false)
+  const [activeHeadingIndex, setActiveHeadingIndex] = useState<number | null>(null)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -106,7 +104,8 @@ export function RichMarkdownEditor({
         translate: 'no'
       },
       nodeViews: {
-        code_block: (node) => createCodeBlockNodeView(node),
+        code_block: (node, view, getPos) =>
+          createCodeBlockNodeView(node, view, getPos as () => number | undefined),
         list_item: (node, view, getPos) =>
           createTaskListItemNodeView(node, view, getPos as () => number | undefined)
       },
@@ -174,6 +173,43 @@ export function RichMarkdownEditor({
     })
   }, [anchorTarget, content])
 
+  useEffect(() => {
+    const root = hostRef.current
+
+    if (!root || headingAnchors.length === 0) {
+      setActiveHeadingIndex(null)
+      return
+    }
+
+    let frameId = 0
+
+    const updateActiveHeading = (): void => {
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        const headings = Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'))
+        let currentIndex = 0
+
+        headings.forEach((heading, index) => {
+          if (heading.getBoundingClientRect().top <= 140) {
+            currentIndex = index
+          }
+        })
+
+        setActiveHeadingIndex(Math.min(currentIndex, headingAnchors.length - 1))
+      })
+    }
+
+    updateActiveHeading()
+    window.addEventListener('scroll', updateActiveHeading, true)
+    window.addEventListener('resize', updateActiveHeading)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      window.removeEventListener('scroll', updateActiveHeading, true)
+      window.removeEventListener('resize', updateActiveHeading)
+    }
+  }, [headingAnchors])
+
   const scrollToHeading = (heading: HeadingAnchor): void => {
     const root = hostRef.current
 
@@ -201,48 +237,12 @@ export function RichMarkdownEditor({
       data-width-mode={settings.previewEditWidthMode}
     >
       {settings.customPreviewCss ? <style>{settings.customPreviewCss}</style> : null}
-      <aside
-        className="preview-edit-nav-card"
-        data-collapsed={navCollapsed}
-        aria-label="文档标题导航"
-      >
-        <header className="preview-edit-nav-header">
-          <span className="preview-edit-nav-title" title={documentTitle}>
-            {documentTitle}
-          </span>
-          {dirty ? <span className="preview-edit-nav-dirty" aria-label="未保存" /> : null}
-          <button
-            className="preview-edit-nav-toggle"
-            type="button"
-            aria-label={navCollapsed ? '展开标题导航' : '收起标题导航'}
-            aria-expanded={!navCollapsed}
-            onClick={() => setNavCollapsed((current) => !current)}
-          >
-            {navCollapsed ? <IconChevronDown /> : <IconChevronUp />}
-          </button>
-        </header>
-        {!navCollapsed ? (
-          <nav className="preview-edit-heading-nav" aria-label="标题列表">
-            {headingAnchors.length > 0 ? (
-              headingAnchors.map((heading) => (
-                <button
-                  key={`${heading.slug}-${heading.index}`}
-                  className="preview-edit-heading-nav-item"
-                  data-level={heading.level}
-                  type="button"
-                  title={heading.text}
-                  onClick={() => scrollToHeading(heading)}
-                >
-                  <span className="preview-edit-heading-nav-marker">H{heading.level}</span>
-                  <span className="preview-edit-heading-nav-text">{heading.text}</span>
-                </button>
-              ))
-            ) : (
-              <span className="preview-edit-heading-nav-empty">无标题</span>
-            )}
-          </nav>
-        ) : null}
-      </aside>
+      <DocumentOutline
+        headings={headingAnchors}
+        dirty={dirty}
+        activeHeadingIndex={activeHeadingIndex}
+        onHeadingSelect={scrollToHeading}
+      />
       <FormatToolbar view={editorView} fontSize={fontSize} onFontSizeChange={setFontSize} />
       <div ref={hostRef} className="preview-edit-prosemirror" />
     </div>

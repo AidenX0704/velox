@@ -29,10 +29,9 @@ interface SidebarProps {
   onOpenWorkspace: () => void
   onOpenFile: (path: string) => void
   onExpandedPathsChange?: (paths: string[]) => void
-}
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
+  onCreateWorkspaceEntry?: (parentPath: string, name: string, type: 'file' | 'directory') => Promise<string | null>
+  onRenameWorkspaceEntry?: (path: string, newName: string) => Promise<string | null>
+  onDeleteWorkspaceEntry?: (path: string) => Promise<boolean>
 }
 
 export function Sidebar({
@@ -48,7 +47,10 @@ export function Sidebar({
   onOpenSettings,
   onOpenWorkspace,
   onOpenFile,
-  onExpandedPathsChange
+  onExpandedPathsChange,
+  onCreateWorkspaceEntry,
+  onRenameWorkspaceEntry,
+  onDeleteWorkspaceEntry
 }: SidebarProps): React.JSX.Element {
   const [panelTab, setPanelTab] = useState<SidebarPanelTab>('workspace')
 
@@ -135,20 +137,6 @@ export function Sidebar({
 
         {panelTab === 'workspace' ? (
           <section className="sidebar-panel" role="tabpanel" aria-label="资源管理器">
-            <div className="explorer-root-header">
-              <IconFolderOpen />
-              <div className="explorer-root-copy">
-                <Typography.Text
-                  className="explorer-root-name"
-                  ellipsis={{ showTooltip: true }}
-                >
-                  {workspaceRoot ? basename(workspaceRoot) : '未打开工作区'}
-                </Typography.Text>
-                <Typography.Text className="explorer-root-path" type="tertiary">
-                  {workspaceRoot ? '工作区目录' : '打开文件夹后显示目录树'}
-                </Typography.Text>
-              </div>
-            </div>
             {workspaceRoot ? (
               <WorkspaceTree
                 entries={workspaceTree}
@@ -156,6 +144,10 @@ export function Sidebar({
                 expandedPaths={expandedPaths}
                 onOpenFile={onOpenFile}
                 onExpandedPathsChange={onExpandedPathsChange}
+                onCreateWorkspaceEntry={onCreateWorkspaceEntry}
+                onRenameWorkspaceEntry={onRenameWorkspaceEntry}
+                onDeleteWorkspaceEntry={onDeleteWorkspaceEntry}
+                workspaceRoot={workspaceRoot}
               />
             ) : (
               <div className="explorer-empty">

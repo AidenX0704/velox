@@ -11,6 +11,7 @@ import { registerIpc } from '../ipc'
 import { AppService } from '../services/app-service'
 import { DocumentSessionService } from '../services/document-session-service'
 import { DocumentService } from '../services/document-service'
+import { ExportService } from '../services/export-service'
 import { logger, registerProcessLogging } from '../services/log-service'
 import { MenuService } from '../services/menu-service'
 import { PreferencesService } from '../services/preferences-service'
@@ -60,6 +61,7 @@ export async function createApp(): Promise<void> {
   const services = {
     appService: new AppService(),
     documentService: new DocumentService(settingsService, recentService),
+    exportService: new ExportService(),
     settingsService,
     preferencesService: new PreferencesService(new PreferencesRepository(database)),
     recentService,

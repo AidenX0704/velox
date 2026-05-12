@@ -20,6 +20,7 @@ import type {
   WorkspaceEntry,
   WorkspaceStateRecord
 } from '../shared/types'
+import type { ExportDocumentInput, ExportDocumentResult, ExportProgress } from '../shared/export'
 import type { EditorPreferences } from '../shared/preferences'
 
 function invoke<T>(channel: string, payload?: unknown): Promise<Result<T>> {
@@ -71,7 +72,20 @@ const api: VeloxAPI = {
       invoke<DocumentLinkPreview | null>(ipcChannels.document.previewLink, input),
     save: (input: SaveDocumentInput) => invoke<DocumentData>(ipcChannels.document.save, input),
     saveAs: (input: SaveDocumentAsInput) =>
-      invoke<DocumentData | null>(ipcChannels.document.saveAs, input)
+      invoke<DocumentData | null>(ipcChannels.document.saveAs, input),
+    export: (input: ExportDocumentInput) =>
+      invoke<ExportDocumentResult | null>(ipcChannels.document.export, input),
+    onExportProgress: (callback) => {
+      const listener = (_event: IpcRendererEvent, progress: ExportProgress): void => {
+        callback(progress)
+      }
+
+      ipcRenderer.on(ipcChannels.document.exportProgress, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.document.exportProgress, listener)
+      }
+    }
   },
   workspace: {
     openFolder: () => invoke<string | null>(ipcChannels.workspace.openFolder),
@@ -80,7 +94,21 @@ const api: VeloxAPI = {
     getState: (rootPath: string) =>
       invoke<WorkspaceStateRecord | null>(ipcChannels.workspace.getState, rootPath),
     updateState: (input: UpdateWorkspaceStateInput) =>
-      invoke<WorkspaceStateRecord>(ipcChannels.workspace.updateState, input)
+      invoke<WorkspaceStateRecord>(ipcChannels.workspace.updateState, input),
+    createEntry: (input) => invoke<string>(ipcChannels.workspace.createEntry, input),
+    renameEntry: (input) => invoke<string>(ipcChannels.workspace.renameEntry, input),
+    deleteEntry: (input) => invoke<void>(ipcChannels.workspace.deleteEntry, input),
+    onDidChange: (callback) => {
+      const listener = (): void => {
+        callback()
+      }
+
+      ipcRenderer.on(ipcChannels.workspace.didChange, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.workspace.didChange, listener)
+      }
+    }
   },
   session: {
     getDocument: (path: string) =>

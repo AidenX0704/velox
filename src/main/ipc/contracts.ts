@@ -51,7 +51,29 @@ export const schemas = {
         .optional(),
       defaultMode: z.enum(['source', 'split', 'preview-edit']).optional(),
       hasSeenWelcome: z.boolean().optional(),
-      shortcutOverrides: z.record(z.string(), z.string()).optional()
+      shortcutOverrides: z.record(z.string(), z.string()).optional(),
+      export: z
+        .object({
+          includeCustomCss: z.boolean().optional(),
+          imageFormat: z.enum(['png', 'jpeg']).optional(),
+          imageScale: z.number().min(1).max(3).optional(),
+          pdfPageSize: z.enum(['A4', 'Letter']).optional(),
+          defaultFormat: z.enum(['html', 'pdf', 'png', 'jpeg', 'docx']).optional()
+        })
+        .optional()
+    })
+    .strict(),
+  exportDocument: z
+    .object({
+      title: nonEmptyString,
+      content: z.string(),
+      sourcePath: nonEmptyString.optional(),
+      format: z.enum(['html', 'pdf', 'png', 'jpeg', 'docx']),
+      includeCustomCss: z.boolean().optional(),
+      customCss: z.string().max(12000).optional(),
+      imageFormat: z.enum(['png', 'jpeg']).optional(),
+      imageScale: z.number().min(1).max(3).optional(),
+      pdfPageSize: z.enum(['A4', 'Letter']).optional()
     })
     .strict(),
   workspaceState: z
@@ -60,6 +82,24 @@ export const schemas = {
       expandedPaths: z.array(nonEmptyString).optional(),
       selectedPath: nonEmptyString.optional(),
       sidebarVisible: z.boolean().optional()
+    })
+    .strict(),
+  createWorkspaceEntry: z
+    .object({
+      parentPath: nonEmptyString,
+      name: nonEmptyString,
+      type: z.enum(['file', 'directory'])
+    })
+    .strict(),
+  renameWorkspaceEntry: z
+    .object({
+      path: nonEmptyString,
+      newName: nonEmptyString
+    })
+    .strict(),
+  deleteWorkspaceEntry: z
+    .object({
+      path: nonEmptyString
     })
     .strict(),
   documentSession: z
@@ -101,3 +141,4 @@ export type ResolveDocumentLinkInput = z.infer<typeof schemas.resolveDocumentLin
 export type EditorPreferencesPatchInput = z.infer<typeof schemas.editorPreferencesPatch>
 export type WorkspaceStateInput = z.infer<typeof schemas.workspaceState>
 export type DocumentSessionInput = z.infer<typeof schemas.documentSession>
+export type ExportDocumentInput = z.infer<typeof schemas.exportDocument>

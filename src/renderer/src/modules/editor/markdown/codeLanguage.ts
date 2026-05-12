@@ -1,5 +1,3 @@
-import hljs from 'highlight.js'
-
 export interface CodeLanguageMeta {
   displayName: string
   highlightLanguage: string
@@ -7,7 +5,33 @@ export interface CodeLanguageMeta {
   kind: string
 }
 
+export const commonCodeLanguages = [
+  'text',
+  'javascript',
+  'typescript',
+  'python',
+  'java',
+  'go',
+  'rust',
+  'kotlin',
+  'swift',
+  'cpp',
+  'c',
+  'csharp',
+  'html',
+  'css',
+  'json',
+  'yaml',
+  'markdown',
+  'sql',
+  'bash',
+  'powershell',
+  'dockerfile',
+  'diff'
+] as const
+
 const languageAliases: Record<string, string> = {
+  text: 'plaintext',
   cjs: 'javascript',
   js: 'javascript',
   jsx: 'javascript',
@@ -42,8 +66,8 @@ const displayNames: Record<string, string> = {
 export function getCodeLanguageMeta(language?: string): CodeLanguageMeta {
   const requestedLanguage = normalizeLanguageName(language)
   const aliasedLanguage = languageAliases[requestedLanguage] ?? requestedLanguage
-  const highlightLanguage =
-    aliasedLanguage && hljs.getLanguage(aliasedLanguage) ? aliasedLanguage : 'plaintext'
+  // Use aliasedLanguage directly for highlighting, Shiki and HLJS fallbacks are handled in the rendering layer
+  const highlightLanguage = aliasedLanguage || 'plaintext'
   const displayName = requestedLanguage || displayNames[highlightLanguage] || highlightLanguage
 
   return {

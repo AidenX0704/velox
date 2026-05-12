@@ -1,4 +1,8 @@
-import { defaultEditorPreferences, type EditorPreferences } from '../../shared/preferences'
+import {
+  defaultEditorPreferences,
+  type EditorPreferences,
+  type EditorPreferencesPatch
+} from '../../shared/preferences'
 import { PreferencesRepository } from '../database/repositories/preferences-repository'
 
 const editorPreferencesKey = 'editorPreferences'
@@ -13,14 +17,23 @@ export class PreferencesService {
     return {
       ...defaultEditorPreferences,
       hasSeenWelcome: hasExistingPreferences,
-      ...stored
+      ...stored,
+      export: {
+        ...defaultEditorPreferences.export,
+        ...stored?.export
+      }
     }
   }
 
-  updateEditorPreferences(patch: Partial<EditorPreferences>): EditorPreferences {
+  updateEditorPreferences(patch: EditorPreferencesPatch): EditorPreferences {
+    const current = this.getEditorPreferences()
     const next = {
-      ...this.getEditorPreferences(),
-      ...patch
+      ...current,
+      ...patch,
+      export: {
+        ...current.export,
+        ...patch.export
+      }
     }
 
     this.preferencesRepository.set(editorPreferencesKey, next)

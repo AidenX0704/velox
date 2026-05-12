@@ -8,6 +8,10 @@ interface CodeBlockProps {
   language?: string
 }
 
+/**
+ * Static CodeBlock component used in Markdown Preview.
+ * In this mode, the language is read-only as it's driven by the source markdown.
+ */
 export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
   const languageMeta = useMemo(() => getCodeLanguageMeta(language), [language])

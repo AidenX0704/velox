@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
 import type { EditorView } from 'prosemirror-view'
 import type { MarkType, NodeType } from 'prosemirror-model'
@@ -37,7 +37,9 @@ function toggleMarkCommand(markType: MarkType): Command {
     }
     const hasMark = state.doc.rangeHasMark(from, to, markType)
     if (dispatch) {
-      const tr = hasMark ? state.tr.removeMark(from, to, markType) : state.tr.addMark(from, to, markType.create())
+      const tr = hasMark
+        ? state.tr.removeMark(from, to, markType)
+        : state.tr.addMark(from, to, markType.create())
       dispatch(tr)
     }
     return true
@@ -50,7 +52,11 @@ function setBlockTypeCommand(nodeType: NodeType, attrs?: Record<string, unknown>
     const parent = $from.node()
     if (parent.type === nodeType) {
       if (dispatch) {
-        const tr = state.tr.setBlockType($from.before(), $from.after(), state.schema.nodes.paragraph)
+        const tr = state.tr.setBlockType(
+          $from.before(),
+          $from.after(),
+          state.schema.nodes.paragraph
+        )
         dispatch(tr)
       }
       return true
@@ -69,7 +75,11 @@ function wrapInCommand(nodeType: NodeType): Command {
     const parent = $from.node()
     if (parent.type === nodeType) {
       if (dispatch) {
-        const tr = state.tr.setBlockType($from.before(), $from.after(), state.schema.nodes.paragraph)
+        const tr = state.tr.setBlockType(
+          $from.before(),
+          $from.after(),
+          state.schema.nodes.paragraph
+        )
         dispatch(tr)
       }
       return true
@@ -88,7 +98,11 @@ function liftCommand(): Command {
     const parent = $from.node()
     if (parent.type.name !== 'paragraph') {
       if (dispatch) {
-        const tr = state.tr.setBlockType($from.before(), $from.after(), state.schema.nodes.paragraph)
+        const tr = state.tr.setBlockType(
+          $from.before(),
+          $from.after(),
+          state.schema.nodes.paragraph
+        )
         dispatch(tr)
       }
       return true
@@ -97,12 +111,14 @@ function liftCommand(): Command {
   }
 }
 
-export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolbarProps): React.JSX.Element | null {
+export function FormatToolbar({
+  view,
+  fontSize,
+  onFontSizeChange
+}: FormatToolbarProps): React.JSX.Element | null {
   const [cursorMarks, setCursorMarks] = useState<Set<string>>(new Set())
   const [currentBlockType, setCurrentBlockType] = useState<string>('paragraph')
   const [blockLevel, setBlockLevel] = useState<number>(0)
-  const viewRef = useRef(view)
-  viewRef.current = view
 
   useEffect(() => {
     if (!view) return
@@ -144,12 +160,15 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
     }
   }, [view])
 
-  const execCommand = useCallback((command: Command) => {
-    const v = viewRef.current
-    if (!v) return
-    command(v.state, v.dispatch)
-    v.focus()
-  }, [])
+  const execCommand = useCallback(
+    (command: Command) => {
+      if (!view) return
+      const v = view
+      command(v.state, v.dispatch)
+      v.focus()
+    },
+    [view]
+  )
 
   const isMarkActive = useCallback((markName: string) => cursorMarks.has(markName), [cursorMarks])
 
@@ -163,33 +182,33 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
   )
 
   const handleBold = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     execCommand(toggleMarkCommand(v.state.schema.marks.strong))
-  }, [execCommand])
+  }, [execCommand, view])
 
   const handleItalic = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     execCommand(toggleMarkCommand(v.state.schema.marks.em))
-  }, [execCommand])
+  }, [execCommand, view])
 
   const handleStrikethrough = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     const mark = v.state.schema.marks.strikethrough ?? v.state.schema.marks.s
     if (mark) execCommand(toggleMarkCommand(mark))
-  }, [execCommand])
+  }, [execCommand, view])
 
   const handleInlineCode = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     execCommand(toggleMarkCommand(v.state.schema.marks.code))
-  }, [execCommand])
+  }, [execCommand, view])
 
   const handleHeading = useCallback(
     (level: number) => {
-      const v = viewRef.current
+      const v = view
       if (!v) return
       if (isBlockActive('heading', level)) {
         execCommand(setBlockTypeCommand(v.state.schema.nodes.paragraph))
@@ -197,11 +216,11 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
         execCommand(setBlockTypeCommand(v.state.schema.nodes.heading, { level }))
       }
     },
-    [isBlockActive, execCommand]
+    [isBlockActive, execCommand, view]
   )
 
   const handleBulletList = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     const { state, dispatch } = v
     if (isBlockActive('bullet_list')) {
@@ -210,10 +229,10 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
       wrapInList(state.schema.nodes.bullet_list)(state, dispatch)
     }
     v.focus()
-  }, [isBlockActive])
+  }, [isBlockActive, view])
 
   const handleOrderedList = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     const { state, dispatch } = v
     if (isBlockActive('ordered_list')) {
@@ -222,30 +241,30 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
       wrapInList(state.schema.nodes.ordered_list)(state, dispatch)
     }
     v.focus()
-  }, [isBlockActive])
+  }, [isBlockActive, view])
 
   const handleBlockquote = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     if (isBlockActive('blockquote')) {
       execCommand(liftCommand())
     } else {
       execCommand(wrapInCommand(v.state.schema.nodes.blockquote))
     }
-  }, [isBlockActive, execCommand])
+  }, [isBlockActive, execCommand, view])
 
   const handleCodeBlock = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     if (isBlockActive('code_block')) {
       execCommand(setBlockTypeCommand(v.state.schema.nodes.paragraph))
     } else {
       execCommand(setBlockTypeCommand(v.state.schema.nodes.code_block))
     }
-  }, [isBlockActive, execCommand])
+  }, [isBlockActive, execCommand, view])
 
   const handleInsertLink = useCallback(() => {
-    const v = viewRef.current
+    const v = view
     if (!v) return
     const { state, dispatch } = v
     const { selection } = state
@@ -272,7 +291,7 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
       }
     }
     v.focus()
-  }, [])
+  }, [view])
 
   const headingMenu = useMemo(
     () => [
@@ -310,7 +329,9 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
                     }
                   }}
                 >
-                  <span className={`format-heading-option ${item.level > 0 ? `h${item.level}` : ''}`}>
+                  <span
+                    className={`format-heading-option ${item.level > 0 ? `h${item.level}` : ''}`}
+                  >
                     {item.label}
                   </span>
                 </Dropdown.Item>
@@ -318,7 +339,11 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
             </Dropdown.Menu>
           }
         >
-          <Button size="small" theme="borderless" className="format-toolbar-btn format-heading-select">
+          <Button
+            size="small"
+            theme="borderless"
+            className="format-toolbar-btn format-heading-select"
+          >
             {currentHeadingLabel}
             <span className="format-toolbar-chevron">▾</span>
           </Button>
@@ -455,14 +480,22 @@ export function FormatToolbar({ view, fontSize, onFontSizeChange }: FormatToolba
           render={
             <Dropdown.Menu>
               {FONT_SIZES.map((size) => (
-                <Dropdown.Item key={size} active={fontSize === size} onClick={() => onFontSizeChange(size)}>
+                <Dropdown.Item
+                  key={size}
+                  active={fontSize === size}
+                  onClick={() => onFontSizeChange(size)}
+                >
                   {size}px
                 </Dropdown.Item>
               ))}
             </Dropdown.Menu>
           }
         >
-          <Button size="small" theme="borderless" className="format-toolbar-btn format-font-size-select">
+          <Button
+            size="small"
+            theme="borderless"
+            className="format-toolbar-btn format-font-size-select"
+          >
             {fontSize}px
             <span className="format-toolbar-chevron">▾</span>
           </Button>

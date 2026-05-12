@@ -148,6 +148,11 @@ export type MenuCommand =
   | 'document:new'
   | 'document:open'
   | 'document:save'
+  | 'document:export-default'
+  | 'document:export-html'
+  | 'document:export-pdf'
+  | 'document:export-png'
+  | 'document:export-docx'
   | 'workspace:open-folder'
 
 export interface VeloxAPI {
@@ -168,7 +173,7 @@ export interface VeloxAPI {
   preferences: {
     getEditor: () => Promise<Result<import('./preferences').EditorPreferences>>
     updateEditor: (
-      patch: Partial<import('./preferences').EditorPreferences>
+      patch: import('./preferences').EditorPreferencesPatch
     ) => Promise<Result<import('./preferences').EditorPreferences>>
     resetEditor: () => Promise<Result<import('./preferences').EditorPreferences>>
   }
@@ -185,12 +190,26 @@ export interface VeloxAPI {
     previewLink: (input: ResolveDocumentLinkInput) => Promise<Result<DocumentLinkPreview | null>>
     save: (input: SaveDocumentInput) => Promise<Result<DocumentData>>
     saveAs: (input: SaveDocumentAsInput) => Promise<Result<DocumentData | null>>
+    export: (
+      input: import('./export').ExportDocumentInput
+    ) => Promise<Result<import('./export').ExportDocumentResult | null>>
+    onExportProgress: (
+      callback: (progress: import('./export').ExportProgress) => void
+    ) => () => void
   }
   workspace: {
     openFolder: () => Promise<Result<string | null>>
     getTree: (rootPath: string) => Promise<Result<WorkspaceEntry[]>>
     getState: (rootPath: string) => Promise<Result<WorkspaceStateRecord | null>>
     updateState: (input: UpdateWorkspaceStateInput) => Promise<Result<WorkspaceStateRecord>>
+    createEntry: (input: {
+      parentPath: string
+      name: string
+      type: 'file' | 'directory'
+    }) => Promise<Result<string>>
+    renameEntry: (input: { path: string; newName: string }) => Promise<Result<string>>
+    deleteEntry: (input: { path: string }) => Promise<Result<void>>
+    onDidChange: (callback: () => void) => () => void
   }
   session: {
     getDocument: (path: string) => Promise<Result<DocumentSessionRecord | null>>
