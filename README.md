@@ -6,24 +6,24 @@
 [![React](https://img.shields.io/badge/React-19-149eca?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-Velox 是一个基于 Electron、React 与 TypeScript 构建的桌面端 Markdown 编辑器，目标是提供接近 Typora 的沉浸式写作体验，同时保留源码编辑、分栏预览、主题定制和本地桌面应用能力。
+Velox 是一个基于 Electron、React 与 TypeScript 构建的高性能桌面端 Markdown 编辑器，目标是提供现代化的沉浸式所见即所得写作体验，同时保留纯粹的源码编辑、分栏预览、灵活的主题定制和完备的本地桌面应用能力。
 
 > 项目仍处于早期开发阶段。欢迎 Star、试用、提交 Issue 或 Pull Request。
 
 ## 预览
 
-Velox 当前提供源码编辑、分栏预览和类 Typora 预览编辑三种工作模式，并支持主题色、亮色、黑色和跟随系统外观切换。
+Velox 当前提供源码编辑、分栏预览和所见即所得的富文本编辑等三种工作模式，并支持主题色、亮色、黑色和跟随系统外观自动切换。
 
 ## 特性
 
-- **多编辑模式**：支持源码编辑、源码/预览分栏、类 Typora 预览编辑。
+- **多编辑模式**：支持源码编辑、源码/预览分栏、所见即所得富文本编辑。
 - **Markdown 增强渲染**：支持标题、引用、列表、任务列表、表格、代码块、公式和常见排版能力。
-- **代码块体验**：支持代码高亮、语言标识、复制代码、折叠/展开代码块。
-- **预览编辑能力**：基于 ProseMirror 实现直接编辑，支持基础块、列表、表格、行内公式与块级公式。
-- **工作区面板**：支持打开文件夹、目录树、最近文件和文档会话恢复。
-- **主题系统**：支持预设主题色、自定义主题色、亮色、黑色和跟随系统外观。
-- **桌面应用架构**：主进程服务化拆分、类型化 IPC、隔离 preload API、窗口状态管理、安全配置和打包图标。
-- **本地持久化**：使用 SQLite 保存编辑器设置、最近文件、最近工作区、工作区展开状态与文档会话状态。
+- **代码块体验**：支持代码高亮、语言标识、自动检测、复制代码、折叠/展开代码块。
+- **预览编辑能力**：基于 ProseMirror 实现文档结构的直接编辑，支持基础块、列表、表格、行内公式与块级公式。
+- **工作区管理**：内置全功能侧边栏资源管理器，支持新建、重命名、删除文件，实时监听文件系统变动，并支持文档会话状态恢复。
+- **主题系统**：支持多套预设主题色、自定义主题色、亮色、黑色和跟随系统外观切换。
+- **桌面应用架构**：主进程服务化拆分、严格类型化 IPC、隔离 preload API、窗口状态管理、安全配置和全平台打包。
+- **本地持久化**：使用 SQLite (better-sqlite3) 稳定保存编辑器偏好、最近文件、最近工作区、工作区展开状态与各文档的会话状态。
 
 ## 技术栈
 
@@ -32,7 +32,7 @@ Velox 当前提供源码编辑、分栏预览和类 Typora 预览编辑三种工
 - **编辑器**：CodeMirror 6、ProseMirror、prosemirror-tables
 - **Markdown**：markdown-it、markdown-it-multimd-table、markdown-it-task-lists、markdown-it-texmath
 - **渲染增强**：Shiki、highlight.js、KaTeX、DOMPurify
-- **持久化**：better-sqlite3、SQLite WAL
+- **持久化**：better-sqlite3、SQLite WAL、chokidar
 - **工程化**：pnpm、ESLint、Prettier、electron-builder
 
 ## 项目结构
@@ -54,7 +54,7 @@ scripts/             工程脚本，例如图标生成
 - `src/main/database/`：SQLite 初始化、迁移与仓储层。
 - `src/main/services/`：文档、工作区、偏好设置、最近记录、自动更新等主进程服务。
 - `src/main/ipc/`：类型化 IPC 注册与参数校验。
-- `src/renderer/src/modules/editor/`：源码编辑、预览、预览编辑模式。
+- `src/renderer/src/modules/editor/`：源码编辑、预览、富文本编辑模式。
 - `src/renderer/src/features/theme/`：主题色与亮色/黑色/系统模式运行时同步。
 - `src/renderer/src/layout/`：主布局、标题栏、状态栏、工作区与设置面板。
 
@@ -136,17 +136,17 @@ VELOX_UPDATE_URL=https://your-update-host.example.com pnpm run build:mac
 - 引用块、分割线、行内代码、围栏代码块
 - 表格、多行表格基础渲染
 - 行内公式与块级公式
-- 代码高亮、代码块复制、代码块折叠
+- 代码块语法高亮、语言切换、复制、折叠
 
 ## 路线图
 
-- [x] 主题色、自定义主题色、亮色/黑色/系统外观切换
-- [x] 应用 Logo 与跨平台打包图标
-- [ ] 更完整的类 Typora 所见即所得编辑体验
+- [x] 主题色、自定义主题色、亮色/黑色/系统外观自动切换
+- [x] 应用 Logo 与跨平台打包图标体系
+- [x] 全功能工作区资源管理器与文件系统实时同步
+- [ ] 更强大的所见即所得富文本排版交互
 - [ ] 表格工具栏、增删行列、对齐与批量选择交互
 - [ ] 公式块可视化编辑与错误提示
-- [ ] 文件监听、自动保存、冲突处理与草稿恢复
-- [ ] 命令面板、快捷键设置与插件体系
+- [ ] 命令面板、全局搜索、快捷键设置与插件体系
 - [ ] 单元测试、端到端测试与 CI 发布流程
 
 ## 贡献
