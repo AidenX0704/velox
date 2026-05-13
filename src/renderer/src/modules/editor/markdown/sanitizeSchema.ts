@@ -1,5 +1,5 @@
 import { defaultSchema } from 'rehype-sanitize'
-import type { Schema } from 'hast-util-sanitize'
+import type { Options } from 'rehype-sanitize'
 
 const safeTags = [
   'details',
@@ -31,7 +31,7 @@ const globalAttributes = [
   'dataCopyState'
 ]
 
-export const markdownSanitizeSchema: Schema = {
+export const markdownSanitizeSchema: Options = {
   ...defaultSchema,
   tagNames: [...(defaultSchema.tagNames ?? []), ...safeTags],
   attributes: {
