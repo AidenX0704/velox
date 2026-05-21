@@ -104,6 +104,15 @@ export class MenuService {
       {
         label: 'Window',
         submenu: [{ role: 'minimize' }, { role: 'zoom' }]
+      },
+      {
+        label: 'Help',
+        submenu: [
+          {
+            label: 'Check for Updates...',
+            click: () => this.sendCommand('updater:check')
+          }
+        ]
       }
     ]
   }

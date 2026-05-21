@@ -29,6 +29,9 @@ mac:
   icon: build/icon.icns
   category: public.app-category.productivity
   hardenedRuntime: true
+  target:
+    - dmg
+    - zip
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSDocumentsFolderUsageDescription: Velox needs access to open and save Markdown documents.
@@ -49,6 +52,11 @@ appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 deb:
   artifactName: ${productName}-${version}-${arch}.${ext}
+publish:
+  provider: github
+  owner: AidenX0704
+  repo: velox
+  releaseType: release
 npmRebuild: true
 compression: maximum
 electronDownload:

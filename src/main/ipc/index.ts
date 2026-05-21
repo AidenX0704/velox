@@ -10,6 +10,7 @@ import { PreferencesService } from '../services/preferences-service'
 import { RecentService } from '../services/recent-service'
 import { SettingsService } from '../services/settings-service'
 import { ShellService } from '../services/shell-service'
+import { UpdaterService } from '../services/updater-service'
 import { WorkspaceService } from '../services/workspace-service'
 import { WorkspaceStateService } from '../services/workspace-state-service'
 
@@ -23,6 +24,7 @@ export interface MainServices {
   workspaceStateService: WorkspaceStateService
   documentSessionService: DocumentSessionService
   shellService: ShellService
+  updaterService: UpdaterService
   workspaceService: WorkspaceService
 }
 
@@ -143,5 +145,18 @@ export function registerIpc(services: MainServices): void {
   )
   registerIpcHandler(ipcChannels.shell.showItemInFolder, schemas.path, (path) => {
     services.shellService.showItemInFolder(path)
+  })
+
+  registerIpcHandler(ipcChannels.updater.getStatus, schemas.empty, () =>
+    services.updaterService.getStatus()
+  )
+  registerIpcHandler(ipcChannels.updater.checkForUpdates, schemas.empty, () =>
+    services.updaterService.checkForUpdates()
+  )
+  registerIpcHandler(ipcChannels.updater.downloadUpdate, schemas.empty, () =>
+    services.updaterService.downloadUpdate()
+  )
+  registerIpcHandler(ipcChannels.updater.quitAndInstall, schemas.empty, () => {
+    services.updaterService.quitAndInstall()
   })
 }

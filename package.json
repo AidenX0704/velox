@@ -1,6 +1,6 @@
 {
   "name": "velox",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Typora-inspired desktop Markdown editor built with Electron, React and TypeScript",
   "main": "./out/main/index.js",
   "author": "Velox",
@@ -20,7 +20,11 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:linux": "npm run build && electron-builder --linux",
+    "release": "npm run build && electron-builder --publish always",
+    "release:win": "npm run build && electron-builder --win --publish always",
+    "release:mac": "npm run build && electron-builder --mac --publish always",
+    "release:linux": "npm run build && electron-builder --linux --publish always"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

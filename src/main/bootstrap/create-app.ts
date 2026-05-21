@@ -58,6 +58,7 @@ export async function createApp(): Promise<void> {
   const database = getDatabase()
   const settingsService = new SettingsService()
   const recentService = new RecentService(new RecentRepository(database))
+  const updaterService = new UpdaterService()
   const services = {
     appService: new AppService(),
     documentService: new DocumentService(settingsService, recentService),
@@ -68,6 +69,7 @@ export async function createApp(): Promise<void> {
     workspaceStateService: new WorkspaceStateService(new WorkspaceStateRepository(database)),
     documentSessionService: new DocumentSessionService(new DocumentSessionRepository(database)),
     shellService: new ShellService(),
+    updaterService,
     workspaceService: new WorkspaceService(settingsService, recentService)
   }
 
@@ -75,11 +77,10 @@ export async function createApp(): Promise<void> {
 
   new MenuService(windowManager).install()
 
-  const updaterService = new UpdaterService()
   updaterService.install()
 
   windowManager.createMainWindow()
-  updaterService.checkForUpdates()
+  void updaterService.checkForUpdates()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

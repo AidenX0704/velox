@@ -16,6 +16,7 @@ import type {
   SaveDocumentInput,
   UpdateDocumentSessionInput,
   UpdateWorkspaceStateInput,
+  UpdaterStatus,
   VeloxAPI,
   WorkspaceEntry,
   WorkspaceStateRecord
@@ -121,6 +122,23 @@ const api: VeloxAPI = {
   shell: {
     openExternal: (url: string) => invoke<void>(ipcChannels.shell.openExternal, url),
     showItemInFolder: (path: string) => invoke<void>(ipcChannels.shell.showItemInFolder, path)
+  },
+  updater: {
+    getStatus: () => invoke<UpdaterStatus>(ipcChannels.updater.getStatus),
+    checkForUpdates: () => invoke<UpdaterStatus>(ipcChannels.updater.checkForUpdates),
+    downloadUpdate: () => invoke<UpdaterStatus>(ipcChannels.updater.downloadUpdate),
+    quitAndInstall: () => invoke<void>(ipcChannels.updater.quitAndInstall),
+    onStatusChange: (callback) => {
+      const listener = (_event: IpcRendererEvent, status: UpdaterStatus): void => {
+        callback(status)
+      }
+
+      ipcRenderer.on(ipcChannels.updater.statusChanged, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.updater.statusChanged, listener)
+      }
+    }
   },
   menu: {
     onCommand: (callback) => {

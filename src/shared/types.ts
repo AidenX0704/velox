@@ -120,6 +120,30 @@ export interface WorkspaceStateRecord {
   updatedAt: string
 }
 
+export type UpdaterState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+export interface UpdaterStatus {
+  state: UpdaterState
+  message: string
+  version?: string
+  releaseName?: string
+  releaseDate?: string
+  releaseNotes?: string
+  percent?: number
+  transferred?: number
+  total?: number
+  bytesPerSecond?: number
+  error?: string
+  updatedAt: string
+}
+
 export interface UpdateWorkspaceStateInput {
   workspacePath: string
   expandedPaths?: string[]
@@ -153,6 +177,7 @@ export type MenuCommand =
   | 'document:export-pdf'
   | 'document:export-png'
   | 'document:export-docx'
+  | 'updater:check'
   | 'workspace:open-folder'
 
 export interface VeloxAPI {
@@ -219,6 +244,13 @@ export interface VeloxAPI {
   shell: {
     openExternal: (url: string) => Promise<Result<void>>
     showItemInFolder: (path: string) => Promise<Result<void>>
+  }
+  updater: {
+    getStatus: () => Promise<Result<UpdaterStatus>>
+    checkForUpdates: () => Promise<Result<UpdaterStatus>>
+    downloadUpdate: () => Promise<Result<UpdaterStatus>>
+    quitAndInstall: () => Promise<Result<void>>
+    onStatusChange: (callback: (status: UpdaterStatus) => void) => () => void
   }
   menu: {
     onCommand: (callback: (command: MenuCommand) => void) => () => void

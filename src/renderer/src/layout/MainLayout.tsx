@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
+import type { UpdaterStatus } from '../../../shared/types'
 import { MarkdownEditor } from '../modules/editor/MarkdownEditor'
 import type { CursorPosition } from '../modules/editor/model/types'
 import { useDocument } from '../features/document/useDocument'
@@ -27,9 +28,13 @@ export function MainLayout(): React.JSX.Element {
   const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ line: 1, column: 1 })
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
+  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
+  const updaterManualCheckRef = useRef(false)
+  const updaterAvailablePromptRef = useRef<string | undefined>(undefined)
+  const updaterInstallPromptRef = useRef<string | undefined>(undefined)
   const { settings: editorSettings, updateSettings, resetSettings } = useEditorSettings()
   const {
     document,
@@ -248,11 +253,116 @@ export function MainLayout(): React.JSX.Element {
     ]
   )
 
+  const downloadUpdate = useCallback(async (): Promise<void> => {
+    const result = await window.api.updater.downloadUpdate()
+
+    if (!result.ok) {
+      Toast.error(result.error.message)
+    }
+  }, [])
+
+  const installUpdate = useCallback(async (): Promise<void> => {
+    const result = await window.api.updater.quitAndInstall()
+
+    if (!result.ok) {
+      Toast.error(result.error.message)
+    }
+  }, [])
+
+  const handleUpdaterStatus = useCallback(
+    (status: UpdaterStatus): void => {
+      setUpdaterStatus(status)
+
+      if (status.state === 'available') {
+        updaterManualCheckRef.current = false
+
+        const version = status.version ?? status.updatedAt
+        if (updaterAvailablePromptRef.current === version) {
+          return
+        }
+
+        updaterAvailablePromptRef.current = version
+        Modal.confirm({
+          title: status.version ? `发现新版本 ${status.version}` : '发现新版本',
+          content: status.releaseNotes || status.message,
+          okText: '下载更新',
+          cancelText: '稍后',
+          onOk: () => {
+            void downloadUpdate()
+          }
+        })
+        return
+      }
+
+      if (status.state === 'downloaded') {
+        const version = status.version ?? status.updatedAt
+        if (updaterInstallPromptRef.current === version) {
+          return
+        }
+
+        updaterInstallPromptRef.current = version
+        Modal.confirm({
+          title: '更新已准备就绪',
+          content: status.version
+            ? `版本 ${status.version} 已下载，重启后会完成安装。`
+            : '更新已下载，重启后会完成安装。',
+          okText: '重启安装',
+          cancelText: '稍后',
+          onOk: () => {
+            void installUpdate()
+          }
+        })
+        return
+      }
+
+      if (status.state === 'not-available' && updaterManualCheckRef.current) {
+        updaterManualCheckRef.current = false
+        Toast.success(status.message)
+        return
+      }
+
+      if (status.state === 'error' && updaterManualCheckRef.current) {
+        updaterManualCheckRef.current = false
+        Toast.error(status.error || status.message)
+      }
+    },
+    [downloadUpdate, installUpdate]
+  )
+
+  const checkForUpdates = useCallback(async (): Promise<void> => {
+    updaterManualCheckRef.current = true
+    Toast.info('正在检查更新')
+
+    const result = await window.api.updater.checkForUpdates()
+
+    if (!result.ok) {
+      updaterManualCheckRef.current = false
+      Toast.error(result.error.message)
+    }
+  }, [])
+
   useEffect(() => {
     return window.api.document.onExportProgress((progress) => {
       setExportProgress(progress)
     })
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    window.api.updater.getStatus().then((result) => {
+      if (!cancelled && result.ok) {
+        handleUpdaterStatus(result.data)
+      }
+    })
+
+    const unsubscribe = window.api.updater.onStatusChange(handleUpdaterStatus)
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [handleUpdaterStatus])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
@@ -329,8 +439,39 @@ export function MainLayout(): React.JSX.Element {
       if (command === 'document:export-docx') {
         void handleExport('docx')
       }
+
+      if (command === 'document:new') {
+        openEditorView()
+        void createDocument()
+      }
+
+      if (command === 'document:open') {
+        openEditorView()
+        void openDocument()
+      }
+
+      if (command === 'document:save') {
+        void saveDocument()
+      }
+
+      if (command === 'workspace:open-folder') {
+        void openWorkspace()
+      }
+
+      if (command === 'updater:check') {
+        void checkForUpdates()
+      }
     })
-  }, [editorSettings.export.defaultFormat, editorSettings.export.imageFormat, handleExport])
+  }, [
+    checkForUpdates,
+    createDocument,
+    editorSettings.export.defaultFormat,
+    editorSettings.export.imageFormat,
+    handleExport,
+    openDocument,
+    openWorkspace,
+    saveDocument
+  ])
 
   return (
     <div
@@ -426,6 +567,21 @@ export function MainLayout(): React.JSX.Element {
           <div className="export-progress-modal">
             <Progress percent={exportProgress.percent} showInfo />
             <Typography.Text type="tertiary">{exportProgress.message}</Typography.Text>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
+        visible={updaterStatus?.state === 'downloading'}
+        title="正在下载更新"
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        width={420}
+      >
+        {updaterStatus ? (
+          <div className="export-progress-modal">
+            <Progress percent={Math.round(updaterStatus.percent ?? 0)} showInfo />
+            <Typography.Text type="tertiary">{updaterStatus.message}</Typography.Text>
           </div>
         ) : null}
       </Modal>

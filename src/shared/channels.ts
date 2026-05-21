@@ -53,6 +53,13 @@ export const ipcChannels = {
     openExternal: 'shell:open-external',
     showItemInFolder: 'shell:show-item-in-folder'
   },
+  updater: {
+    getStatus: 'updater:get-status',
+    checkForUpdates: 'updater:check-for-updates',
+    downloadUpdate: 'updater:download-update',
+    quitAndInstall: 'updater:quit-and-install',
+    statusChanged: 'updater:status-changed'
+  },
   menu: {
     command: 'menu:command'
   }

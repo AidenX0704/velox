@@ -23,6 +23,7 @@ Velox 当前提供源码编辑、分栏预览和所见即所得的富文本编�
 - **工作区管理**：内置全功能侧边栏资源管理器，支持新建、重命名、删除文件，实时监听文件系统变动，并支持文档会话状态恢复。
 - **主题系统**：支持多套预设主题色、自定义主题色、亮色、黑色和跟随系统外观切换。
 - **桌面应用架构**：主进程服务化拆分、严格类型化 IPC、隔离 preload API、窗口状态管理、安全配置和全平台打包。
+- **在线更新与发布**：基于 GitHub Releases 提供自动更新源，发布标签后通过 GitHub Actions 自动构建并上传 Windows、macOS、Linux 安装包。
 - **本地持久化**：使用 SQLite (better-sqlite3) 稳定保存编辑器偏好、最近文件、最近工作区、工作区展开状态与各文档的会话状态。
 
 ## 技术栈
@@ -100,9 +101,12 @@ pnpm run build:unpack
 pnpm run build:mac
 pnpm run build:win
 pnpm run build:linux
+
+# 发布并上传到 GitHub Release
+pnpm run release
 ```
 
-## 打包说明
+## 打包与发布
 
 应用图标源文件位于 `build/logo.svg`，运行：
 
@@ -123,11 +127,27 @@ Velox 使用 `better-sqlite3` 作为本地 SQLite 存储引擎。它是原生模
 pnpm exec electron-builder install-app-deps
 ```
 
-自动更新默认关闭。发布时可以通过环境变量配置更新源：
+Velox 使用 `electron-updater` 读取 GitHub Releases 作为线上更新源。打包配置中的发布源是 `AidenX0704/velox`，正式包会从最新 GitHub Release 读取 `latest.yml`、`latest-mac.yml`、`latest-linux.yml` 等更新元数据。
+
+常规发版流程：
+
+1. 修改 `package.json` 中的版本号，例如 `1.0.1`。
+2. 提交版本改动。
+3. 创建并推送匹配版本号的标签，例如 `v1.0.1`。
+4. GitHub Actions 会自动在 Windows、macOS、Linux runner 上构建安装包，并上传到同一个 GitHub Release。
 
 ```bash
-VELOX_UPDATE_URL=https://your-update-host.example.com pnpm run build:mac
+git tag v1.0.1
+git push origin v1.0.1
 ```
+
+也可以在 GitHub Actions 的 `Release` workflow 中手动输入已存在的标签重新发布。手动本地发布需要设置可写入 Release 的 `GH_TOKEN`：
+
+```bash
+GH_TOKEN=github_pat_xxx pnpm run release
+```
+
+开发或内测时可以通过 `VELOX_UPDATE_URL` 临时覆盖更新源，指向自建的 generic update feed。macOS 面向真实用户分发时还需要配置代码签名和 notarization，否则系统可能阻止安装或更新。
 
 ## 当前支持的 Markdown 能力
 
@@ -143,6 +163,7 @@ VELOX_UPDATE_URL=https://your-update-host.example.com pnpm run build:mac
 - [x] 主题色、自定义主题色、亮色/黑色/系统外观自动切换
 - [x] 应用 Logo 与跨平台打包图标体系
 - [x] 全功能工作区资源管理器与文件系统实时同步
+- [x] GitHub Releases 在线更新与 CI 自动发布
 - [ ] 更强大的所见即所得富文本排版交互
 - [ ] 表格工具栏、增删行列、对齐与批量选择交互
 - [ ] 公式块可视化编辑与错误提示
