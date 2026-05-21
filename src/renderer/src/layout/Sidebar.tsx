@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Typography } from '@douyinfe/semi-ui'
 import {
   IconFile,
-  IconFolder,
-  IconFolderOpen,
+  IconFolderOpenStroked,
+  IconFolderStroked,
   IconHistory,
-  IconPlus,
-  IconSetting
+  IconPlusStroked,
+  IconSettingStroked
 } from '@douyinfe/semi-icons'
 import type { RecentFileRecord, WorkspaceEntry } from '../../../shared/types'
 import { BrandLogo } from '../components/BrandLogo'
@@ -14,6 +14,10 @@ import { WorkspaceTree } from './WorkspaceTree'
 
 type AppView = 'editor' | 'settings'
 type SidebarPanelTab = 'workspace' | 'recent'
+
+function basename(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
+}
 
 interface SidebarProps {
   activeView: AppView
@@ -29,7 +33,11 @@ interface SidebarProps {
   onOpenWorkspace: () => void
   onOpenFile: (path: string) => void
   onExpandedPathsChange?: (paths: string[]) => void
-  onCreateWorkspaceEntry?: (parentPath: string, name: string, type: 'file' | 'directory') => Promise<string | null>
+  onCreateWorkspaceEntry?: (
+    parentPath: string,
+    name: string,
+    type: 'file' | 'directory'
+  ) => Promise<string | null>
   onRenameWorkspaceEntry?: (path: string, newName: string) => Promise<string | null>
   onDeleteWorkspaceEntry?: (path: string) => Promise<boolean>
 }
@@ -53,6 +61,14 @@ export function Sidebar({
   onDeleteWorkspaceEntry
 }: SidebarProps): React.JSX.Element {
   const [panelTab, setPanelTab] = useState<SidebarPanelTab>('workspace')
+  const singleFileEntry: WorkspaceEntry | null =
+    !workspaceRoot && selectedPath
+      ? {
+          path: selectedPath,
+          name: basename(selectedPath),
+          type: 'file'
+        }
+      : null
 
   return (
     <aside className="sidebar" data-visible={visible}>
@@ -78,7 +94,7 @@ export function Sidebar({
               onOpenEditor()
             }}
           >
-            <IconFolder />
+            <IconFolderStroked />
           </button>
           <button
             className="activity-item"
@@ -100,7 +116,7 @@ export function Sidebar({
             aria-label="新建文档"
             onClick={onNew}
           >
-            <IconPlus />
+            <IconPlusStroked />
           </button>
         </div>
         <div className="activity-bar-bottom">
@@ -112,7 +128,7 @@ export function Sidebar({
             aria-label="设置"
             onClick={onOpenSettings}
           >
-            <IconSetting />
+            <IconSettingStroked />
           </button>
         </div>
       </nav>
@@ -130,7 +146,7 @@ export function Sidebar({
               aria-label="打开文件夹"
               onClick={onOpenWorkspace}
             >
-              <IconFolderOpen />
+              <IconFolderOpenStroked />
             </button>
           ) : null}
         </header>
@@ -149,11 +165,21 @@ export function Sidebar({
                 onDeleteWorkspaceEntry={onDeleteWorkspaceEntry}
                 workspaceRoot={workspaceRoot}
               />
+            ) : singleFileEntry ? (
+              <WorkspaceTree
+                entries={[singleFileEntry]}
+                selectedPath={selectedPath}
+                onOpenFile={onOpenFile}
+                workspaceRoot={singleFileEntry.path}
+                workspaceRootType="file"
+              />
             ) : (
               <div className="explorer-empty">
-                <IconFolder />
+                <IconFolderStroked />
                 <Typography.Text strong>未打开文件夹</Typography.Text>
-                <Typography.Text type="tertiary">选择一个工作区来浏览 Markdown 文件。</Typography.Text>
+                <Typography.Text type="tertiary">
+                  选择一个工作区来浏览 Markdown 文件。
+                </Typography.Text>
                 <button className="explorer-empty-action" type="button" onClick={onOpenWorkspace}>
                   打开文件夹
                 </button>

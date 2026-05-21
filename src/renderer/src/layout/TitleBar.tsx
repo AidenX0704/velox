@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Button, Dropdown, Tooltip, Typography } from '@douyinfe/semi-ui'
 import {
-  IconCode,
+  IconCodeStroked,
   IconColumnsStroked,
-  IconEyeOpened,
+  IconEyeOpenedStroked,
   IconExport,
   IconFile,
-  IconFolderOpen,
   IconImage,
+  IconImageStroked,
   IconPdf,
-  IconSave,
+  IconSaveStroked,
   IconSidebar
 } from '@douyinfe/semi-icons'
 import type { ExportFormat } from '../../../shared/export'
@@ -31,9 +31,13 @@ interface TitleBarProps {
 }
 
 const modeOptions: Array<SegmentOption<EditorMode>> = [
-  { value: 'source', label: editorModeLabels.source, icon: <IconCode /> },
+  { value: 'source', label: editorModeLabels.source, icon: <IconCodeStroked /> },
   { value: 'split', label: editorModeLabels.split, icon: <IconColumnsStroked /> },
-  { value: 'preview-edit', label: editorModeLabels['preview-edit'], icon: <IconEyeOpened /> }
+  {
+    value: 'preview-edit',
+    label: editorModeLabels['preview-edit'],
+    icon: <IconEyeOpenedStroked />
+  }
 ]
 
 function WindowsCaptionIcon({
@@ -107,10 +111,22 @@ export function TitleBar({
         </Tooltip>
         <div className="titlebar-icon-group" aria-label="文件操作">
           <Tooltip content="打开 Markdown 文件" position="bottom">
-            <Button icon={<IconFolderOpen />} size="small" theme="borderless" onClick={onOpen} />
+            <Button
+              icon={<IconFile />}
+              size="small"
+              theme="borderless"
+              aria-label="打开 Markdown 文件"
+              onClick={onOpen}
+            />
           </Tooltip>
           <Tooltip content="保存当前文档" position="bottom">
-            <Button icon={<IconSave />} size="small" theme="borderless" onClick={onSave} />
+            <Button
+              icon={<IconSaveStroked />}
+              size="small"
+              theme="borderless"
+              aria-label="保存当前文档"
+              onClick={onSave}
+            />
           </Tooltip>
           <Dropdown
             position="bottomLeft"
@@ -119,7 +135,7 @@ export function TitleBar({
                 <Dropdown.Item icon={<IconPdf />} onClick={() => onExport('pdf')}>
                   导出 PDF
                 </Dropdown.Item>
-                <Dropdown.Item icon={<IconImage />} onClick={() => onExport('png')}>
+                <Dropdown.Item icon={<IconImageStroked />} onClick={() => onExport('png')}>
                   导出 PNG
                 </Dropdown.Item>
                 <Dropdown.Item icon={<IconImage />} onClick={() => onExport('jpeg')}>
@@ -134,7 +150,7 @@ export function TitleBar({
               </Dropdown.Menu>
             }
           >
-            <Button icon={<IconExport />} size="small" theme="borderless" />
+            <Button icon={<IconExport />} size="small" theme="borderless" aria-label="导出文档" />
           </Dropdown>
         </div>
       </div>

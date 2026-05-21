@@ -25,6 +25,26 @@ function wrapSelection(view: EditorView, before: string, after: string): boolean
   return true
 }
 
+export type SourceMarkdownFormatAction =
+  | 'paragraph'
+  | 'heading-1'
+  | 'heading-2'
+  | 'heading-3'
+  | 'heading-4'
+  | 'heading-5'
+  | 'heading-6'
+  | 'bold'
+  | 'italic'
+  | 'strikethrough'
+  | 'inline-code'
+  | 'bullet-list'
+  | 'ordered-list'
+  | 'task-list'
+  | 'blockquote'
+  | 'code-block'
+  | 'horizontal-rule'
+  | 'link'
+
 function insertAtLineStart(view: EditorView, prefix: string): boolean {
   const { from } = view.state.selection.main
   const line = view.state.doc.lineAt(from)
@@ -42,28 +62,106 @@ function insertAtLineStart(view: EditorView, prefix: string): boolean {
   return true
 }
 
+function replaceLinePrefix(view: EditorView, prefix: string): boolean {
+  const { from } = view.state.selection.main
+  const line = view.state.doc.lineAt(from)
+  const match = /^(\s*)(#{1,6}\s+|>\s+|[-+*]\s(?:\[(?: |x|X)\]\s)?|\d+\.\s+)/.exec(line.text)
+  const indent = match?.[1] ?? ''
+  const prefixFrom = line.from + indent.length
+  const prefixTo = match ? line.from + match[0].length : prefixFrom
+
+  view.dispatch({
+    changes: { from: prefixFrom, to: prefixTo, insert: prefix }
+  })
+  view.focus()
+  return true
+}
+
+function insertMarkdownBlock(view: EditorView, markdown: string): boolean {
+  const { from, to } = view.state.selection.main
+  const before = from > 0 && view.state.sliceDoc(from - 1, from) !== '\n' ? '\n' : ''
+  const after = to < view.state.doc.length && view.state.sliceDoc(to, to + 1) !== '\n' ? '\n' : ''
+  const insert = `${before}${markdown}${after}`
+
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + before.length + markdown.length }
+  })
+  view.focus()
+  return true
+}
+
+function insertLink(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main
+  const selected = view.state.sliceDoc(from, to)
+  const url = window.prompt('请输入链接地址:', 'https://')
+
+  if (!url) {
+    return false
+  }
+
+  const text = selected || window.prompt('请输入链接文本:', '') || ''
+
+  if (!text) {
+    return false
+  }
+
+  const replacement = `[${text}](${url})`
+  view.dispatch({
+    changes: { from, to, insert: replacement },
+    selection: { anchor: from + 1, head: from + 1 + text.length }
+  })
+  view.focus()
+  return true
+}
+
+function applyMarkdownFormat(view: EditorView, action: SourceMarkdownFormatAction): boolean {
+  switch (action) {
+    case 'paragraph':
+      return replaceLinePrefix(view, '')
+    case 'heading-1':
+      return replaceLinePrefix(view, '# ')
+    case 'heading-2':
+      return replaceLinePrefix(view, '## ')
+    case 'heading-3':
+      return replaceLinePrefix(view, '### ')
+    case 'heading-4':
+      return replaceLinePrefix(view, '#### ')
+    case 'heading-5':
+      return replaceLinePrefix(view, '##### ')
+    case 'heading-6':
+      return replaceLinePrefix(view, '###### ')
+    case 'bold':
+      return wrapSelection(view, '**', '**')
+    case 'italic':
+      return wrapSelection(view, '*', '*')
+    case 'strikethrough':
+      return wrapSelection(view, '~~', '~~')
+    case 'inline-code':
+      return wrapSelection(view, '`', '`')
+    case 'bullet-list':
+      return replaceLinePrefix(view, '- ')
+    case 'ordered-list':
+      return replaceLinePrefix(view, '1. ')
+    case 'task-list':
+      return replaceLinePrefix(view, '- [ ] ')
+    case 'blockquote':
+      return replaceLinePrefix(view, '> ')
+    case 'code-block':
+      return wrapSelection(view, '```\n', '\n```')
+    case 'horizontal-rule':
+      return insertMarkdownBlock(view, '\n---\n')
+    case 'link':
+      return insertLink(view)
+  }
+}
+
 const markdownKeymap = keymap.of([
-  { key: 'Mod-b', run: (v) => wrapSelection(v, '**', '**') },
-  { key: 'Mod-i', run: (v) => wrapSelection(v, '*', '*') },
-  { key: 'Mod-d', run: (v) => wrapSelection(v, '~~', '~~') },
-  { key: 'Mod-`', run: (v) => wrapSelection(v, '`', '`') },
-  {
-    key: 'Mod-k',
-    run: (v) => {
-      const { from, to } = v.state.selection.main
-      const selected = v.state.sliceDoc(from, to)
-      const url = window.prompt('请输入链接地址:', 'https://')
-      if (!url) return false
-      const text = selected || window.prompt('请输入链接文本:', '') || ''
-      if (!text) return false
-      const replacement = `[${text}](${url})`
-      v.dispatch({
-        changes: { from, to, insert: replacement },
-        selection: { anchor: from + 1, head: from + 1 + text.length }
-      })
-      return true
-    }
-  },
+  { key: 'Mod-b', run: (v) => applyMarkdownFormat(v, 'bold') },
+  { key: 'Mod-i', run: (v) => applyMarkdownFormat(v, 'italic') },
+  { key: 'Mod-d', run: (v) => applyMarkdownFormat(v, 'strikethrough') },
+  { key: 'Mod-`', run: (v) => applyMarkdownFormat(v, 'inline-code') },
+  { key: 'Mod-k', run: (v) => applyMarkdownFormat(v, 'link') },
   { key: 'Mod-Shift-1', run: (v) => insertAtLineStart(v, '# ') },
   { key: 'Mod-Shift-2', run: (v) => insertAtLineStart(v, '## ') },
   { key: 'Mod-Shift-3', run: (v) => insertAtLineStart(v, '### ') },
@@ -90,6 +188,7 @@ export interface SourceMarkdownEditorHandle {
   scrollToLine: (line: number) => void
   getVisibleLine: () => number
   getLineCount: () => number
+  applyFormat: (action: SourceMarkdownFormatAction) => boolean
 }
 
 export const SourceMarkdownEditor = forwardRef<
@@ -175,6 +274,11 @@ export const SourceMarkdownEditor = forwardRef<
     },
     getLineCount() {
       return viewRef.current?.state.doc.lines ?? 1
+    },
+    applyFormat(action: SourceMarkdownFormatAction) {
+      const view = viewRef.current
+
+      return view ? applyMarkdownFormat(view, action) : false
     }
   }))
 

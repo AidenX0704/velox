@@ -1022,7 +1022,7 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
     }
 
     a {
-      color: #2563eb;
+      color: #1677FF;
       text-decoration: none;
     }
 

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
+import { IconMoreStroked } from '@douyinfe/semi-icons'
 import type { EditorView } from 'prosemirror-view'
 import type { MarkType, NodeType } from 'prosemirror-model'
 import type { Command } from 'prosemirror-state'
-import { NodeSelection } from 'prosemirror-state'
+import { NodeSelection, TextSelection } from 'prosemirror-state'
 import { wrapInList, liftListItem } from 'prosemirror-schema-list'
+import type { SourceMarkdownFormatAction } from '../source/SourceMarkdownEditor'
 
 interface FormatToolbarProps {
-  view: EditorView | null
-  fontSize: number
-  onFontSizeChange: (size: number) => void
+  view?: EditorView | null
+  fontSize?: number
+  onFontSizeChange?: (size: number) => void
+  onMarkdownFormat?: (action: SourceMarkdownFormatAction) => void
 }
 
 const FONT_SIZES = [12, 13, 14, 15, 16, 17, 18, 20, 22, 24]
@@ -111,10 +114,59 @@ function liftCommand(): Command {
   }
 }
 
+function insertHorizontalRuleCommand(): Command {
+  return (state, dispatch) => {
+    const horizontalRule = state.schema.nodes.horizontal_rule
+
+    if (!horizontalRule) {
+      return false
+    }
+
+    if (dispatch) {
+      let tr = state.tr.replaceSelectionWith(horizontalRule.create()).scrollIntoView()
+      const position = tr.selection.to
+
+      if (state.schema.nodes.paragraph) {
+        tr = tr.insert(position, state.schema.nodes.paragraph.create())
+        tr = tr.setSelection(
+          TextSelection.create(tr.doc, Math.min(position + 1, tr.doc.content.size))
+        )
+      }
+
+      dispatch(tr)
+    }
+
+    return true
+  }
+}
+
+function insertTaskListCommand(): Command {
+  return (state, dispatch) => {
+    const bulletList = state.schema.nodes.bullet_list
+    const listItem = state.schema.nodes.list_item
+    const paragraph = state.schema.nodes.paragraph
+
+    if (!bulletList || !listItem || !paragraph) {
+      return false
+    }
+
+    if (dispatch) {
+      const taskList = bulletList.create(
+        null,
+        listItem.create({ checked: false }, paragraph.create())
+      )
+      dispatch(state.tr.replaceSelectionWith(taskList).scrollIntoView())
+    }
+
+    return true
+  }
+}
+
 export function FormatToolbar({
   view,
   fontSize,
-  onFontSizeChange
+  onFontSizeChange,
+  onMarkdownFormat
 }: FormatToolbarProps): React.JSX.Element | null {
   const [cursorMarks, setCursorMarks] = useState<Set<string>>(new Set())
   const [currentBlockType, setCurrentBlockType] = useState<string>('paragraph')
@@ -169,6 +221,12 @@ export function FormatToolbar({
     },
     [view]
   )
+  const execMarkdownFormat = useCallback(
+    (action: SourceMarkdownFormatAction) => {
+      onMarkdownFormat?.(action)
+    },
+    [onMarkdownFormat]
+  )
 
   const isMarkActive = useCallback((markName: string) => cursorMarks.has(markName), [cursorMarks])
 
@@ -183,45 +241,63 @@ export function FormatToolbar({
 
   const handleBold = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('bold')
+      return
+    }
     execCommand(toggleMarkCommand(v.state.schema.marks.strong))
-  }, [execCommand, view])
+  }, [execCommand, execMarkdownFormat, view])
 
   const handleItalic = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('italic')
+      return
+    }
     execCommand(toggleMarkCommand(v.state.schema.marks.em))
-  }, [execCommand, view])
+  }, [execCommand, execMarkdownFormat, view])
 
   const handleStrikethrough = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('strikethrough')
+      return
+    }
     const mark = v.state.schema.marks.strikethrough ?? v.state.schema.marks.s
     if (mark) execCommand(toggleMarkCommand(mark))
-  }, [execCommand, view])
+  }, [execCommand, execMarkdownFormat, view])
 
   const handleInlineCode = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('inline-code')
+      return
+    }
     execCommand(toggleMarkCommand(v.state.schema.marks.code))
-  }, [execCommand, view])
+  }, [execCommand, execMarkdownFormat, view])
 
   const handleHeading = useCallback(
     (level: number) => {
       const v = view
-      if (!v) return
+      if (!v) {
+        execMarkdownFormat(`heading-${level}` as SourceMarkdownFormatAction)
+        return
+      }
       if (isBlockActive('heading', level)) {
         execCommand(setBlockTypeCommand(v.state.schema.nodes.paragraph))
       } else {
         execCommand(setBlockTypeCommand(v.state.schema.nodes.heading, { level }))
       }
     },
-    [isBlockActive, execCommand, view]
+    [isBlockActive, execCommand, execMarkdownFormat, view]
   )
 
   const handleBulletList = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('bullet-list')
+      return
+    }
     const { state, dispatch } = v
     if (isBlockActive('bullet_list')) {
       liftListItem(state.schema.nodes.list_item)(state, dispatch)
@@ -229,11 +305,14 @@ export function FormatToolbar({
       wrapInList(state.schema.nodes.bullet_list)(state, dispatch)
     }
     v.focus()
-  }, [isBlockActive, view])
+  }, [execMarkdownFormat, isBlockActive, view])
 
   const handleOrderedList = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('ordered-list')
+      return
+    }
     const { state, dispatch } = v
     if (isBlockActive('ordered_list')) {
       liftListItem(state.schema.nodes.list_item)(state, dispatch)
@@ -241,31 +320,40 @@ export function FormatToolbar({
       wrapInList(state.schema.nodes.ordered_list)(state, dispatch)
     }
     v.focus()
-  }, [isBlockActive, view])
+  }, [execMarkdownFormat, isBlockActive, view])
 
   const handleBlockquote = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('blockquote')
+      return
+    }
     if (isBlockActive('blockquote')) {
       execCommand(liftCommand())
     } else {
       execCommand(wrapInCommand(v.state.schema.nodes.blockquote))
     }
-  }, [isBlockActive, execCommand, view])
+  }, [isBlockActive, execCommand, execMarkdownFormat, view])
 
   const handleCodeBlock = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('code-block')
+      return
+    }
     if (isBlockActive('code_block')) {
       execCommand(setBlockTypeCommand(v.state.schema.nodes.paragraph))
     } else {
       execCommand(setBlockTypeCommand(v.state.schema.nodes.code_block))
     }
-  }, [isBlockActive, execCommand, view])
+  }, [isBlockActive, execCommand, execMarkdownFormat, view])
 
   const handleInsertLink = useCallback(() => {
     const v = view
-    if (!v) return
+    if (!v) {
+      execMarkdownFormat('link')
+      return
+    }
     const { state, dispatch } = v
     const { selection } = state
     const mark = state.schema.marks.link
@@ -291,7 +379,29 @@ export function FormatToolbar({
       }
     }
     v.focus()
-  }, [view])
+  }, [execMarkdownFormat, view])
+
+  const handleHorizontalRule = useCallback(() => {
+    const v = view
+
+    if (!v) {
+      execMarkdownFormat('horizontal-rule')
+      return
+    }
+
+    execCommand(insertHorizontalRuleCommand())
+  }, [execCommand, execMarkdownFormat, view])
+
+  const handleTaskList = useCallback(() => {
+    const v = view
+
+    if (!v) {
+      execMarkdownFormat('task-list')
+      return
+    }
+
+    execCommand(insertTaskListCommand())
+  }, [execCommand, execMarkdownFormat, view])
 
   const headingMenu = useMemo(
     () => [
@@ -309,7 +419,9 @@ export function FormatToolbar({
     return '正文'
   }, [currentBlockType, blockLevel])
 
-  if (!view) return null
+  const canFormat = Boolean(view || onMarkdownFormat)
+
+  if (!canFormat) return null
 
   return (
     <div className="format-toolbar" onMouseDown={preventFocusLoss}>
@@ -323,7 +435,11 @@ export function FormatToolbar({
                   active={isBlockActive(item.nodeType, item.level || undefined)}
                   onClick={() => {
                     if (item.level === 0) {
-                      execCommand(setBlockTypeCommand(view.state.schema.nodes.paragraph))
+                      if (view) {
+                        execCommand(setBlockTypeCommand(view.state.schema.nodes.paragraph))
+                      } else {
+                        execMarkdownFormat('paragraph')
+                      }
                     } else {
                       handleHeading(item.level)
                     }
@@ -479,28 +595,57 @@ export function FormatToolbar({
         <Dropdown
           render={
             <Dropdown.Menu>
-              {FONT_SIZES.map((size) => (
-                <Dropdown.Item
-                  key={size}
-                  active={fontSize === size}
-                  onClick={() => onFontSizeChange(size)}
-                >
-                  {size}px
-                </Dropdown.Item>
-              ))}
+              <Dropdown.Item onClick={handleTaskList}>任务列表</Dropdown.Item>
+              <Dropdown.Item onClick={handleHorizontalRule}>分隔线</Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => handleHeading(5)}>标题 5</Dropdown.Item>
+              <Dropdown.Item onClick={() => handleHeading(6)}>标题 6</Dropdown.Item>
             </Dropdown.Menu>
           }
         >
           <Button
             size="small"
             theme="borderless"
-            className="format-toolbar-btn format-font-size-select"
+            className="format-toolbar-btn"
+            aria-label="更多格式"
           >
-            {fontSize}px
-            <span className="format-toolbar-chevron">▾</span>
+            <IconMoreStroked />
           </Button>
         </Dropdown>
       </div>
+
+      {onFontSizeChange && typeof fontSize === 'number' ? (
+        <>
+          <div className="format-toolbar-divider" />
+
+          <div className="format-toolbar-group">
+            <Dropdown
+              render={
+                <Dropdown.Menu>
+                  {FONT_SIZES.map((size) => (
+                    <Dropdown.Item
+                      key={size}
+                      active={fontSize === size}
+                      onClick={() => onFontSizeChange(size)}
+                    >
+                      {size}px
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              }
+            >
+              <Button
+                size="small"
+                theme="borderless"
+                className="format-toolbar-btn format-font-size-select"
+              >
+                {fontSize}px
+                <span className="format-toolbar-chevron">▾</span>
+              </Button>
+            </Dropdown>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

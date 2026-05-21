@@ -3,14 +3,14 @@ import { Button, InputNumber, Select, Switch, TextArea, Typography } from '@douy
 import {
   IconArrowLeft,
   IconArticle,
-  IconCode,
+  IconCodeStroked,
   IconColorPalette,
   IconDesktop,
   IconExport,
-  IconMoon,
+  IconMoonStroked,
   IconRefresh,
   IconSettingStroked,
-  IconSun
+  IconSunStroked
 } from '@douyinfe/semi-icons'
 import type { AppInfo } from '../../../shared/types'
 import {
@@ -46,8 +46,8 @@ const appearanceModeOptions: Array<{
   icon: React.ReactNode
 }> = [
   { value: 'system', label: '跟随系统', icon: <IconDesktop /> },
-  { value: 'light', label: '亮色', icon: <IconSun /> },
-  { value: 'dark', label: '黑色', icon: <IconMoon /> }
+  { value: 'light', label: '亮色', icon: <IconSunStroked /> },
+  { value: 'dark', label: '黑色', icon: <IconMoonStroked /> }
 ]
 
 const preferenceSections: Array<{
@@ -56,7 +56,7 @@ const preferenceSections: Array<{
   icon: React.ReactNode
 }> = [
   { id: 'interface', label: '界面偏好', icon: <IconDesktop /> },
-  { id: 'source', label: '源码编辑', icon: <IconCode /> },
+  { id: 'source', label: '源码编辑', icon: <IconCodeStroked /> },
   { id: 'preview', label: '预览渲染', icon: <IconArticle /> },
   { id: 'shortcuts', label: '快捷键', icon: <IconSettingStroked /> },
   { id: 'export', label: '导出默认项', icon: <IconExport /> }
@@ -244,7 +244,7 @@ export function SettingsPage({
 
           <SettingsCard
             id="settings-source"
-            icon={<IconCode />}
+            icon={<IconCodeStroked />}
             title="源码编辑"
             description="配置 CodeMirror 源码区的阅读密度和换行行为。"
           >

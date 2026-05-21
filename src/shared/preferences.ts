@@ -24,8 +24,8 @@ export interface ThemeColorPreset {
 }
 
 export const themeColorPresets: ThemeColorPreset[] = [
-  { id: 'indigo', label: '靛蓝', color: '#4f46e5' },
-  { id: 'blue', label: '蓝色', color: '#2563eb' },
+  { id: 'indigo', label: '靛蓝', color: '#1677ff' },
+  { id: 'blue', label: '蓝色', color: '#1677ff' },
   { id: 'cyan', label: '青色', color: '#0891b2' },
   { id: 'emerald', label: '绿松', color: '#059669' },
   { id: 'amber', label: '琥珀', color: '#d97706' },
@@ -77,8 +77,8 @@ export const defaultEditorPreferences: EditorPreferences = {
   splitScrollSync: true,
   customPreviewCss: '',
   appearanceMode: 'system',
-  themeColorPreset: 'indigo',
-  customThemeColor: '#4f46e5',
+  themeColorPreset: 'blue',
+  customThemeColor: '#1677ff',
   defaultMode: 'split',
   hasSeenWelcome: false,
   shortcutOverrides: {},

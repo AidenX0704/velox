@@ -7,7 +7,7 @@ import {
 
 export type ResolvedAppearanceMode = 'light' | 'dark'
 
-const fallbackAccentColor = '#4f46e5'
+const fallbackAccentColor = '#1677ff'
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/
 
 export function getSystemAppearanceMode(): ResolvedAppearanceMode {
