@@ -1,11 +1,7 @@
 import katex from 'katex'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
-import {
-  InputRule,
-  textblockTypeInputRule,
-  wrappingInputRule
-} from 'prosemirror-inputrules'
+import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules'
 import {
   defaultMarkdownParser,
   defaultMarkdownSerializer,
@@ -299,7 +295,11 @@ function createMarkdownSerializer(): MarkdownSerializer {
   )
 }
 
-function setTokenAttr(token: { attrs: [string, string][] | null }, name: string, value: string): void {
+function setTokenAttr(
+  token: { attrs: [string, string][] | null },
+  name: string,
+  value: string
+): void {
   const attrs = token.attrs ?? []
   const index = attrs.findIndex((attr) => attr[0] === name)
 

@@ -183,6 +183,8 @@ export type MenuCommand =
 export interface VeloxAPI {
   app: {
     getInfo: () => Promise<Result<AppInfo>>
+    getPendingOpenFile: () => Promise<Result<string | null>>
+    onOpenFile: (callback: (filePath: string) => void) => () => void
   }
   window: {
     getIsMaximized: () => Promise<Result<boolean>>

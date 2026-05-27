@@ -1,6 +1,8 @@
 export const ipcChannels = {
   app: {
-    getInfo: 'app:get-info'
+    getInfo: 'app:get-info',
+    openFile: 'app:open-file',
+    getPendingOpenFile: 'app:get-pending-open-file'
   },
   window: {
     getIsMaximized: 'window:get-is-maximized',

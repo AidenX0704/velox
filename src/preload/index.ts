@@ -30,7 +30,19 @@ function invoke<T>(channel: string, payload?: unknown): Promise<Result<T>> {
 
 const api: VeloxAPI = {
   app: {
-    getInfo: () => invoke<AppInfo>(ipcChannels.app.getInfo)
+    getInfo: () => invoke<AppInfo>(ipcChannels.app.getInfo),
+    getPendingOpenFile: () => invoke<string | null>(ipcChannels.app.getPendingOpenFile),
+    onOpenFile: (callback) => {
+      const listener = (_event: IpcRendererEvent, filePath: string): void => {
+        callback(filePath)
+      }
+
+      ipcRenderer.on(ipcChannels.app.openFile, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.app.openFile, listener)
+      }
+    }
   },
   window: {
     getIsMaximized: () => invoke<boolean>(ipcChannels.window.getIsMaximized),

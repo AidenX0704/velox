@@ -38,15 +38,7 @@ const fixtures: MarkdownFixture[] = [
   },
   {
     name: 'nested lists and quote',
-    input: [
-      '> 引用',
-      '',
-      '- 一级',
-      '  - 二级',
-      '',
-      '1. 有序',
-      '2. 列表'
-    ].join('\n'),
+    input: ['> 引用', '', '- 一级', '  - 二级', '', '1. 有序', '2. 列表'].join('\n'),
     includes: ['> 引用', '* 一级', '1. 有序']
   },
   {
@@ -83,7 +75,10 @@ for (const fixture of fixtures) {
   assert.equal(twice, once, `${fixture.name}: rich markdown normalization must be idempotent`)
 
   for (const snippet of fixture.includes ?? []) {
-    assert.ok(once.includes(snippet), `${fixture.name}: expected normalized markdown to include ${snippet}`)
+    assert.ok(
+      once.includes(snippet),
+      `${fixture.name}: expected normalized markdown to include ${snippet}`
+    )
   }
 }
 

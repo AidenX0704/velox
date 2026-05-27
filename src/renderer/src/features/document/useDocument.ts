@@ -66,7 +66,11 @@ export function useDocument(): {
   saveDocumentAs: () => Promise<void>
   openWorkspace: () => Promise<void>
   refreshWorkspace: () => Promise<void>
-  createWorkspaceEntry: (parentPath: string, name: string, type: 'file' | 'directory') => Promise<string | null>
+  createWorkspaceEntry: (
+    parentPath: string,
+    name: string,
+    type: 'file' | 'directory'
+  ) => Promise<string | null>
   renameWorkspaceEntry: (path: string, newName: string) => Promise<string | null>
   deleteWorkspaceEntry: (path: string) => Promise<boolean>
 } {
@@ -149,7 +153,11 @@ export function useDocument(): {
   }, [refreshWorkspace])
 
   const createWorkspaceEntry = useCallback(
-    async (parentPath: string, name: string, type: 'file' | 'directory'): Promise<string | null> => {
+    async (
+      parentPath: string,
+      name: string,
+      type: 'file' | 'directory'
+    ): Promise<string | null> => {
       const result = await window.api.workspace.createEntry({ parentPath, name, type })
       if (result.ok) {
         return result.data
@@ -165,7 +173,7 @@ export function useDocument(): {
       const result = await window.api.workspace.renameEntry({ path, newName })
       if (result.ok) {
         if (document.path === path) {
-           setDocument(prev => ({...prev, path: result.data}))
+          setDocument((prev) => ({ ...prev, path: result.data }))
         }
         return result.data
       }
@@ -179,10 +187,10 @@ export function useDocument(): {
     async (path: string): Promise<boolean> => {
       const result = await window.api.workspace.deleteEntry({ path })
       if (result.ok) {
-         if (document.path === path) {
-             setDocument(createInitialDocument())
-         }
-         return true
+        if (document.path === path) {
+          setDocument(createInitialDocument())
+        }
+        return true
       }
       Toast.error(result.error.message)
       return false
@@ -329,19 +337,28 @@ export function useDocument(): {
     const timer = window.setTimeout(() => {
       void refreshRecent()
 
-      window.api.preferences.getEditor().then((result) => {
-        if (!result.ok) {
-          Toast.error(result.error.message)
+      // Check for pending open file from command line args (e.g., double-clicking a .md file)
+      window.api.app.getPendingOpenFile().then((result) => {
+        if (result.ok && result.data) {
+          void openPath(result.data)
           return
         }
 
-        if (!result.data.hasSeenWelcome) {
-          setDocument(createInitialDocument(welcomeContent))
-          void window.api.preferences.updateEditor({ hasSeenWelcome: true })
-          return
-        }
+        // No pending file, restore last document
+        window.api.preferences.getEditor().then((result) => {
+          if (!result.ok) {
+            Toast.error(result.error.message)
+            return
+          }
 
-        void restoreLastDocument()
+          if (!result.data.hasSeenWelcome) {
+            setDocument(createInitialDocument(welcomeContent))
+            void window.api.preferences.updateEditor({ hasSeenWelcome: true })
+            return
+          }
+
+          void restoreLastDocument()
+        })
       })
 
       window.api.recent.listWorkspaces().then((result) => {
@@ -352,7 +369,13 @@ export function useDocument(): {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [loadWorkspace, refreshRecent, restoreLastDocument])
+  }, [loadWorkspace, openPath, refreshRecent, restoreLastDocument])
+
+  useEffect(() => {
+    return window.api.app.onOpenFile((filePath: string) => {
+      void openPath(filePath)
+    })
+  }, [openPath])
 
   useEffect(() => {
     return window.api.menu.onCommand((command: MenuCommand) => {

@@ -33,7 +33,10 @@ async function highlightCodeWithShiki(code: string, language: string): Promise<s
   }
 
   try {
-    const isDark = document.documentElement.dataset.colorMode === 'dark' || document.body.classList.contains('dark') || document.body.getAttribute('theme-mode') === 'dark'
+    const isDark =
+      document.documentElement.dataset.colorMode === 'dark' ||
+      document.body.classList.contains('dark') ||
+      document.body.getAttribute('theme-mode') === 'dark'
     const theme = isDark ? 'github-dark' : 'github-light'
 
     const html = await codeToHtml(code || ' ', {

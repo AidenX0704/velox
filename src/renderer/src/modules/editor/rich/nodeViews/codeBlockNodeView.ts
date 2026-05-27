@@ -37,7 +37,9 @@ export function createCodeBlockNodeView(
 
     const language = normalizeSelectedLanguage(languageSelect.value)
     // IMPORTANT: Dispatch transaction to update the underlying document model
-    view.dispatch(view.state.tr.setNodeMarkup(position, undefined, { ...currentNode.attrs, params: language }))
+    view.dispatch(
+      view.state.tr.setNodeMarkup(position, undefined, { ...currentNode.attrs, params: language })
+    )
     view.focus()
   })
   shell.pre.append(highlightLayer, contentDOM)
@@ -78,17 +80,17 @@ function updateCodeBlockDom(
 ): void {
   const language = getCodeBlockLanguage(node)
   const languageMeta = getCodeLanguageMeta(language)
-  
+
   // Update UI metadata
   dom.dataset.language = languageMeta.displayName
   dom.dataset.languageKind = languageMeta.kind
-  
+
   // Sync select value
   languageSelect.value = getSelectLanguageValue(language)
-  
+
   // Apply highlighting
   highlightLayer.innerHTML = highlightCodeSync(node.textContent, languageMeta.highlightLanguage)
-  
+
   // Sync content metadata
   contentDOM.dataset.rawCode = encodeURIComponent(node.textContent)
   contentDOM.style.setProperty('--code-language', languageMeta.displayName)

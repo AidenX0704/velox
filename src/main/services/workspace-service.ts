@@ -33,7 +33,7 @@ export class WorkspaceService {
     const folderPath = result.filePaths[0]
     this.settingsService.addRecentFolder(folderPath)
     this.recentService?.addWorkspace(folderPath)
-    
+
     await this.watchWorkspace(folderPath)
 
     return folderPath
@@ -84,12 +84,12 @@ export class WorkspaceService {
   async renameEntry(path: string, newName: string): Promise<string> {
     const parentDir = dirname(path)
     let targetName = newName
-    
+
     // Auto-append .md if renaming a file that looks like a markdown file but lost its extension
     if (extname(path) === '.md' && !extname(newName)) {
       targetName = `${newName}.md`
     }
-    
+
     const targetPath = join(parentDir, targetName)
     await rename(path, targetPath)
     return targetPath

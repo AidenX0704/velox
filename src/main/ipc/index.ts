@@ -13,6 +13,7 @@ import { ShellService } from '../services/shell-service'
 import { UpdaterService } from '../services/updater-service'
 import { WorkspaceService } from '../services/workspace-service'
 import { WorkspaceStateService } from '../services/workspace-state-service'
+import { getPendingOpenFile } from '../bootstrap/create-app'
 
 export interface MainServices {
   appService: AppService
@@ -30,6 +31,7 @@ export interface MainServices {
 
 export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.app.getInfo, schemas.empty, () => services.appService.getInfo())
+  registerIpcHandler(ipcChannels.app.getPendingOpenFile, schemas.empty, () => getPendingOpenFile())
 
   registerIpcHandler(ipcChannels.window.getIsMaximized, schemas.empty, (_input, event) => {
     return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized())
