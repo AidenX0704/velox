@@ -403,6 +403,16 @@ function createEditorTheme(fontSize: number, lineHeight: number): Extension {
     '.cm-line': {
       lineHeight: String(lineHeight)
     },
+    '.cm-line span': {
+      textDecoration: 'none !important',
+      textDecorationLine: 'none !important',
+      borderBottom: '0 !important'
+    },
+    '.cm-line .cm-header, .cm-line .cm-heading': {
+      textDecoration: 'none !important',
+      textDecorationLine: 'none !important',
+      borderBottom: '0 !important'
+    },
     '.cm-gutters': {
       backgroundColor: 'var(--surface-base)',
       borderRight: '1px solid var(--line-strong)',

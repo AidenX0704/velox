@@ -58,6 +58,11 @@ textarea,
   background: var(--surface-base);
 }
 
+.app-shell[data-resizing-sidebar='true'] {
+  cursor: col-resize;
+  user-select: none;
+}
+
 .app-shell .semi-icon {
   display: inline-flex;
   align-items: center;
@@ -85,6 +90,37 @@ textarea,
   --text-secondary: #aab3c2;
   --text-tertiary: #788396;
   --text-on-brand: #ffffff;
+}
+
+.app-shell[data-dragging='true']::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-soft);
+  border: 2px dashed var(--brand);
+  border-radius: 8px;
+  margin: 4px;
+  pointer-events: none;
+}
+
+.app-shell[data-dragging='true']::before {
+  content: '拖放到此处打开文件';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  padding: 12px 24px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
 }
 
 .sidebar {
@@ -186,6 +222,38 @@ textarea,
   width: 0;
   border-right: 0;
   pointer-events: none;
+}
+
+.sidebar-resizer {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  content: '';
+  transition: background 120ms ease;
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.app-shell[data-resizing-sidebar='true'] .sidebar-resizer::after {
+  background: var(--brand-active);
+}
+
+.sidebar-resizer:focus-visible {
+  outline: none;
 }
 
 .app-shell[data-platform='darwin'] .sidebar[data-visible='true'] {
@@ -603,13 +671,184 @@ textarea,
   background: var(--surface-base);
 }
 
+/* ---------- Tab Bar ---------- */
+
+.tabbar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 36px;
+  height: 36px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--line-soft);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+.tabbar-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 0 4px;
+}
+
+.tabbar-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 180px;
+  min-width: 80px;
+  max-width: 180px;
+  height: 30px;
+  gap: 6px;
+  padding: 0 4px 0 10px;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.tabbar-tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.tabbar-tab--active {
+  background: var(--surface-base);
+  color: var(--text-primary);
+}
+
+.tabbar-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--brand-active);
+  border-radius: 2px 2px 0 0;
+}
+
+.tabbar-tab--pinned {
+  flex: 0 0 36px;
+  min-width: 36px;
+  max-width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+.tabbar-tab--pinned .tabbar-tab-title {
+  display: none;
+}
+
+.tabbar-tab--dragging {
+  opacity: 0.5;
+}
+
+.tabbar-tab--drop-target {
+  background: var(--brand-softer);
+}
+
+.tabbar-tab-pin-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.tabbar-tab-title {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.tabbar-tab-dirty {
+  display: inline-block;
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.tabbar-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 100ms ease,
+    background 100ms ease,
+    color 100ms ease;
+}
+
+.tabbar-tab:hover .tabbar-tab-close,
+.tabbar-tab--active .tabbar-tab-close {
+  opacity: 1;
+}
+
+.tabbar-tab-close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.tabbar-new-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  margin: 0 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 100ms ease,
+    color 100ms ease;
+}
+
+.tabbar-new-tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
 .titlebar {
   position: relative;
   z-index: 40;
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(112px, 38vw) minmax(0, 1fr);
+  display: flex;
   flex: 0 0 var(--titlebar-height);
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   padding: 0 12px 0 32px;
   border-bottom: 1px solid var(--line-strong);
@@ -624,19 +863,6 @@ textarea,
   min-width: 0;
   gap: 6px;
   -webkit-app-region: no-drag;
-}
-
-.titlebar-name {
-  display: block;
-  justify-self: center;
-  max-width: min(38vw, 520px);
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .titlebar-actions,
@@ -1437,7 +1663,6 @@ textarea,
 @media (max-width: 900px) {
   .app-shell {
     --activitybar-width: 44px;
-    --sidebar-pane-width: 196px;
   }
 
   .titlebar {

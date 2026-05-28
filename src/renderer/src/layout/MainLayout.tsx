@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
 import type { UpdaterStatus } from '../../../shared/types'
 import { MarkdownEditor } from '../modules/editor/MarkdownEditor'
-import type { CursorPosition } from '../modules/editor/model/types'
-import { useDocument } from '../features/document/useDocument'
+import type { CursorPosition, EditorMode } from '../modules/editor/model/types'
+import { useTabs } from '../features/tabs/useTabs'
+import { TabBar } from '../features/tabs/TabBar'
 import { useEditorSettings } from '../features/settings/useEditorSettings'
 import {
   applyThemeToDocument,
@@ -20,15 +21,53 @@ import { TitleBar } from './TitleBar'
 
 type AppView = 'editor' | 'settings'
 
+const defaultSidebarPaneWidth = 236
+const minSidebarPaneWidth = 180
+const maxSidebarPaneWidth = 480
+const sidebarPaneWidthStorageKey = 'velox:sidebar-pane-width'
+
+function computeWordCount(content: string): number {
+  const text = content.trim()
+  if (!text) return 0
+  return text.split(/\s+/).length
+}
+
+function getDroppedFilePath(file: File): string {
+  return (file as File & { path?: string }).path || window.api.app.getPathForFile(file)
+}
+
+function hasExternalFiles(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).includes('Files')
+}
+
+function clampSidebarPaneWidth(width: number): number {
+  return Math.min(maxSidebarPaneWidth, Math.max(minSidebarPaneWidth, Math.round(width)))
+}
+
+function getInitialSidebarPaneWidth(): number {
+  const storedWidth = Number(window.localStorage.getItem(sidebarPaneWidthStorageKey))
+  return Number.isFinite(storedWidth) ? clampSidebarPaneWidth(storedWidth) : defaultSidebarPaneWidth
+}
+
 export function MainLayout(): React.JSX.Element {
   const [activeView, setActiveView] = useState<AppView>('editor')
   const [platform, setPlatform] = useState<string>('')
   const [resolvedAppearanceMode, setResolvedAppearanceMode] =
     useState<ResolvedAppearanceMode>('light')
-  const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ line: 1, column: 1 })
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
+  const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
+  const [sidebarPaneWidth, setSidebarPaneWidth] = useState(getInitialSidebarPaneWidth)
+  const [workspaceTree, setWorkspaceTree] = useState<
+    import('../../../shared/types').WorkspaceEntry[]
+  >([])
+  const [recentFiles, setRecentFiles] = useState<
+    import('../../../shared/types').RecentFileRecord[]
+  >([])
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false)
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
@@ -36,27 +75,321 @@ export function MainLayout(): React.JSX.Element {
   const updaterAvailablePromptRef = useRef<string | undefined>(undefined)
   const updaterInstallPromptRef = useRef<string | undefined>(undefined)
   const { settings: editorSettings, updateSettings, resetSettings } = useEditorSettings()
+
   const {
-    document,
-    editorMode,
-    workspaceRoot,
-    workspaceTree,
-    recentFiles,
-    pendingAnchor,
-    wordCount,
+    tabs,
+    activeTabId,
+    activeTab,
+    setActiveTabId,
     setEditorMode,
     setContent,
-    createDocument,
-    openDocument,
-    openPath,
-    openPathFromLink,
-    clearPendingAnchor,
-    saveDocument,
-    openWorkspace,
-    createWorkspaceEntry,
-    renameWorkspaceEntry,
-    deleteWorkspaceEntry
-  } = useDocument()
+    setCursorPosition,
+    addTab,
+    closeTab,
+    closeOtherTabs,
+    closeAllTabs,
+    closeSavedTabs,
+    pinTab,
+    unpinTab,
+    reorderTabs,
+    switchToNextTab,
+    switchToPreviousTab,
+    switchToTabByIndex,
+    updateTabDocument,
+    findTabByPath
+  } = useTabs()
+
+  // Refs for stable callback references
+  const openPathRef = useRef<
+    ((path: string, options?: { mode?: EditorMode }) => Promise<boolean>) | undefined
+  >(undefined)
+  const loadWorkspaceRef = useRef<((path: string) => Promise<void>) | undefined>(undefined)
+  const refreshRecentRef = useRef<(() => Promise<void>) | undefined>(undefined)
+  const hasInitializedRef = useRef(false)
+  const sidebarResizeRef = useRef<{
+    pointerId: number
+    startX: number
+    startWidth: number
+  } | null>(null)
+
+  const document = useMemo(
+    () =>
+      activeTab?.document ?? {
+        title: 'Untitled.md',
+        content: '',
+        dirty: false,
+        path: undefined
+      },
+    [activeTab?.document]
+  )
+  const editorMode = activeTab?.editorMode ?? 'split'
+  const cursorPosition = useMemo<CursorPosition>(
+    () => ({
+      line: activeTab?.cursorLine ?? 1,
+      column: activeTab?.cursorColumn ?? 1
+    }),
+    [activeTab?.cursorLine, activeTab?.cursorColumn]
+  )
+  const wordCount = useMemo(() => computeWordCount(document.content), [document.content])
+
+  const refreshRecent = useCallback(async () => {
+    const [filesResult] = await Promise.all([window.api.recent.listFiles()])
+    if (filesResult.ok) {
+      setRecentFiles(filesResult.data)
+    }
+  }, [])
+
+  const saveDocument = useCallback(async (): Promise<void> => {
+    if (!activeTab) return
+    const result = activeTab.document.path
+      ? await window.api.document.save({
+          path: activeTab.document.path,
+          content: activeTab.document.content
+        })
+      : await window.api.document.saveAs({ content: activeTab.document.content })
+
+    if (result.ok && result.data) {
+      updateTabDocument(activeTab.id, {
+        path: result.data.path,
+        title: result.data.title,
+        content: result.data.content,
+        dirty: false,
+        updatedAt: result.data.updatedAt
+      })
+      Toast.success('已保存')
+      void refreshRecent()
+    } else if (!result.ok) {
+      Toast.error(result.error.message)
+    }
+  }, [activeTab, updateTabDocument, refreshRecent])
+
+  const openPath = useCallback(
+    async (path: string, options?: { mode?: EditorMode }): Promise<boolean> => {
+      const targetMode = options?.mode ?? activeTab?.editorMode ?? editorMode
+      const existing = findTabByPath(path)
+      if (existing) {
+        setActiveTabId(existing.id)
+        if (targetMode) {
+          // setActiveTabId updates the hook ref synchronously; setEditorMode now targets that ref.
+          setEditorMode(targetMode)
+        }
+        return true
+      }
+
+      const result = await window.api.document.openPath(path)
+      if (result.ok) {
+        addTab(
+          {
+            path: result.data.path,
+            title: result.data.title,
+            content: result.data.content,
+            dirty: result.data.dirty,
+            updatedAt: result.data.updatedAt
+          },
+          targetMode
+        )
+        void refreshRecent()
+        return true
+      }
+
+      Toast.error(result.error.message)
+      return false
+    },
+    [
+      activeTab?.editorMode,
+      editorMode,
+      findTabByPath,
+      setActiveTabId,
+      setEditorMode,
+      addTab,
+      refreshRecent
+    ]
+  )
+
+  const createDocument = useCallback(async (): Promise<void> => {
+    const result = await window.api.document.createUntitled()
+    if (result.ok) {
+      addTab({
+        path: result.data.path,
+        title: result.data.title,
+        content: result.data.content,
+        dirty: result.data.dirty,
+        updatedAt: result.data.updatedAt
+      })
+    } else {
+      Toast.error(result.error.message)
+    }
+  }, [addTab])
+
+  const openDocument = useCallback(async (): Promise<void> => {
+    const result = await window.api.document.open()
+    if (result.ok && result.data) {
+      const existing = result.data.path ? findTabByPath(result.data.path) : undefined
+      if (existing) {
+        setActiveTabId(existing.id)
+      } else {
+        addTab({
+          path: result.data.path,
+          title: result.data.title,
+          content: result.data.content,
+          dirty: result.data.dirty,
+          updatedAt: result.data.updatedAt
+        })
+      }
+      void refreshRecent()
+    } else if (!result.ok) {
+      Toast.error(result.error.message)
+    }
+  }, [findTabByPath, setActiveTabId, addTab, refreshRecent])
+
+  const loadWorkspace = useCallback(async (path: string) => {
+    setWorkspaceRoot(path)
+    const treeResult = await window.api.workspace.getTree(path)
+    if (treeResult.ok) {
+      setWorkspaceTree(treeResult.data)
+    } else {
+      Toast.error(treeResult.error.message)
+    }
+  }, [])
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    openPathRef.current = openPath
+  }, [openPath])
+
+  useEffect(() => {
+    loadWorkspaceRef.current = loadWorkspace
+  }, [loadWorkspace])
+
+  useEffect(() => {
+    refreshRecentRef.current = refreshRecent
+  }, [refreshRecent])
+
+  const openWorkspace = useCallback(async () => {
+    const result = await window.api.workspace.openFolder()
+    if (!result.ok) {
+      Toast.error(result.error.message)
+      return
+    }
+    if (!result.data) return
+    await loadWorkspace(result.data)
+    void refreshRecent()
+  }, [loadWorkspace, refreshRecent])
+
+  const confirmDiscardChanges = useCallback(async (): Promise<boolean> => {
+    if (!document.dirty) return true
+
+    return new Promise((resolve) => {
+      Modal.confirm({
+        title: '当前文档尚未保存',
+        content: '跳转到其他文档会丢失未保存的修改，是否继续？',
+        okText: '继续跳转',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false)
+      })
+    })
+  }, [document.dirty])
+
+  const openPathFromLink = useCallback(
+    async (path: string, anchor?: string): Promise<boolean> => {
+      if (path !== document.path) {
+        const confirmed = await confirmDiscardChanges()
+        if (!confirmed) return false
+      }
+
+      const opened = path === document.path ? true : await openPath(path)
+      if (opened) {
+        setPendingAnchor(anchor ?? null)
+      }
+      return opened
+    },
+    [confirmDiscardChanges, document.path, openPath]
+  )
+
+  const clearPendingAnchor = useCallback(() => {
+    setPendingAnchor(null)
+  }, [])
+
+  const handleCloseTab = useCallback(
+    async (tabId: string): Promise<void> => {
+      const tab = tabs.find((t) => t.id === tabId)
+      if (!tab) return
+
+      if (tab.document.dirty) {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Modal.confirm({
+            title: '文档尚未保存',
+            content: `"${tab.document.title}" 尚未保存，是否保存后再关闭？`,
+            okText: '保存并关闭',
+            cancelText: '直接关闭',
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false)
+          })
+        })
+
+        if (confirmed) {
+          setActiveTabId(tabId)
+          await new Promise((r) => setTimeout(r, 0))
+          const result = tab.document.path
+            ? await window.api.document.save({
+                path: tab.document.path,
+                content: tab.document.content
+              })
+            : await window.api.document.saveAs({ content: tab.document.content })
+          if (result.ok) {
+            updateTabDocument(tabId, { dirty: false })
+          }
+        }
+      }
+
+      closeTab(tabId, { force: true })
+    },
+    [tabs, setActiveTabId, updateTabDocument, closeTab]
+  )
+
+  const handleCloseOthers = useCallback(
+    async (tabId: string): Promise<void> => {
+      const unsavedOthers = tabs.filter((t) => t.id !== tabId && t.document.dirty)
+      if (unsavedOthers.length > 0) {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Modal.confirm({
+            title: '存在未保存的文档',
+            content: `还有 ${unsavedOthers.length} 个文档未保存，是否全部关闭？`,
+            okText: '全部关闭',
+            cancelText: '取消',
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false)
+          })
+        })
+        if (!confirmed) return
+      }
+      closeOtherTabs(tabId, { force: true })
+    },
+    [tabs, closeOtherTabs]
+  )
+
+  const handleCloseAll = useCallback(async (): Promise<void> => {
+    const unsaved = tabs.filter((t) => t.document.dirty)
+    if (unsaved.length > 0) {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Modal.confirm({
+          title: '存在未保存的文档',
+          content: `还有 ${unsaved.length} 个文档未保存，是否全部关闭？`,
+          okText: '全部关闭',
+          cancelText: '取消',
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false)
+        })
+      })
+      if (!confirmed) return
+    }
+    closeAllTabs({ force: true })
+  }, [tabs, closeAllTabs])
+
+  const handleNewTab = useCallback((): void => {
+    void createDocument()
+  }, [createDocument])
 
   useEffect(() => {
     let cancelled = false
@@ -72,9 +405,13 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [])
 
+  // Set default editor mode only when creating a new untitled document
   useEffect(() => {
-    setEditorMode(editorSettings.defaultMode)
-  }, [editorSettings.defaultMode, setEditorMode])
+    if (activeTab && !activeTab.document.path && activeTab.editorMode === 'split') {
+      setEditorMode(editorSettings.defaultMode)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId]) // Only run when active tab ID changes
 
   useEffect(() => {
     const updateResolvedMode = (): void => {
@@ -99,17 +436,12 @@ export function MainLayout(): React.JSX.Element {
   }, [editorSettings, resolvedAppearanceMode])
 
   useEffect(() => {
-    if (!workspaceRoot) {
-      return
-    }
+    if (!workspaceRoot) return
 
     let cancelled = false
 
     window.api.workspace.getState(workspaceRoot).then((result) => {
-      if (cancelled) {
-        return
-      }
-
+      if (cancelled) return
       if (result.ok && result.data) {
         setExpandedWorkspacePaths(result.data.expandedPaths)
         updateSettings({ showSidebar: result.data.sidebarVisible })
@@ -122,32 +454,25 @@ export function MainLayout(): React.JSX.Element {
   }, [updateSettings, workspaceRoot])
 
   useEffect(() => {
-    if (!document.path) {
-      return
-    }
+    if (!document.path) return
 
     let cancelled = false
 
     window.api.session.getDocument(document.path).then((result) => {
-      if (cancelled) {
-        return
-      }
-
+      if (cancelled) return
       if (result.ok && result.data) {
         setEditorMode(result.data.mode)
-        setCursorPosition({ line: result.data.cursorLine, column: result.data.cursorColumn })
+        setCursorPosition(result.data.cursorLine, result.data.cursorColumn)
       }
     })
 
     return () => {
       cancelled = true
     }
-  }, [document.path, setEditorMode])
+  }, [document.path, setEditorMode, setCursorPosition])
 
   useEffect(() => {
-    if (!workspaceRoot) {
-      return
-    }
+    if (!workspaceRoot) return
 
     window.clearTimeout(workspacePersistTimerRef.current)
     workspacePersistTimerRef.current = window.setTimeout(() => {
@@ -160,9 +485,7 @@ export function MainLayout(): React.JSX.Element {
   }, [editorSettings.showSidebar, expandedWorkspacePaths, workspaceRoot])
 
   useEffect(() => {
-    if (!document.path) {
-      return
-    }
+    if (!document.path) return
 
     window.clearTimeout(sessionPersistTimerRef.current)
     sessionPersistTimerRef.current = window.setTimeout(() => {
@@ -176,9 +499,7 @@ export function MainLayout(): React.JSX.Element {
   }, [cursorPosition.column, cursorPosition.line, document.path, editorMode])
 
   useEffect(() => {
-    if (!pendingAnchor) {
-      return
-    }
+    if (!pendingAnchor) return
 
     const timer = window.setTimeout(clearPendingAnchor, 500)
 
@@ -193,13 +514,78 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [])
 
-  const openEditorView = (): void => {
-    setActiveView('editor')
-  }
+  useEffect(() => {
+    window.localStorage.setItem(sidebarPaneWidthStorageKey, String(sidebarPaneWidth))
+  }, [sidebarPaneWidth])
 
-  const openSettingsView = (): void => {
+  const openEditorView = useCallback((): void => {
+    setActiveView('editor')
+  }, [])
+
+  const openSettingsView = useCallback((): void => {
     setActiveView('settings')
-  }
+  }, [])
+
+  const handleSidebarResizeStart = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      if (event.button !== 0) {
+        return
+      }
+
+      event.preventDefault()
+      event.currentTarget.setPointerCapture(event.pointerId)
+      sidebarResizeRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startWidth: sidebarPaneWidth
+      }
+      setIsResizingSidebar(true)
+    },
+    [sidebarPaneWidth]
+  )
+
+  const resizeSidebarByKeyboard = useCallback((delta: number): void => {
+    setSidebarPaneWidth((current) => clampSidebarPaneWidth(current + delta))
+  }, [])
+
+  useEffect(() => {
+    if (!isResizingSidebar) {
+      return
+    }
+
+    const handlePointerMove = (event: PointerEvent): void => {
+      const resizeState = sidebarResizeRef.current
+
+      if (!resizeState || event.pointerId !== resizeState.pointerId) {
+        return
+      }
+
+      setSidebarPaneWidth(
+        clampSidebarPaneWidth(resizeState.startWidth + event.clientX - resizeState.startX)
+      )
+    }
+
+    const handlePointerUp = (event: PointerEvent): void => {
+      const resizeState = sidebarResizeRef.current
+
+      if (resizeState && event.pointerId !== resizeState.pointerId) {
+        return
+      }
+
+      sidebarResizeRef.current = null
+      setIsResizingSidebar(false)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+  }, [isResizingSidebar])
 
   const handleExport = useCallback(
     async (format: ExportFormat): Promise<void> => {
@@ -385,6 +771,27 @@ export function MainLayout(): React.JSX.Element {
         void createDocument()
         return
       }
+      if (e.key === 'w') {
+        e.preventDefault()
+        if (activeTab) {
+          void handleCloseTab(activeTab.id)
+        }
+        return
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          switchToPreviousTab()
+        } else {
+          switchToNextTab()
+        }
+        return
+      }
+      if (e.key >= '1' && e.key <= '9' && !e.shiftKey) {
+        e.preventDefault()
+        switchToTabByIndex(parseInt(e.key) - 1)
+        return
+      }
       if (e.key === '1' && e.shiftKey) {
         e.preventDefault()
         setEditorMode('source')
@@ -415,7 +822,13 @@ export function MainLayout(): React.JSX.Element {
     createDocument,
     setEditorMode,
     editorSettings.showSidebar,
-    updateSettings
+    updateSettings,
+    activeTab,
+    handleCloseTab,
+    switchToNextTab,
+    switchToPreviousTab,
+    switchToTabByIndex,
+    openEditorView
   ])
 
   useEffect(() => {
@@ -470,8 +883,190 @@ export function MainLayout(): React.JSX.Element {
     handleExport,
     openDocument,
     openWorkspace,
-    saveDocument
+    saveDocument,
+    openEditorView
   ])
+
+  useEffect(() => {
+    return window.api.app.onOpenFile((filePath: string) => {
+      void openPath(filePath, { mode: 'preview-edit' })
+    })
+  }, [openPath])
+
+  useEffect(() => {
+    if (hasInitializedRef.current) {
+      return
+    }
+
+    let cancelled = false
+
+    const timer = window.setTimeout(() => {
+      if (cancelled) {
+        return
+      }
+
+      hasInitializedRef.current = true
+      void refreshRecent()
+
+      window.api.app.getPendingOpenFile().then((result) => {
+        if (result.ok && result.data) {
+          void openPath(result.data, { mode: 'preview-edit' })
+          return
+        }
+
+        window.api.preferences.getEditor().then((result) => {
+          if (!result.ok) {
+            Toast.error(result.error.message)
+            return
+          }
+
+          if (!result.data.hasSeenWelcome) {
+            void window.api.preferences.updateEditor({ hasSeenWelcome: true })
+            return
+          }
+
+          window.api.session.getLastDocument().then((sessionResult) => {
+            if (sessionResult.ok && sessionResult.data) {
+              void openPath(sessionResult.data.path, { mode: sessionResult.data.mode })
+            }
+          })
+        })
+      })
+
+      window.api.recent.listWorkspaces().then((result) => {
+        if (result.ok && result.data[0]) {
+          void loadWorkspace(result.data[0].path)
+        }
+      })
+    }, 0)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [loadWorkspace, openPath, refreshRecent])
+
+  useEffect(() => {
+    return window.api.workspace.onDidChange(() => {
+      if (workspaceRoot) {
+        window.api.workspace.getTree(workspaceRoot).then((result) => {
+          if (result.ok) {
+            setWorkspaceTree(result.data)
+          }
+        })
+      }
+    })
+  }, [workspaceRoot])
+
+  const dragOverFrameRef = useRef<number | undefined>(undefined)
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!hasExternalFiles(e.dataTransfer)) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+    if (dragOverFrameRef.current === undefined) {
+      dragOverFrameRef.current = requestAnimationFrame(() => {
+        setIsDragging(true)
+        dragOverFrameRef.current = undefined
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (dragOverFrameRef.current !== undefined) {
+        cancelAnimationFrame(dragOverFrameRef.current)
+      }
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!hasExternalFiles(e.dataTransfer)) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+    const relatedTarget = e.relatedTarget as Node | null
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setIsDragging(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      if (!hasExternalFiles(e.dataTransfer)) {
+        return
+      }
+
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(false)
+
+      const files = Array.from(e.dataTransfer.files)
+      if (files.length === 0) return
+
+      const firstFilePath = getDroppedFilePath(files[0])
+      if (files.length === 1 && firstFilePath) {
+        const statResult = await window.api.workspace.getTree(firstFilePath)
+        if (statResult.ok) {
+          await loadWorkspaceRef.current?.(firstFilePath)
+          void refreshRecentRef.current?.()
+          return
+        }
+      }
+
+      for (const file of files) {
+        const filePath = getDroppedFilePath(file)
+        if (filePath && /\.(md|markdown|mdown|mkd|txt)$/i.test(filePath)) {
+          openEditorView()
+          await openPathRef.current?.(filePath, { mode: 'preview-edit' })
+        }
+      }
+    },
+    [openEditorView]
+  )
+
+  const createWorkspaceEntry = useCallback(
+    async (
+      parentPath: string,
+      name: string,
+      type: 'file' | 'directory'
+    ): Promise<string | null> => {
+      const result = await window.api.workspace.createEntry({ parentPath, name, type })
+      if (result.ok) return result.data
+      Toast.error(result.error.message)
+      return null
+    },
+    []
+  )
+
+  const renameWorkspaceEntry = useCallback(
+    async (path: string, newName: string): Promise<string | null> => {
+      const result = await window.api.workspace.renameEntry({ path, newName })
+      if (result.ok) {
+        if (activeTab?.document.path === path) {
+          updateTabDocument(activeTab.id, { path: result.data })
+        }
+        return result.data
+      }
+      Toast.error(result.error.message)
+      return null
+    },
+    [activeTab, updateTabDocument]
+  )
+
+  const deleteWorkspaceEntry = useCallback(async (path: string): Promise<boolean> => {
+    const result = await window.api.workspace.deleteEntry({ path })
+    if (result.ok) {
+      return true
+    }
+    Toast.error(result.error.message)
+    return false
+  }, [])
 
   return (
     <div
@@ -481,10 +1076,17 @@ export function MainLayout(): React.JSX.Element {
       data-platform={platform}
       data-sidebar-visible={editorSettings.showSidebar}
       data-view={activeView}
+      data-dragging={isDragging}
+      data-resizing-sidebar={isResizingSidebar}
+      style={{ '--sidebar-pane-width': `${sidebarPaneWidth}px` } as React.CSSProperties}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <Sidebar
         activeView={activeView}
         visible={editorSettings.showSidebar}
+        paneWidth={sidebarPaneWidth}
         workspaceRoot={workspaceRoot}
         workspaceTree={workspaceTree}
         recentFiles={recentFiles}
@@ -497,6 +1099,8 @@ export function MainLayout(): React.JSX.Element {
         onOpenEditor={openEditorView}
         onOpenSettings={openSettingsView}
         onOpenWorkspace={() => void openWorkspace()}
+        onResizeStart={handleSidebarResizeStart}
+        onResizeByKeyboard={resizeSidebarByKeyboard}
         onOpenFile={(path) => {
           openEditorView()
           void openPath(path)
@@ -510,8 +1114,6 @@ export function MainLayout(): React.JSX.Element {
         {activeView === 'editor' ? (
           <>
             <TitleBar
-              title={document.title}
-              dirty={document.dirty}
               mode={editorMode}
               platform={platform}
               showSidebar={editorSettings.showSidebar}
@@ -521,20 +1123,37 @@ export function MainLayout(): React.JSX.Element {
               onSave={() => void saveDocument()}
               onExport={(format) => void handleExport(format)}
             />
+            <TabBar
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onSelect={setActiveTabId}
+              onClose={(tabId) => void handleCloseTab(tabId)}
+              onCloseOthers={(tabId) => void handleCloseOthers(tabId)}
+              onCloseAll={() => void handleCloseAll()}
+              onCloseSaved={closeSavedTabs}
+              onPin={pinTab}
+              onUnpin={unpinTab}
+              onReorder={reorderTabs}
+              onNewTab={handleNewTab}
+            />
             <section className="editor-host" data-editor-mode={editorMode}>
-              <MarkdownEditor
-                mode={editorMode}
-                dirty={document.dirty}
-                content={document.content}
-                settings={editorSettings}
-                currentPath={document.path}
-                workspaceRoot={workspaceRoot}
-                anchorTarget={pendingAnchor}
-                onChange={setContent}
-                onCursorChange={setCursorPosition}
-                onOpenDocumentLink={openPathFromLink}
-                onLinkError={(message) => Toast.error(message)}
-              />
+              {activeTab ? (
+                <MarkdownEditor
+                  mode={editorMode}
+                  dirty={document.dirty}
+                  content={document.content}
+                  settings={editorSettings}
+                  currentPath={document.path}
+                  workspaceRoot={workspaceRoot}
+                  anchorTarget={pendingAnchor}
+                  onChange={setContent}
+                  onCursorChange={(position) => setCursorPosition(position.line, position.column)}
+                  onOpenDocumentLink={openPathFromLink}
+                  onLinkError={(message) => Toast.error(message)}
+                />
+              ) : (
+                <div className="empty-editor" />
+              )}
             </section>
             <StatusBar
               mode={editorMode}

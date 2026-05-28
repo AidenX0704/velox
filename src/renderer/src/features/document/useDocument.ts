@@ -59,13 +59,15 @@ export function useDocument(): {
   setContent: (content: string) => void
   createDocument: () => Promise<void>
   openDocument: () => Promise<void>
-  openPath: (path: string) => Promise<boolean>
+  openPath: (path: string, options?: { mode?: EditorMode }) => Promise<boolean>
   openPathFromLink: (path: string, anchor?: string) => Promise<boolean>
   clearPendingAnchor: () => void
   saveDocument: () => Promise<void>
   saveDocumentAs: () => Promise<void>
   openWorkspace: () => Promise<void>
+  loadWorkspace: (path: string) => Promise<void>
   refreshWorkspace: () => Promise<void>
+  refreshRecent: () => Promise<void>
   createWorkspaceEntry: (
     parentPath: string,
     name: string,
@@ -199,11 +201,14 @@ export function useDocument(): {
   )
 
   const openPath = useCallback(
-    async (path: string): Promise<boolean> => {
+    async (path: string, options?: { mode?: EditorMode }): Promise<boolean> => {
       const result = await window.api.document.openPath(path)
 
       if (result.ok) {
         setDocument(toDocumentState(result.data))
+        if (options?.mode) {
+          setEditorMode(options.mode)
+        }
         void refreshRecent()
         return true
       }
@@ -211,7 +216,7 @@ export function useDocument(): {
       Toast.error(result.error.message)
       return false
     },
-    [refreshRecent]
+    [refreshRecent, setEditorMode]
   )
 
   const restoreLastDocument = useCallback(async (): Promise<void> => {
@@ -340,7 +345,7 @@ export function useDocument(): {
       // Check for pending open file from command line args (e.g., double-clicking a .md file)
       window.api.app.getPendingOpenFile().then((result) => {
         if (result.ok && result.data) {
-          void openPath(result.data)
+          void openPath(result.data, { mode: 'preview-edit' })
           return
         }
 
@@ -373,7 +378,7 @@ export function useDocument(): {
 
   useEffect(() => {
     return window.api.app.onOpenFile((filePath: string) => {
-      void openPath(filePath)
+      void openPath(filePath, { mode: 'preview-edit' })
     })
   }, [openPath])
 
@@ -416,7 +421,9 @@ export function useDocument(): {
     saveDocument,
     saveDocumentAs,
     openWorkspace,
+    loadWorkspace,
     refreshWorkspace,
+    refreshRecent,
     createWorkspaceEntry,
     renameWorkspaceEntry,
     deleteWorkspaceEntry

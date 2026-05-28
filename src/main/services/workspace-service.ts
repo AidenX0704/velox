@@ -105,7 +105,7 @@ export class WorkspaceService {
 
     this.currentWorkspacePath = rootPath
     this.watcher = chokidar.watch(rootPath, {
-      ignored: [/(^|[\/\\])\../, ...workspaceIgnore], // ignore dotfiles and ignore list
+      ignored: [/(^|[/\\])\../, ...workspaceIgnore], // ignore dotfiles and ignore list
       persistent: true,
       ignoreInitial: true,
       depth: 5

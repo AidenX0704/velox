@@ -184,6 +184,7 @@ export interface VeloxAPI {
   app: {
     getInfo: () => Promise<Result<AppInfo>>
     getPendingOpenFile: () => Promise<Result<string | null>>
+    getPathForFile: (file: File) => string
     onOpenFile: (callback: (filePath: string) => void) => () => void
   }
   window: {

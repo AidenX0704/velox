@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import { ipcChannels } from '../shared/channels'
 import type {
   AppInfo,
@@ -32,6 +32,7 @@ const api: VeloxAPI = {
   app: {
     getInfo: () => invoke<AppInfo>(ipcChannels.app.getInfo),
     getPendingOpenFile: () => invoke<string | null>(ipcChannels.app.getPendingOpenFile),
+    getPathForFile: (file) => webUtils.getPathForFile(file),
     onOpenFile: (callback) => {
       const listener = (_event: IpcRendererEvent, filePath: string): void => {
         callback(filePath)

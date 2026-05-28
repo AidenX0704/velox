@@ -22,6 +22,7 @@ function basename(path: string): string {
 interface SidebarProps {
   activeView: AppView
   visible: boolean
+  paneWidth: number
   workspaceRoot: string | null
   workspaceTree: WorkspaceEntry[]
   recentFiles: RecentFileRecord[]
@@ -32,6 +33,8 @@ interface SidebarProps {
   onOpenSettings: () => void
   onOpenWorkspace: () => void
   onOpenFile: (path: string) => void
+  onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void
+  onResizeByKeyboard: (delta: number) => void
   onExpandedPathsChange?: (paths: string[]) => void
   onCreateWorkspaceEntry?: (
     parentPath: string,
@@ -45,6 +48,7 @@ interface SidebarProps {
 export function Sidebar({
   activeView,
   visible,
+  paneWidth,
   workspaceRoot,
   workspaceTree,
   recentFiles,
@@ -55,6 +59,8 @@ export function Sidebar({
   onOpenSettings,
   onOpenWorkspace,
   onOpenFile,
+  onResizeStart,
+  onResizeByKeyboard,
   onExpandedPathsChange,
   onCreateWorkspaceEntry,
   onRenameWorkspaceEntry,
@@ -214,6 +220,28 @@ export function Sidebar({
           </section>
         )}
       </div>
+      <div
+        className="sidebar-resizer"
+        role="separator"
+        aria-label="调整资源管理器宽度"
+        aria-orientation="vertical"
+        aria-valuemin={180}
+        aria-valuemax={480}
+        aria-valuenow={paneWidth}
+        tabIndex={visible ? 0 : -1}
+        onPointerDown={onResizeStart}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault()
+            onResizeByKeyboard(event.shiftKey ? -40 : -12)
+          }
+
+          if (event.key === 'ArrowRight') {
+            event.preventDefault()
+            onResizeByKeyboard(event.shiftKey ? 40 : 12)
+          }
+        }}
+      />
     </aside>
   )
 }

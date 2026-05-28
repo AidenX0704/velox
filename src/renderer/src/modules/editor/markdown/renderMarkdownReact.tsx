@@ -10,7 +10,15 @@ import remarkMath from 'remark-math'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
-import { CodeBlockPre, MarkdownImage, MarkdownTable, SafeLink } from './MarkdownRenderComponents'
+import {
+  CodeBlockPre,
+  MarkdownBlockquote,
+  MarkdownFrontmatter,
+  MarkdownImage,
+  MarkdownTable,
+  SafeLink,
+  type MarkdownFrontmatterEntry
+} from './MarkdownRenderComponents'
 import { slugifyHeading } from '../rendering/headingAnchors'
 import { markdownSanitizeSchema } from './sanitizeSchema'
 
@@ -28,6 +36,7 @@ type HeadingTagName = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
 export function renderMarkdownReact(content: string): ReactNode {
   resetHeadingRenderState()
+  const { body, frontmatter } = splitFrontmatter(content)
 
   const file = unified()
     .use(remarkParse)
@@ -53,12 +62,96 @@ export function renderMarkdownReact(content: string): ReactNode {
         pre: CodeBlockPre,
         table: MarkdownTable,
         img: MarkdownImage,
-        a: SafeLink
+        a: SafeLink,
+        blockquote: MarkdownBlockquote
       }
     })
-    .processSync(content)
+    .processSync(body)
+
+  if (frontmatter.length > 0) {
+    return (
+      <>
+        <MarkdownFrontmatter entries={frontmatter} />
+        {file.result}
+      </>
+    )
+  }
 
   return file.result
+}
+
+function splitFrontmatter(content: string): {
+  body: string
+  frontmatter: MarkdownFrontmatterEntry[]
+} {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
+
+  if (!match) {
+    return { body: content, frontmatter: [] }
+  }
+
+  return {
+    body: content.slice(match[0].length),
+    frontmatter: parseFrontmatter(match[1])
+  }
+}
+
+function parseFrontmatter(raw: string): MarkdownFrontmatterEntry[] {
+  const entries: MarkdownFrontmatterEntry[] = []
+  let currentEntry: MarkdownFrontmatterEntry | null = null
+
+  const commitCurrentEntry = (): void => {
+    if (currentEntry) {
+      entries.push(currentEntry)
+      currentEntry = null
+    }
+  }
+
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith('#')) {
+      continue
+    }
+
+    const pair = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+
+    if (pair) {
+      commitCurrentEntry()
+      currentEntry = {
+        key: pair[1],
+        value: pair[2] ? stripYamlQuotes(pair[2].trim()) : []
+      }
+      continue
+    }
+
+    const listItem = /^\s*-\s+(.+)$/.exec(line)
+
+    if (listItem && currentEntry) {
+      const nextValue = stripYamlQuotes(listItem[1].trim())
+      currentEntry.value = Array.isArray(currentEntry.value)
+        ? [...currentEntry.value, nextValue]
+        : [currentEntry.value, nextValue].filter(Boolean)
+      continue
+    }
+
+    if (currentEntry && typeof currentEntry.value === 'string') {
+      currentEntry.value = `${currentEntry.value} ${stripYamlQuotes(line.trim())}`.trim()
+    }
+  }
+
+  commitCurrentEntry()
+
+  return entries
+}
+
+function stripYamlQuotes(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1)
+  }
+
+  return value
 }
 
 function resetHeadingRenderState(): void {

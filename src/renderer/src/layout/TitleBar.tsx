@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Dropdown, Tooltip, Typography } from '@douyinfe/semi-ui'
+import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
 import {
   IconCodeStroked,
   IconColumnsStroked,
@@ -18,8 +18,6 @@ import type { EditorMode } from '../modules/editor/model/types'
 import { editorModeLabels } from '../modules/editor/model/types'
 
 interface TitleBarProps {
-  title: string
-  dirty: boolean
   mode: EditorMode
   platform: string
   showSidebar: boolean
@@ -49,8 +47,6 @@ function WindowsCaptionIcon({
 }
 
 export function TitleBar({
-  title,
-  dirty,
   mode,
   platform,
   showSidebar,
@@ -154,10 +150,6 @@ export function TitleBar({
           </Dropdown>
         </div>
       </div>
-      <Typography.Text className="titlebar-name" ellipsis={{ showTooltip: true }}>
-        {title}
-        {dirty ? ' ●' : ''}
-      </Typography.Text>
       <div className="titlebar-actions">
         <Segment
           className="mode-segment"

@@ -120,7 +120,7 @@ function WorkspaceTreeContent({
     })
   }
 
-  const handleCreateRequest = (parentPath: string, type: 'file' | 'directory') => {
+  const handleCreateRequest = (parentPath: string, type: 'file' | 'directory'): void => {
     if (!onCreateWorkspaceEntry) {
       return
     }
@@ -141,7 +141,7 @@ function WorkspaceTreeContent({
     })
   }
 
-  const handleRenameRequest = (path: string, currentName: string) => {
+  const handleRenameRequest = (path: string, currentName: string): void => {
     setInlineInput({
       type: 'rename',
       targetPath: path,
@@ -149,13 +149,13 @@ function WorkspaceTreeContent({
     })
   }
 
-  const handleDeleteRequest = async (path: string) => {
+  const handleDeleteRequest = async (path: string): Promise<void> => {
     if (onDeleteWorkspaceEntry) {
       await onDeleteWorkspaceEntry(path)
     }
   }
 
-  const handleInlineInputComplete = async (value: string) => {
+  const handleInlineInputComplete = async (value: string): Promise<void> => {
     if (!value.trim() || !inlineInput) {
       setInlineInput(null)
       return

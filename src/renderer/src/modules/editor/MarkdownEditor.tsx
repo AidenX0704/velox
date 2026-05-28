@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/editor.css'
 import type { CursorPosition, EditorMode, MarkdownEditorPreferences } from './model/types'
 import { MarkdownPreview } from './preview/MarkdownPreview'
-import { RichMarkdownEditor } from './rich/RichMarkdownEditor'
 import { FormatToolbar } from './rich/FormatToolbar'
 import { DocumentOutline } from './outline/DocumentOutline'
 import { collectHeadingAnchors, type HeadingAnchor } from './rendering/headingAnchors'
@@ -52,6 +51,7 @@ export function MarkdownEditor({
   const [splitRatio, setSplitRatio] = useState(defaultSplitRatio)
   const [dragging, setDragging] = useState(false)
   const [sourceVisibleLine, setSourceVisibleLine] = useState(1)
+  const [previewActiveHeadingIndex, setPreviewActiveHeadingIndex] = useState<number | null>(null)
   const headingAnchors = useMemo(() => collectHeadingAnchors(content), [content])
   const sourceActiveHeadingIndex = findHeadingIndexAtOrBeforeLine(headingAnchors, sourceVisibleLine)
   const linkNavigation = useMemo<EditorLinkNavigationOptions>(
@@ -100,6 +100,58 @@ export function MarkdownEditor({
     }
   }, [settings.splitScrollSync])
 
+  useEffect(() => {
+    if (mode !== 'preview-edit') {
+      return
+    }
+
+    const previewElement = previewPaneRef.current
+
+    if (!previewElement) {
+      setPreviewActiveHeadingIndex(null)
+      return
+    }
+
+    let frameId = 0
+    const updateActiveHeading = (): void => {
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        setPreviewActiveHeadingIndex(getActivePreviewHeadingIndex(previewElement, headingAnchors))
+      })
+    }
+
+    updateActiveHeading()
+    previewElement.addEventListener('scroll', updateActiveHeading)
+    window.addEventListener('resize', updateActiveHeading)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      previewElement.removeEventListener('scroll', updateActiveHeading)
+      window.removeEventListener('resize', updateActiveHeading)
+    }
+  }, [content, headingAnchors, mode])
+
+  const scrollPreviewToHeading = (heading: HeadingAnchor): void => {
+    const previewElement = previewPaneRef.current
+
+    if (!previewElement) {
+      return
+    }
+
+    const headingElement = previewElement.querySelector<HTMLElement>(
+      `[data-heading-anchor="${cssEscape(heading.slug)}"]`
+    )
+
+    if (!headingElement) {
+      return
+    }
+
+    previewElement.scrollTop = Math.max(
+      0,
+      getElementScrollTop(previewElement, headingElement) - scrollSyncTopOffset
+    )
+  }
+
   if (mode === 'source') {
     return (
       <div className="editor-mode-shell" data-editor-view="source">
@@ -133,18 +185,33 @@ export function MarkdownEditor({
 
   if (mode === 'preview-edit') {
     return (
-      <RichMarkdownEditor
-        dirty={dirty}
-        content={content}
-        settings={settings}
-        currentPath={currentPath}
-        workspaceRoot={workspaceRoot}
-        anchorTarget={anchorTarget}
-        onOpenDocumentLink={onOpenDocumentLink}
-        onLinkError={onLinkError}
-        onChange={onChange}
-        onCursorChange={onCursorChange}
-      />
+      <div
+        className="preview-edit-shell preview-edit-shell-readonly"
+        style={
+          {
+            '--preview-max-width': `${settings.previewMaxWidth}px`,
+            '--preview-font-size': `${settings.previewFontSize}px`,
+            '--preview-line-height': String(settings.previewLineHeight)
+          } as React.CSSProperties
+        }
+        data-preview-centered={settings.previewCentered}
+        data-width-mode={settings.previewEditWidthMode}
+      >
+        <DocumentOutline
+          headings={headingAnchors}
+          dirty={dirty}
+          activeHeadingIndex={previewActiveHeadingIndex}
+          onHeadingSelect={scrollPreviewToHeading}
+        />
+        <div ref={previewPaneRef} className="preview-pane preview-readonly-pane">
+          <MarkdownPreview
+            content={content}
+            anchorTarget={anchorTarget}
+            linkNavigation={linkNavigation}
+            customCss={settings.customPreviewCss}
+          />
+        </div>
+      </div>
     )
   }
 
@@ -395,6 +462,30 @@ function getPreviewHeadingPositions(
       }
     })
     .filter((position): position is PreviewHeadingPosition => position !== null)
+}
+
+function getActivePreviewHeadingIndex(
+  previewElement: HTMLElement,
+  headingAnchors: HeadingAnchor[]
+): number | null {
+  const headingPositions = getPreviewHeadingPositions(previewElement, headingAnchors)
+
+  if (headingPositions.length === 0) {
+    return null
+  }
+
+  const currentTop = previewElement.scrollTop + scrollSyncTopOffset
+  let activeIndex = headingPositions[0].anchor.index
+
+  for (const position of headingPositions) {
+    if (position.top > currentTop) {
+      break
+    }
+
+    activeIndex = position.anchor.index
+  }
+
+  return activeIndex
 }
 
 function mapLineToPreviewTop({
