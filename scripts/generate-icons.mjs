@@ -1,19 +1,23 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { deflateSync } from 'node:zlib'
+import { PNG } from 'pngjs'
 
+/**
+ * Generates every packaged and in-app icon from the current source artwork.
+ * Source: build/velox.png
+ */
 const root = resolve(import.meta.dirname, '..')
 const buildDir = resolve(root, 'build')
 const resourcesDir = resolve(root, 'resources')
+const sourcePath = resolve(buildDir, 'velox.png')
+const pngDir = resolve(buildDir, 'icons')
+const iconsetDir = resolve(buildDir, 'icon.iconset')
 
-const pngTargets = [
-  { path: resolve(buildDir, 'icon.png'), size: 512 },
-  { path: resolve(resourcesDir, 'icon.png'), size: 512 }
-]
-
+const appIconSize = 512
+const pngSizes = [16, 24, 32, 48, 64, 128, 256, 512, 1024]
 const icoSizes = [16, 24, 32, 48, 64, 128, 256]
-const icnsTypes = [
+const icnsEntries = [
   ['icp4', 16],
   ['icp5', 32],
   ['icp6', 64],
@@ -23,281 +27,153 @@ const icnsTypes = [
   ['ic10', 1024]
 ]
 
+if (!existsSync(sourcePath)) {
+  throw new Error(`Missing source icon: ${sourcePath}`)
+}
+
 mkdirSync(buildDir, { recursive: true })
 mkdirSync(resourcesDir, { recursive: true })
+rmSync(pngDir, { force: true, recursive: true })
+rmSync(iconsetDir, { force: true, recursive: true })
+mkdirSync(pngDir, { recursive: true })
+mkdirSync(iconsetDir, { recursive: true })
 
-for (const target of pngTargets) {
-  writePng(target.path, renderIcon(target.size))
+const source = PNG.sync.read(readFileSync(sourcePath))
+const squareSource = cropToSquare(source)
+const rendered = new Map(pngSizes.map((size) => [size, resizeImage(squareSource, size)]))
+
+for (const [size, image] of rendered) {
+  writePng(resolve(pngDir, `icon-${size}.png`), image)
 }
+
+writePng(resolve(buildDir, 'icon.png'), rendered.get(appIconSize))
+writePng(resolve(resourcesDir, 'icon.png'), rendered.get(appIconSize))
 
 writeIco(
   resolve(buildDir, 'icon.ico'),
-  icoSizes.map((size) => ({ size, png: encodePng(renderIcon(size)) }))
+  icoSizes.map((size) => ({ size, png: encodePng(rendered.get(size)) }))
 )
 writeIcns(
   resolve(buildDir, 'icon.icns'),
-  icnsTypes.map(([type, size]) => ({ type, png: encodePng(renderIcon(size)) }))
+  icnsEntries.map(([type, size]) => ({ type, png: encodePng(rendered.get(size)) }))
 )
-rmSync(resolve(buildDir, 'icon.iconset'), { force: true, recursive: true })
 
-console.log('Generated Velox icons in build/ and resources/.')
+writeIconset(rendered)
+
+console.log('Generated Velox icon pack from build/velox.png.')
+
+function writeIconset(renderedImages) {
+  const iconsetTargets = [
+    ['icon_16x16.png', 16],
+    ['icon_16x16@2x.png', 32],
+    ['icon_32x32.png', 32],
+    ['icon_32x32@2x.png', 64],
+    ['icon_128x128.png', 128],
+    ['icon_128x128@2x.png', 256],
+    ['icon_256x256.png', 256],
+    ['icon_256x256@2x.png', 512],
+    ['icon_512x512.png', 512],
+    ['icon_512x512@2x.png', 1024]
+  ]
+
+  for (const [fileName, size] of iconsetTargets) {
+    writePng(resolve(iconsetDir, fileName), renderedImages.get(size))
+  }
+}
 
 function writePng(path, image) {
+  if (!image) {
+    throw new Error(`Cannot write missing image: ${path}`)
+  }
+
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, encodePng(image))
 }
 
-function renderIcon(size) {
-  const pixels = new Uint8Array(size * size * 4)
-
-  drawRoundedRect(pixels, size, 34, 34, 444, 444, 104, (x, y) =>
-    mix([91, 92, 246], mix([37, 99, 235], [15, 118, 110], y), x * 0.2 + y * 0.8)
-  )
-  drawStroke(pixels, size, [117, 140, 92, 208, 148, 291, 183, 273], 18, [255, 255, 255, 72])
-  drawRoundedRect(pixels, size, 142, 104, 228, 300, 39, (x, y) =>
-    mix([255, 255, 255], [238, 244, 255], y)
-  )
-  drawPolygon(
-    pixels,
-    size,
-    [
-      [320, 104],
-      [370, 155],
-      [330, 155],
-      [320, 145]
-    ],
-    [220, 232, 255, 255]
-  )
-  drawStroke(pixels, size, [184, 174, 260, 174], 16, [148, 163, 184, 255])
-  drawStroke(pixels, size, [184, 210, 286, 210], 14, [203, 213, 225, 255])
-  drawStroke(pixels, size, [184, 246, 239, 246], 14, [203, 213, 225, 255])
-  drawStroke(pixels, size, [171, 236, 240, 323, 344, 177], 42, [17, 24, 39, 255])
-  drawStroke(pixels, size, [171, 236, 240, 323, 344, 177], 16, [255, 255, 255, 42])
-
-  return { width: size, height: size, pixels }
-}
-
-function drawRoundedRect(pixels, size, x, y, width, height, radius, colorAt) {
-  const scale = size / 512
-  const bounds = scaleBounds(x, y, width, height, scale)
-  const samples = size < 64 ? 2 : 3
-
-  for (let py = bounds.top; py < bounds.bottom; py += 1) {
-    for (let px = bounds.left; px < bounds.right; px += 1) {
-      const coverage = sampleCoverage(px, py, samples, (sx, sy) =>
-        roundedRectCoverage(sx / scale, sy / scale, x, y, width, height, radius)
-      )
-
-      if (coverage <= 0) {
-        continue
-      }
-
-      const color = colorAt(
-        (px - bounds.left) / Math.max(1, bounds.right - bounds.left),
-        (py - bounds.top) / Math.max(1, bounds.bottom - bounds.top)
-      )
-      blendPixel(pixels, size, px, py, [color[0], color[1], color[2], Math.round(255 * coverage)])
-    }
-  }
-}
-
-function drawStroke(pixels, size, points, width, color) {
-  const scale = size / 512
-  const scaledWidth = width * scale
-  const xs = []
-  const ys = []
-
-  for (let index = 0; index < points.length; index += 2) {
-    xs.push(points[index] * scale)
-    ys.push(points[index + 1] * scale)
-  }
-
-  const left = Math.max(0, Math.floor(Math.min(...xs) - scaledWidth))
-  const right = Math.min(size, Math.ceil(Math.max(...xs) + scaledWidth))
-  const top = Math.max(0, Math.floor(Math.min(...ys) - scaledWidth))
-  const bottom = Math.min(size, Math.ceil(Math.max(...ys) + scaledWidth))
-  const samples = size < 64 ? 2 : 3
-
-  for (let py = top; py < bottom; py += 1) {
-    for (let px = left; px < right; px += 1) {
-      const coverage = sampleCoverage(px, py, samples, (sx, sy) => {
-        let distance = Number.POSITIVE_INFINITY
-
-        for (let index = 0; index < xs.length - 1; index += 1) {
-          distance = Math.min(
-            distance,
-            distanceToSegment(sx, sy, xs[index], ys[index], xs[index + 1], ys[index + 1])
-          )
-        }
-
-        return distance <= scaledWidth / 2 ? 1 : 0
-      })
-
-      if (coverage > 0) {
-        blendPixel(pixels, size, px, py, [
-          color[0],
-          color[1],
-          color[2],
-          Math.round(color[3] * coverage)
-        ])
-      }
-    }
-  }
-}
-
-function drawPolygon(pixels, size, points, color) {
-  const scale = size / 512
-  const scaled = points.map(([x, y]) => [x * scale, y * scale])
-  const left = Math.max(0, Math.floor(Math.min(...scaled.map(([x]) => x))))
-  const right = Math.min(size, Math.ceil(Math.max(...scaled.map(([x]) => x))))
-  const top = Math.max(0, Math.floor(Math.min(...scaled.map(([, y]) => y))))
-  const bottom = Math.min(size, Math.ceil(Math.max(...scaled.map(([, y]) => y))))
-  const samples = 3
-
-  for (let py = top; py < bottom; py += 1) {
-    for (let px = left; px < right; px += 1) {
-      const coverage = sampleCoverage(px, py, samples, (sx, sy) =>
-        pointInPolygon(sx, sy, scaled) ? 1 : 0
-      )
-
-      if (coverage > 0) {
-        blendPixel(pixels, size, px, py, [
-          color[0],
-          color[1],
-          color[2],
-          Math.round(color[3] * coverage)
-        ])
-      }
-    }
-  }
-}
-
-function scaleBounds(x, y, width, height, scale) {
-  return {
-    left: Math.max(0, Math.floor(x * scale - 1)),
-    top: Math.max(0, Math.floor(y * scale - 1)),
-    right: Math.min(Math.ceil((x + width) * scale + 1), Math.ceil(512 * scale)),
-    bottom: Math.min(Math.ceil((y + height) * scale + 1), Math.ceil(512 * scale))
-  }
-}
-
-function roundedRectCoverage(px, py, x, y, width, height, radius) {
-  const nearestX = clamp(px, x + radius, x + width - radius)
-  const nearestY = clamp(py, y + radius, y + height - radius)
-  const dx = px - nearestX
-  const dy = py - nearestY
-
-  return dx * dx + dy * dy <= radius * radius ? 1 : 0
-}
-
-function sampleCoverage(px, py, samples, test) {
-  let hits = 0
-
-  for (let y = 0; y < samples; y += 1) {
-    for (let x = 0; x < samples; x += 1) {
-      if (test(px + (x + 0.5) / samples, py + (y + 0.5) / samples)) {
-        hits += 1
-      }
-    }
-  }
-
-  return hits / (samples * samples)
-}
-
-function distanceToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx - ax
-  const dy = by - ay
-  const lengthSquared = dx * dx + dy * dy
-  const t = lengthSquared === 0 ? 0 : clamp(((px - ax) * dx + (py - ay) * dy) / lengthSquared, 0, 1)
-  const x = ax + t * dx
-  const y = ay + t * dy
-
-  return Math.hypot(px - x, py - y)
-}
-
-function pointInPolygon(px, py, points) {
-  let inside = false
-
-  for (
-    let index = 0, previous = points.length - 1;
-    index < points.length;
-    previous = index, index += 1
-  ) {
-    const [xi, yi] = points[index]
-    const [xj, yj] = points[previous]
-    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi
-
-    if (intersects) {
-      inside = !inside
-    }
-  }
-
-  return inside
-}
-
-function blendPixel(pixels, size, x, y, color) {
-  const offset = (y * size + x) * 4
-  const sourceAlpha = color[3] / 255
-  const targetAlpha = pixels[offset + 3] / 255
-  const outAlpha = sourceAlpha + targetAlpha * (1 - sourceAlpha)
-
-  if (outAlpha <= 0) {
-    return
-  }
-
-  pixels[offset] = Math.round(
-    (color[0] * sourceAlpha + pixels[offset] * targetAlpha * (1 - sourceAlpha)) / outAlpha
-  )
-  pixels[offset + 1] = Math.round(
-    (color[1] * sourceAlpha + pixels[offset + 1] * targetAlpha * (1 - sourceAlpha)) / outAlpha
-  )
-  pixels[offset + 2] = Math.round(
-    (color[2] * sourceAlpha + pixels[offset + 2] * targetAlpha * (1 - sourceAlpha)) / outAlpha
-  )
-  pixels[offset + 3] = Math.round(outAlpha * 255)
-}
-
 function encodePng(image) {
-  const bytesPerRow = image.width * 4 + 1
-  const raw = Buffer.alloc(bytesPerRow * image.height)
+  return PNG.sync.write(image, {
+    colorType: 6,
+    inputColorType: 6
+  })
+}
 
-  for (let y = 0; y < image.height; y += 1) {
-    raw[y * bytesPerRow] = 0
-    Buffer.from(image.pixels.buffer, y * image.width * 4, image.width * 4).copy(
-      raw,
-      y * bytesPerRow + 1
-    )
+function cropToSquare(image) {
+  const cropSize = Math.min(image.width, image.height)
+  const startX = Math.floor((image.width - cropSize) / 2)
+  const startY = Math.floor((image.height - cropSize) / 2)
+  const output = new PNG({ width: cropSize, height: cropSize })
+
+  for (let y = 0; y < cropSize; y += 1) {
+    for (let x = 0; x < cropSize; x += 1) {
+      copyPixel(image, output, startX + x, startY + y, x, y)
+    }
   }
 
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    pngChunk('IHDR', ihdr(image.width, image.height)),
-    pngChunk('IDAT', deflateSync(raw, { level: 9 })),
-    pngChunk('IEND', Buffer.alloc(0))
-  ])
+  return output
 }
 
-function ihdr(width, height) {
-  const buffer = Buffer.alloc(13)
-  buffer.writeUInt32BE(width, 0)
-  buffer.writeUInt32BE(height, 4)
-  buffer[8] = 8
-  buffer[9] = 6
-  buffer[10] = 0
-  buffer[11] = 0
-  buffer[12] = 0
-  return buffer
+function resizeImage(image, size) {
+  const output = new PNG({ width: size, height: size })
+  const scaleX = image.width / size
+  const scaleY = image.height / size
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const sourceX = (x + 0.5) * scaleX - 0.5
+      const sourceY = (y + 0.5) * scaleY - 0.5
+      const [red, green, blue, alpha] = sampleBilinear(image, sourceX, sourceY)
+      const offset = (y * size + x) * 4
+      output.data[offset] = red
+      output.data[offset + 1] = green
+      output.data[offset + 2] = blue
+      output.data[offset + 3] = alpha
+    }
+  }
+
+  return output
 }
 
-function pngChunk(type, data) {
-  const typeBuffer = Buffer.from(type, 'ascii')
-  const length = Buffer.alloc(4)
-  const crc = Buffer.alloc(4)
+function sampleBilinear(image, x, y) {
+  const x0 = clamp(Math.floor(x), 0, image.width - 1)
+  const y0 = clamp(Math.floor(y), 0, image.height - 1)
+  const x1 = clamp(x0 + 1, 0, image.width - 1)
+  const y1 = clamp(y0 + 1, 0, image.height - 1)
+  const dx = clamp(x - x0, 0, 1)
+  const dy = clamp(y - y0, 0, 1)
+  const top = mixPixel(readPixel(image, x0, y0), readPixel(image, x1, y0), dx)
+  const bottom = mixPixel(readPixel(image, x0, y1), readPixel(image, x1, y1), dx)
 
-  length.writeUInt32BE(data.length, 0)
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), 0)
+  return mixPixel(top, bottom, dy)
+}
 
-  return Buffer.concat([length, typeBuffer, data, crc])
+function readPixel(image, x, y) {
+  const offset = (y * image.width + x) * 4
+
+  return [
+    image.data[offset],
+    image.data[offset + 1],
+    image.data[offset + 2],
+    image.data[offset + 3]
+  ]
+}
+
+function copyPixel(source, target, sourceX, sourceY, targetX, targetY) {
+  const sourceOffset = (sourceY * source.width + sourceX) * 4
+  const targetOffset = (targetY * target.width + targetX) * 4
+
+  target.data[targetOffset] = source.data[sourceOffset]
+  target.data[targetOffset + 1] = source.data[sourceOffset + 1]
+  target.data[targetOffset + 2] = source.data[sourceOffset + 2]
+  target.data[targetOffset + 3] = source.data[sourceOffset + 3]
+}
+
+function mixPixel(a, b, amount) {
+  return [
+    Math.round(a[0] * (1 - amount) + b[0] * amount),
+    Math.round(a[1] * (1 - amount) + b[1] * amount),
+    Math.round(a[2] * (1 - amount) + b[2] * amount),
+    Math.round(a[3] * (1 - amount) + b[3] * amount)
+  ]
 }
 
 function writeIco(path, images) {
@@ -341,28 +217,6 @@ function writeIcns(path, images) {
   header.write('icns', 0, 4, 'ascii')
   header.writeUInt32BE(length, 4)
   writeFileSync(path, Buffer.concat([header, ...chunks]))
-}
-
-function crc32(buffer) {
-  let crc = 0xffffffff
-
-  for (const byte of buffer) {
-    crc ^= byte
-
-    for (let index = 0; index < 8; index += 1) {
-      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1
-    }
-  }
-
-  return (crc ^ 0xffffffff) >>> 0
-}
-
-function mix(a, b, amount) {
-  return [
-    Math.round(a[0] * (1 - amount) + b[0] * amount),
-    Math.round(a[1] * (1 - amount) + b[1] * amount),
-    Math.round(a[2] * (1 - amount) + b[2] * amount)
-  ]
 }
 
 function clamp(value, min, max) {

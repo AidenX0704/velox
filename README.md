@@ -34,7 +34,7 @@ Velox 当前提供源码编辑、分栏预览和所见即所得的富文本编�
 - **Markdown**：markdown-it、markdown-it-multimd-table、markdown-it-task-lists、markdown-it-texmath
 - **渲染增强**：Shiki、highlight.js、KaTeX、DOMPurify
 - **持久化**：better-sqlite3、SQLite WAL、chokidar
-- **工程化**：pnpm、ESLint、Prettier、electron-builder
+- **工程化**：npm、ESLint、Prettier、electron-builder
 
 ## 项目结构
 
@@ -64,54 +64,54 @@ scripts/             工程脚本，例如图标生成
 建议使用：
 
 - Node.js 20+
-- pnpm 10+
+- npm 10+
 - macOS / Windows / Linux 桌面环境
 
 安装依赖：
 
 ```bash
-pnpm install
+npm install
 ```
 
 ## 常用命令
 
 ```bash
 # 开发模式
-pnpm dev
+npm run dev
 
 # 预览生产构建
-pnpm start
+npm run start
 
 # 生成应用图标
-pnpm run icons
+npm run icons
 
 # 类型检查
-pnpm run typecheck
+npm run typecheck
 
 # 代码检查
-pnpm run lint
+npm run lint
 
 # 生产构建
-pnpm run build
+npm run build
 
 # 打包目录构建
-pnpm run build:unpack
+npm run build:unpack
 
 # 平台打包
-pnpm run build:mac
-pnpm run build:win
-pnpm run build:linux
+npm run build:mac
+npm run build:win
+npm run build:linux
 
 # 发布并上传到 GitHub Release
-pnpm run release
+npm run release
 ```
 
 ## 打包与发布
 
-应用图标源文件位于 `build/logo.svg`，运行：
+应用图标源文件位于 `build/velox.png`，运行：
 
 ```bash
-pnpm run icons
+npm run icons
 ```
 
 会生成：
@@ -119,13 +119,17 @@ pnpm run icons
 - `build/icon.png`
 - `build/icon.ico`
 - `build/icon.icns`
+- `build/icons/` 多尺寸 PNG 图标包
+- `build/icon.iconset/` macOS iconset 图标包
 - `resources/icon.png`
 
 Velox 使用 `better-sqlite3` 作为本地 SQLite 存储引擎。它是原生模块，如果更换 Electron、Node 版本或清理依赖后出现 native binding 错误，可以执行：
 
 ```bash
-pnpm exec electron-builder install-app-deps
+npm exec electron-builder install-app-deps
 ```
+
+打包配置关闭了 electron-builder 的隐式 `npmRebuild`，避免打包阶段的子进程在部分 Windows/nvm 环境下调用外部包管理器失败。原生依赖应在安装后由 `postinstall` 或上面的命令显式安装。
 
 Velox 使用 `electron-updater` 读取 GitHub Releases 作为线上更新源。打包配置中的发布源是 `AidenX0704/velox`，正式包会从最新 GitHub Release 读取 `latest.yml`、`latest-mac.yml`、`latest-linux.yml` 等更新元数据。
 
@@ -144,7 +148,7 @@ git push origin v1.0.1
 也可以在 GitHub Actions 的 `Release` workflow 中手动输入已存在的标签重新发布。手动本地发布需要设置可写入 Release 的 `GH_TOKEN`：
 
 ```bash
-GH_TOKEN=github_pat_xxx pnpm run release
+GH_TOKEN=github_pat_xxx npm run release
 ```
 
 开发或内测时可以通过 `VELOX_UPDATE_URL` 临时覆盖更新源，指向自建的 generic update feed。macOS 面向真实用户分发时还需要配置代码签名和 notarization，否则系统可能阻止安装或更新。
@@ -182,9 +186,9 @@ GH_TOKEN=github_pat_xxx pnpm run release
 4. 提交前运行检查：
 
 ```bash
-pnpm run lint
-pnpm run typecheck
-pnpm run build
+npm run lint
+npm run typecheck
+npm run build
 ```
 
 提交信息建议使用清晰的动词开头，例如：
