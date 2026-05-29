@@ -19,7 +19,7 @@ export function createMainWindow(): BrowserWindow {
       : { frame: false }),
     autoHideMenuBar: true,
     title: 'Velox',
-    ...(process.platform === 'linux' ? { icon } : {}),
+    ...(process.platform === 'darwin' ? {} : { icon }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

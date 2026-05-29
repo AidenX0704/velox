@@ -19,6 +19,8 @@ win:
         - x64
 nsis:
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
