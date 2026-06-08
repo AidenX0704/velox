@@ -1,6 +1,6 @@
 {
   "name": "velox",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A Typora-inspired desktop Markdown editor built with Electron, React and TypeScript",
   "main": "./out/main/index.js",
   "author": "Velox",
