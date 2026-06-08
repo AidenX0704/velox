@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.5 - 2026-06-08
+
+### Added
+
+- Added a document history workbench with recent activity, rendered previews, current document diffs, timeline entries, and branch state.
+- Added SQLite-backed document history storage for documents, blobs, branches, snapshots, and timeline events.
+- Added history IPC APIs and preload bindings for listing timelines, listing branches, and reading document activity.
+- Added an application updates section in settings with current version status and manual update checks.
+
+### Changed
+
+- Switched the default editor mode from split view to preview-edit mode, while normalizing legacy split-mode preferences and sessions.
+- Refactored editor styling into focused CSS modules for code blocks, formatting toolbar, frontmatter, link previews, Markdown content, outline, preview layout, rich content, and source mode.
+- Improved update dialogs and release note normalization for GitHub release metadata.
+- Delayed automatic update checks during startup so the main window can become interactive first.
+
+### Fixed
+
+- Fixed rich editor code block insertion freezing by using ProseMirror block type commands and ignoring decorative code block node view DOM mutations.
+- Fixed code block toolbar, line number, language picker, and syntax highlight DOM updates being interpreted as editable content changes.
+- Fixed persisted legacy split-mode values resolving to an unsupported editor mode after preview-edit became the default.
+
 ## 1.0.3 - 2026-05-29
 
 ### Added
