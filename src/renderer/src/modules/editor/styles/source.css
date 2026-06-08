@@ -1,0 +1,57 @@
+.source-editor {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface-base);
+  box-shadow: none;
+}
+
+.source-editor .cm-editor {
+  height: 100%;
+  outline: none;
+}
+
+.source-editor .cm-focused {
+  outline: none;
+}
+
+.source-editor .cm-line {
+  line-height: 1.72;
+}
+
+.source-editor .cm-activeLine {
+  background: var(--brand-softer);
+}
+
+.source-editor .cm-selectionBackground,
+.source-editor .cm-content ::selection {
+  background: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.18) !important;
+}
+
+.source-editor {
+  background: var(--surface-base);
+}
+
+.source-editor .cm-editor {
+  color: var(--text-primary);
+  background: var(--surface-base);
+}
+
+.source-editor .cm-scroller {
+  overflow: auto;
+}
+
+.source-editor .cm-line {
+  color: var(--text-primary);
+}
+
+.source-editor .cm-activeLine {
+  background: transparent;
+}
+
+.source-editor .cm-selectionBackground,
+.source-editor .cm-content ::selection {
+  background: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.16) !important;
+}

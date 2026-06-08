@@ -1,7 +1,6 @@
 import { dialog } from 'electron'
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, relative, resolve } from 'node:path'
-import { nanoid } from 'nanoid'
 import type {
   DocumentLinkPreview,
   DocumentData,
@@ -11,6 +10,7 @@ import type {
   SaveDocumentInput
 } from '../../shared/types'
 import { VeloxError } from '../shared/errors'
+import { HistoryService } from './history-service'
 import { RecentService } from './recent-service'
 import { SettingsService } from './settings-service'
 
@@ -27,13 +27,14 @@ const linkPreviewMaxLength = 1600
 export class DocumentService {
   constructor(
     private readonly settingsService: SettingsService,
-    private readonly recentService?: RecentService
+    private readonly recentService?: RecentService,
+    private readonly historyService?: HistoryService
   ) {}
 
   createUntitled(): DocumentData {
     return {
       content: '',
-      title: `Untitled-${nanoid(6)}`,
+      title: 'undefined.md',
       dirty: false,
       updatedAt: new Date().toISOString()
     }
@@ -57,6 +58,8 @@ export class DocumentService {
     const content = await readFile(filePath, 'utf8')
     this.settingsService.addRecentFile(filePath)
     this.recentService?.addFile(filePath)
+    this.historyService?.recordOpen(filePath)
+    this.historyService?.recordImport(filePath, content)
 
     return {
       path: filePath,
@@ -148,6 +151,7 @@ export class DocumentService {
     await writeFile(input.path, input.content, 'utf8')
     this.settingsService.addRecentFile(input.path)
     this.recentService?.addFile(input.path)
+    this.historyService?.recordSave(input.path, input.content)
 
     return {
       path: input.path,

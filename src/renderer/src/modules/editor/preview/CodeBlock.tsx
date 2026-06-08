@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getCodeLanguageMeta } from '../markdown/codeLanguage'
 import { handleCodeBlockAction } from '../rendering/blockActions'
 import { highlightCodeToHtml } from '../rendering/codeHighlight'
+import { getCodeLineCount, renderCodeLineNumbers } from '../rendering/codeBlockModel'
 
 interface CodeBlockProps {
   code: string
@@ -15,6 +16,7 @@ interface CodeBlockProps {
 export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
   const languageMeta = useMemo(() => getCodeLanguageMeta(language), [language])
+  const lineNumbers = useMemo(() => renderCodeLineNumbers(getCodeLineCount(code)), [code])
 
   useEffect(() => {
     let cancelled = false
@@ -35,10 +37,41 @@ export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element
       className="markdown-code-block"
       data-language={languageMeta.displayName}
       data-language-kind={languageMeta.kind}
+      data-wrap="false"
     >
       <figcaption className="markdown-code-toolbar" contentEditable={false}>
-        <span className="markdown-code-language">{languageMeta.displayName}</span>
+        <span className="markdown-code-title">
+          <button
+            className="markdown-code-title-fold"
+            type="button"
+            title="折叠代码块"
+            aria-label="折叠代码块"
+            aria-pressed="false"
+            data-code-action="fold"
+            onClick={(event) => handleCodeBlockAction(event.currentTarget)}
+          />
+          <span className="markdown-code-title-text">代码块</span>
+        </span>
         <span className="markdown-code-actions">
+          <button
+            className="markdown-code-language markdown-code-language-trigger"
+            type="button"
+            disabled
+            aria-label={`代码语言：${languageMeta.displayName}`}
+          >
+            <span>{languageMeta.displayName}</span>
+          </button>
+          <button
+            className="markdown-code-action markdown-code-action-wrap"
+            type="button"
+            title="自动换行"
+            aria-label="自动换行"
+            aria-pressed="false"
+            data-code-action="wrap"
+            onClick={(event) => handleCodeBlockAction(event.currentTarget)}
+          >
+            <span>自动换行</span>
+          </button>
           <button
             className="markdown-code-action markdown-code-action-copy"
             type="button"
@@ -49,27 +82,21 @@ export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element
           >
             <span>复制</span>
           </button>
-          <button
-            className="markdown-code-action markdown-code-action-fold"
-            type="button"
-            title="折叠代码块"
-            aria-label="折叠代码块"
-            aria-pressed="false"
-            data-code-action="fold"
-            onClick={(event) => handleCodeBlockAction(event.currentTarget)}
-          >
-            <span>折叠</span>
-          </button>
         </span>
       </figcaption>
       <div className="markdown-code-pre">
-        {highlightedHtml ? (
-          <div dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
-        ) : (
-          <pre className="shiki markdown-code-fallback">
-            <code data-raw-code={encodeURIComponent(code)}>{code}</code>
-          </pre>
-        )}
+        <span className="markdown-code-line-numbers" aria-hidden="true">
+          {lineNumbers}
+        </span>
+        <span className="markdown-code-content">
+          {highlightedHtml ? (
+            <div dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+          ) : (
+            <pre className="shiki markdown-code-fallback">
+              <code data-raw-code={encodeURIComponent(code)}>{code}</code>
+            </pre>
+          )}
+        </span>
         <span className="markdown-code-raw" data-raw-code={encodeURIComponent(code)} />
       </div>
     </figure>

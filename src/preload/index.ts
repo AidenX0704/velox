@@ -6,6 +6,9 @@ import type {
   DocumentLinkPreview,
   DocumentSessionRecord,
   DocumentData,
+  HistoryBranchRecord,
+  HistoryDocumentActivity,
+  HistoryTimelineEntry,
   MenuCommand,
   RecentFileRecord,
   RecentWorkspaceRecord,
@@ -75,6 +78,14 @@ const api: VeloxAPI = {
     listFiles: () => invoke<RecentFileRecord[]>(ipcChannels.recent.listFiles),
     listWorkspaces: () => invoke<RecentWorkspaceRecord[]>(ipcChannels.recent.listWorkspaces),
     clear: () => invoke<void>(ipcChannels.recent.clear)
+  },
+  history: {
+    listTimeline: (path?: string) =>
+      invoke<HistoryTimelineEntry[]>(ipcChannels.history.listTimeline, path),
+    listBranches: (path?: string) =>
+      invoke<HistoryBranchRecord[]>(ipcChannels.history.listBranches, path),
+    getDocumentActivity: (path: string) =>
+      invoke<HistoryDocumentActivity>(ipcChannels.history.getDocumentActivity, path)
   },
   document: {
     createUntitled: () => invoke<DocumentData>(ipcChannels.document.createUntitled),

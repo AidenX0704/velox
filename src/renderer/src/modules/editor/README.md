@@ -4,7 +4,7 @@
 
 ## Boundaries
 
-- `MarkdownEditor.tsx` composes source, split, and preview-edit modes.
+- `MarkdownEditor.tsx` composes source and preview-edit modes.
 - `source/` adapts CodeMirror for Markdown source editing.
 - `preview/` owns read-only preview behavior and code block actions.
 - `rich/` adapts ProseMirror for preview editing.

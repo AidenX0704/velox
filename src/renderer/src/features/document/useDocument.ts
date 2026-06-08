@@ -7,6 +7,7 @@ import type {
   RecentWorkspaceRecord,
   WorkspaceEntry
 } from '../../../../shared/types'
+import { normalizeEditorMode } from '../../../../shared/preferences'
 import type { EditorMode } from '../../modules/editor/model/types'
 
 const welcomeContent = `# Welcome to Velox
@@ -14,8 +15,8 @@ const welcomeContent = `# Welcome to Velox
 Velox 是一个正在构建中的类 Typora Markdown 编辑器。
 
 - 支持源码模式
-- 支持源码 / 预览分栏
-- 支持基础预览模式
+- 支持实时预览编辑
+- 支持源码编辑
 
 从左上角打开 Markdown 文件，或直接开始编写。
 `
@@ -30,7 +31,7 @@ interface DocumentState {
 
 function createInitialDocument(content = ''): DocumentState {
   return {
-    title: 'Untitled.md',
+    title: 'undefined.md',
     content,
     dirty: false
   }
@@ -77,7 +78,7 @@ export function useDocument(): {
   deleteWorkspaceEntry: (path: string) => Promise<boolean>
 } {
   const [document, setDocument] = useState<DocumentState>(() => createInitialDocument())
-  const [editorMode, setEditorMode] = useState<EditorMode>('split')
+  const [editorMode, setEditorMode] = useState<EditorMode>('preview-edit')
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
   const [workspaceTree, setWorkspaceTree] = useState<WorkspaceEntry[]>([])
   const [recentFiles, setRecentFiles] = useState<RecentFileRecord[]>([])
@@ -236,7 +237,7 @@ export function useDocument(): {
     const opened = await openPath(lastSession.path)
 
     if (opened) {
-      setEditorMode(lastSession.mode)
+      setEditorMode(normalizeEditorMode(lastSession.mode))
     }
   }, [openPath])
 

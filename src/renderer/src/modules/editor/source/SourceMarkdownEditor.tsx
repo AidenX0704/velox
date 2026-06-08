@@ -251,7 +251,7 @@ export const SourceMarkdownEditor = forwardRef<
       const safeLine = Math.min(Math.max(line, 1), view.state.doc.lines)
       const position = view.state.doc.line(safeLine).from
       view.dispatch({
-        effects: EditorView.scrollIntoView(position, { y: 'start', yMargin: 24 })
+        effects: EditorView.scrollIntoView(position, { y: 'start', yMargin: 0 })
       })
     },
     getVisibleLine() {

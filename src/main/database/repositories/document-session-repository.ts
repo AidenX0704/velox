@@ -1,5 +1,9 @@
 import type Database from 'better-sqlite3'
-import type { EditorMode } from '../../../shared/preferences'
+import {
+  normalizeEditorMode,
+  type EditorMode,
+  type LegacyEditorMode
+} from '../../../shared/preferences'
 
 export interface DocumentSessionRecord {
   path: string
@@ -20,7 +24,7 @@ export interface UpdateDocumentSessionInput {
 
 interface DocumentSessionRow {
   path: string
-  mode: EditorMode
+  mode: LegacyEditorMode
   cursor_line: number
   cursor_column: number
   scroll_top: number
@@ -59,7 +63,7 @@ export class DocumentSessionRepository {
     const current = this.get(input.path)
     const next: DocumentSessionRecord = {
       path: input.path,
-      mode: input.mode ?? current?.mode ?? 'split',
+      mode: input.mode ?? current?.mode ?? 'preview-edit',
       cursorLine: input.cursorLine ?? current?.cursorLine ?? 1,
       cursorColumn: input.cursorColumn ?? current?.cursorColumn ?? 1,
       scrollTop: input.scrollTop ?? current?.scrollTop ?? 0,
@@ -87,7 +91,7 @@ export class DocumentSessionRepository {
   private toRecord(row: DocumentSessionRow): DocumentSessionRecord {
     return {
       path: row.path,
-      mode: row.mode,
+      mode: normalizeEditorMode(row.mode),
       cursorLine: row.cursor_line,
       cursorColumn: row.cursor_column,
       scrollTop: row.scroll_top,

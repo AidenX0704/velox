@@ -1,0 +1,95 @@
+.markdown-frontmatter {
+  margin: 0 0 24px;
+  overflow: hidden;
+  border: 1px solid var(--markdown-color-border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.markdown-frontmatter-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--markdown-color-border);
+  background: var(--markdown-color-background-mute);
+}
+
+.markdown-frontmatter-kicker {
+  color: var(--markdown-color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.markdown-frontmatter-title {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: var(--markdown-color-text);
+  font-size: 1.35em !important;
+  line-height: 1.25 !important;
+}
+
+.markdown-frontmatter-description {
+  max-width: 75ch;
+  margin: 0 !important;
+  color: var(--markdown-color-text);
+  line-height: 1.55 !important;
+  white-space: normal !important;
+}
+
+.markdown-frontmatter-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.28fr) minmax(0, 1fr);
+  margin: 0;
+}
+
+.markdown-frontmatter-row {
+  display: contents;
+}
+
+.markdown-frontmatter-row dt,
+.markdown-frontmatter-row dd {
+  min-width: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--markdown-color-border);
+}
+
+.markdown-frontmatter-row:last-child dt,
+.markdown-frontmatter-row:last-child dd {
+  border-bottom: 0;
+}
+
+.markdown-frontmatter-row dt {
+  color: var(--markdown-color-text-muted);
+  background: var(--markdown-color-background-mute);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.markdown-frontmatter-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.markdown-frontmatter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.markdown-frontmatter-list code {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px !important;
+  margin: 0 !important;
+  border: 1px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.18);
+  border-radius: 999px !important;
+  color: var(--markdown-color-reference-text);
+  background: var(--markdown-color-reference-background) !important;
+  font-size: 12px;
+}

@@ -1,6 +1,7 @@
 import type { ExportPreferences } from './export'
 
-export type EditorMode = 'source' | 'split' | 'preview-edit'
+export type EditorMode = 'source' | 'preview-edit'
+export type LegacyEditorMode = EditorMode | 'split'
 export type PreviewEditWidthMode = 'wide' | 'standard' | 'narrow'
 export type AppearanceMode = 'system' | 'light' | 'dark'
 
@@ -48,7 +49,6 @@ export interface EditorPreferences {
   previewMaxWidth: number
   previewCentered: boolean
   previewEditWidthMode: PreviewEditWidthMode
-  splitScrollSync: boolean
   customPreviewCss: string
   appearanceMode: AppearanceMode
   themeColorPreset: ThemeColorSelection
@@ -74,12 +74,11 @@ export const defaultEditorPreferences: EditorPreferences = {
   previewMaxWidth: 920,
   previewCentered: false,
   previewEditWidthMode: 'standard',
-  splitScrollSync: true,
   customPreviewCss: '',
   appearanceMode: 'system',
   themeColorPreset: 'blue',
   customThemeColor: '#1677ff',
-  defaultMode: 'split',
+  defaultMode: 'preview-edit',
   hasSeenWelcome: false,
   shortcutOverrides: {},
   export: {
@@ -89,4 +88,8 @@ export const defaultEditorPreferences: EditorPreferences = {
     pdfPageSize: 'A4',
     defaultFormat: 'pdf'
   }
+}
+
+export function normalizeEditorMode(mode?: LegacyEditorMode | null): EditorMode {
+  return mode === 'source' ? 'source' : 'preview-edit'
 }

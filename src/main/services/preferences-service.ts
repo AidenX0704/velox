@@ -1,5 +1,6 @@
 import {
   defaultEditorPreferences,
+  normalizeEditorMode,
   type EditorPreferences,
   type EditorPreferencesPatch
 } from '../../shared/preferences'
@@ -14,7 +15,7 @@ export class PreferencesService {
     const stored = this.preferencesRepository.get<Partial<EditorPreferences>>(editorPreferencesKey)
     const hasExistingPreferences = stored !== undefined
 
-    return {
+    const preferences = {
       ...defaultEditorPreferences,
       hasSeenWelcome: hasExistingPreferences,
       ...stored,
@@ -23,6 +24,11 @@ export class PreferencesService {
         ...stored?.export
       }
     }
+
+    return {
+      ...preferences,
+      defaultMode: normalizeEditorMode(preferences.defaultMode)
+    }
   }
 
   updateEditorPreferences(patch: EditorPreferencesPatch): EditorPreferences {
@@ -30,6 +36,7 @@ export class PreferencesService {
     const next = {
       ...current,
       ...patch,
+      defaultMode: normalizeEditorMode(patch.defaultMode ?? current.defaultMode),
       export: {
         ...current.export,
         ...patch.export

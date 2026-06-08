@@ -6,6 +6,7 @@ import { AppService } from '../services/app-service'
 import { DocumentService } from '../services/document-service'
 import { DocumentSessionService } from '../services/document-session-service'
 import { ExportService } from '../services/export-service'
+import { HistoryService } from '../services/history-service'
 import { PreferencesService } from '../services/preferences-service'
 import { RecentService } from '../services/recent-service'
 import { SettingsService } from '../services/settings-service'
@@ -19,6 +20,7 @@ export interface MainServices {
   appService: AppService
   documentService: DocumentService
   exportService: ExportService
+  historyService: HistoryService
   settingsService: SettingsService
   preferencesService: PreferencesService
   recentService: RecentService
@@ -82,6 +84,16 @@ export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.recent.clear, schemas.empty, () => {
     services.recentService.clear()
   })
+
+  registerIpcHandler(ipcChannels.history.listTimeline, schemas.optionalPath, (path) =>
+    services.historyService.listTimeline(path)
+  )
+  registerIpcHandler(ipcChannels.history.listBranches, schemas.optionalPath, (path) =>
+    services.historyService.listBranches(path)
+  )
+  registerIpcHandler(ipcChannels.history.getDocumentActivity, schemas.path, (path) =>
+    services.historyService.getDocumentActivity(path)
+  )
 
   registerIpcHandler(ipcChannels.document.createUntitled, schemas.empty, () =>
     services.documentService.createUntitled()

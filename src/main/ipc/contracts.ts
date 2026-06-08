@@ -41,7 +41,6 @@ export const schemas = {
       previewMaxWidth: z.number().int().min(680).max(1800).optional(),
       previewCentered: z.boolean().optional(),
       previewEditWidthMode: z.enum(['wide', 'standard', 'narrow']).optional(),
-      splitScrollSync: z.boolean().optional(),
       customPreviewCss: z.string().max(12000).optional(),
       appearanceMode: z.enum(['system', 'light', 'dark']).optional(),
       themeColorPreset: z.enum([...themeColorPresetIds, 'custom']).optional(),
@@ -49,7 +48,7 @@ export const schemas = {
         .string()
         .regex(/^#[0-9a-fA-F]{6}$/)
         .optional(),
-      defaultMode: z.enum(['source', 'split', 'preview-edit']).optional(),
+      defaultMode: z.enum(['source', 'preview-edit']).optional(),
       hasSeenWelcome: z.boolean().optional(),
       shortcutOverrides: z.record(z.string(), z.string()).optional(),
       export: z
@@ -105,12 +104,13 @@ export const schemas = {
   documentSession: z
     .object({
       path: nonEmptyString,
-      mode: z.enum(['source', 'split', 'preview-edit']).optional(),
+      mode: z.enum(['source', 'preview-edit']).optional(),
       cursorLine: z.number().int().min(1).optional(),
       cursorColumn: z.number().int().min(1).optional(),
       scrollTop: z.number().min(0).optional()
     })
     .strict(),
+  optionalPath: nonEmptyString.optional(),
   path: nonEmptyString,
   saveDocument: z
     .object({

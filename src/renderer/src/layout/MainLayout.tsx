@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
-import type { UpdaterStatus } from '../../../shared/types'
-import { MarkdownEditor } from '../modules/editor/MarkdownEditor'
+import type { HistoryDocumentActivity, UpdaterStatus } from '../../../shared/types'
+import { normalizeEditorMode } from '../../../shared/preferences'
 import type { CursorPosition, EditorMode } from '../modules/editor/model/types'
-import { useTabs } from '../features/tabs/useTabs'
+import '../modules/editor/styles/editor.css'
+import { createWelcomeDocument, useTabs } from '../features/tabs/useTabs'
 import { TabBar } from '../features/tabs/TabBar'
 import { useEditorSettings } from '../features/settings/useEditorSettings'
 import {
@@ -14,12 +15,30 @@ import {
   subscribeToSystemAppearance,
   type ResolvedAppearanceMode
 } from '../features/theme/theme'
-import { SettingsPage } from './SettingsPanel'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
 import { TitleBar } from './TitleBar'
 
-type AppView = 'editor' | 'settings'
+type AppView = 'editor' | 'recent' | 'settings'
+type UpdaterDialogKind = 'available' | 'downloaded' | null
+
+const MarkdownEditor = lazy(() =>
+  import('../modules/editor/MarkdownEditor').then((module) => ({
+    default: module.MarkdownEditor
+  }))
+)
+
+const SettingsPage = lazy(() =>
+  import('./SettingsPanel').then((module) => ({
+    default: module.SettingsPage
+  }))
+)
+
+const MarkdownPreview = lazy(() =>
+  import('../modules/editor/preview/MarkdownPreview').then((module) => ({
+    default: module.MarkdownPreview
+  }))
+)
 
 const defaultSidebarPaneWidth = 236
 const minSidebarPaneWidth = 180
@@ -49,6 +68,196 @@ function getInitialSidebarPaneWidth(): number {
   return Number.isFinite(storedWidth) ? clampSidebarPaneWidth(storedWidth) : defaultSidebarPaneWidth
 }
 
+function EditorLoadingFallback(): React.JSX.Element {
+  return (
+    <div className="editor-loading" aria-label="正在加载编辑器">
+      <div className="editor-loading-toolbar" />
+      <div className="editor-loading-body">
+        <div className="editor-loading-column">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="editor-loading-column editor-loading-column-preview">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SettingsLoadingFallback(): React.JSX.Element {
+  return <div className="empty-editor" aria-label="正在加载设置" />
+}
+
+function formatActivityTime(value?: string): string {
+  if (!value) return '暂无'
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value))
+}
+
+function formatUpdateDate(value?: string): string | undefined {
+  if (!value) return undefined
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return undefined
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date)
+}
+
+function getUpdateNotes(status: UpdaterStatus): string {
+  return status.releaseNotes?.trim() || '此版本没有提供更新日志。'
+}
+
+function RecentWorkbench({
+  activity,
+  recentFiles,
+  selectedPath,
+  onSelectFile,
+  onOpenInEditor,
+  customCss
+}: {
+  activity: HistoryDocumentActivity | null
+  recentFiles: import('../../../shared/types').RecentFileRecord[]
+  selectedPath?: string
+  onSelectFile: (path: string) => void
+  onOpenInEditor: (path: string) => void
+  customCss?: string
+}): React.JSX.Element {
+  const selectedFile = recentFiles.find((file) => file.path === selectedPath)
+
+  return (
+    <section className="recent-workbench" aria-label="最近活动">
+      <header className="recent-workbench-header">
+        <div className="recent-workbench-title">
+          <Typography.Title heading={5}>最近活动</Typography.Title>
+          <Typography.Text type="tertiary">
+            查看打开记录、分支推进和当前文档相对最近快照的变化。
+          </Typography.Text>
+        </div>
+        {activity ? (
+          <button
+            className="recent-workbench-open"
+            type="button"
+            onClick={() => onOpenInEditor(activity.path)}
+          >
+            打开编辑
+          </button>
+        ) : null}
+      </header>
+      <div className="recent-workbench-body">
+        <aside className="recent-workbench-list" aria-label="最近文档">
+          {recentFiles.map((file) => (
+            <button
+              key={file.path}
+              className="recent-workbench-file"
+              data-active={file.path === selectedPath}
+              type="button"
+              title={file.path}
+              onClick={() => onSelectFile(file.path)}
+            >
+              <span className="recent-workbench-file-title">{file.title}</span>
+              <span className="recent-workbench-file-path">{file.path}</span>
+              <span className="recent-workbench-file-time">
+                {formatActivityTime(file.lastOpenedAt)}
+              </span>
+            </button>
+          ))}
+          {recentFiles.length === 0 ? (
+            <Typography.Text className="recent-workbench-empty" type="tertiary">
+              拖入或打开 Markdown 文档后会出现在这里
+            </Typography.Text>
+          ) : null}
+        </aside>
+        {activity ? (
+          <>
+            <section className="recent-workbench-state" aria-label="文档状态">
+              <div className="recent-state-card">
+                <span className="recent-state-label">当前文档</span>
+                <strong title={activity.path}>{activity.title}</strong>
+                <span className="recent-state-path">{activity.path}</span>
+              </div>
+              <div className="recent-state-grid">
+                <div className="recent-state-metric">
+                  <span>新增</span>
+                  <strong>+{activity.diff.addedLines}</strong>
+                </div>
+                <div className="recent-state-metric">
+                  <span>删除</span>
+                  <strong>-{activity.diff.removedLines}</strong>
+                </div>
+                <div className="recent-state-metric">
+                  <span>分支</span>
+                  <strong>{activity.headSnapshot?.branchName ?? 'main'}</strong>
+                </div>
+              </div>
+              <div className="recent-state-card">
+                <span className="recent-state-label">最近快照</span>
+                <strong>
+                  {activity.headSnapshot
+                    ? `#${activity.headSnapshot.id}`
+                    : selectedFile
+                      ? '等待首次快照'
+                      : '暂无'}
+                </strong>
+                <span className="recent-state-path">
+                  {formatActivityTime(activity.headSnapshot?.createdAt)}
+                </span>
+              </div>
+              <div className="recent-diff-panel">
+                <header>
+                  <span>变化对比</span>
+                  <strong>{activity.diff.unchanged ? '无未保存变化' : '当前文件有变化'}</strong>
+                </header>
+                <div className="recent-diff-lines">
+                  {activity.diff.lines.map((line, index) => (
+                    <div
+                      key={`${line.type}-${index}`}
+                      className="recent-diff-line"
+                      data-type={line.type}
+                    >
+                      <span>
+                        {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
+                      </span>
+                      <code>{line.text || ' '}</code>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+            <section className="recent-rendered-preview" aria-label="渲染预览">
+              <Suspense fallback={<div className="recent-preview-loading" />}>
+                <MarkdownPreview content={activity.currentContent} customCss={customCss} />
+              </Suspense>
+            </section>
+          </>
+        ) : (
+          <div className="recent-workbench-placeholder">
+            <Typography.Text type="tertiary">
+              选择一个最近文档查看渲染状态和变化对比
+            </Typography.Text>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export function MainLayout(): React.JSX.Element {
   const [activeView, setActiveView] = useState<AppView>('editor')
   const [platform, setPlatform] = useState<string>('')
@@ -63,14 +272,24 @@ export function MainLayout(): React.JSX.Element {
   const [recentFiles, setRecentFiles] = useState<
     import('../../../shared/types').RecentFileRecord[]
   >([])
+  const [historyTimeline, setHistoryTimeline] = useState<
+    import('../../../shared/types').HistoryTimelineEntry[]
+  >([])
+  const [historyBranches, setHistoryBranches] = useState<
+    import('../../../shared/types').HistoryBranchRecord[]
+  >([])
+  const [selectedRecentPath, setSelectedRecentPath] = useState<string | undefined>(undefined)
+  const [recentActivity, setRecentActivity] = useState<HistoryDocumentActivity | null>(null)
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
+  const [updaterDialog, setUpdaterDialog] = useState<UpdaterDialogKind>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isResizingSidebar, setIsResizingSidebar] = useState(false)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
+  const editorHostRef = useRef<HTMLElement | null>(null)
   const updaterManualCheckRef = useRef(false)
   const updaterAvailablePromptRef = useRef<string | undefined>(undefined)
   const updaterInstallPromptRef = useRef<string | undefined>(undefined)
@@ -85,6 +304,7 @@ export function MainLayout(): React.JSX.Element {
     setContent,
     setCursorPosition,
     addTab,
+    replaceTabs,
     closeTab,
     closeOtherTabs,
     closeAllTabs,
@@ -104,7 +324,9 @@ export function MainLayout(): React.JSX.Element {
     ((path: string, options?: { mode?: EditorMode }) => Promise<boolean>) | undefined
   >(undefined)
   const loadWorkspaceRef = useRef<((path: string) => Promise<void>) | undefined>(undefined)
-  const refreshRecentRef = useRef<(() => Promise<void>) | undefined>(undefined)
+  const refreshRecentRef = useRef<
+    (() => Promise<import('../../../shared/types').RecentFileRecord[]>) | undefined
+  >(undefined)
   const hasInitializedRef = useRef(false)
   const sidebarResizeRef = useRef<{
     pointerId: number
@@ -115,14 +337,14 @@ export function MainLayout(): React.JSX.Element {
   const document = useMemo(
     () =>
       activeTab?.document ?? {
-        title: 'Untitled.md',
+        title: 'undefined.md',
         content: '',
         dirty: false,
         path: undefined
       },
     [activeTab?.document]
   )
-  const editorMode = activeTab?.editorMode ?? 'split'
+  const editorMode = activeTab?.editorMode ?? 'preview-edit'
   const cursorPosition = useMemo<CursorPosition>(
     () => ({
       line: activeTab?.cursorLine ?? 1,
@@ -133,11 +355,42 @@ export function MainLayout(): React.JSX.Element {
   const wordCount = useMemo(() => computeWordCount(document.content), [document.content])
 
   const refreshRecent = useCallback(async () => {
-    const [filesResult] = await Promise.all([window.api.recent.listFiles()])
+    const [filesResult, timelineResult, branchesResult] = await Promise.all([
+      window.api.recent.listFiles(),
+      window.api.history.listTimeline(),
+      window.api.history.listBranches()
+    ])
     if (filesResult.ok) {
       setRecentFiles(filesResult.data)
     }
+    if (timelineResult.ok) {
+      setHistoryTimeline(timelineResult.data)
+    }
+    if (branchesResult.ok) {
+      setHistoryBranches(branchesResult.data)
+    }
+    return filesResult.ok ? filesResult.data : []
   }, [])
+
+  const loadRecentActivity = useCallback(async (path: string): Promise<void> => {
+    setSelectedRecentPath(path)
+    const result = await window.api.history.getDocumentActivity(path)
+    if (result.ok) {
+      setRecentActivity(result.data)
+    } else {
+      Toast.error(result.error.message)
+    }
+  }, [])
+
+  const openRecentView = useCallback((): void => {
+    setActiveView('recent')
+    void refreshRecent().then((files) => {
+      const nextPath = selectedRecentPath ?? files[0]?.path
+      if (nextPath) {
+        void loadRecentActivity(nextPath)
+      }
+    })
+  }, [loadRecentActivity, refreshRecent, selectedRecentPath])
 
   const saveDocument = useCallback(async (): Promise<void> => {
     if (!activeTab) return
@@ -173,6 +426,11 @@ export function MainLayout(): React.JSX.Element {
           // setActiveTabId updates the hook ref synchronously; setEditorMode now targets that ref.
           setEditorMode(targetMode)
         }
+        const touchResult = await window.api.document.openPath(path)
+        if (!touchResult.ok) {
+          Toast.error(touchResult.error.message)
+        }
+        void refreshRecent()
         return true
       }
 
@@ -207,19 +465,29 @@ export function MainLayout(): React.JSX.Element {
   )
 
   const createDocument = useCallback(async (): Promise<void> => {
+    const existingUndefinedTab = tabs.find((tab) => tab.document.title === 'undefined.md')
+    if (existingUndefinedTab) {
+      setActiveTabId(existingUndefinedTab.id)
+      return
+    }
+
     const result = await window.api.document.createUntitled()
     if (result.ok) {
-      addTab({
-        path: result.data.path,
-        title: result.data.title,
-        content: result.data.content,
-        dirty: result.data.dirty,
-        updatedAt: result.data.updatedAt
-      })
+      const tabId = addTab(
+        {
+          path: result.data.path,
+          title: result.data.title,
+          content: result.data.content,
+          dirty: result.data.dirty,
+          updatedAt: result.data.updatedAt
+        },
+        editorSettings.defaultMode
+      )
+      setActiveTabId(tabId)
     } else {
       Toast.error(result.error.message)
     }
-  }, [addTab])
+  }, [addTab, editorSettings.defaultMode, setActiveTabId, tabs])
 
   const openDocument = useCallback(async (): Promise<void> => {
     const result = await window.api.document.open()
@@ -405,14 +673,6 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [])
 
-  // Set default editor mode only when creating a new untitled document
-  useEffect(() => {
-    if (activeTab && !activeTab.document.path && activeTab.editorMode === 'split') {
-      setEditorMode(editorSettings.defaultMode)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTabId]) // Only run when active tab ID changes
-
   useEffect(() => {
     const updateResolvedMode = (): void => {
       setResolvedAppearanceMode(resolveAppearanceMode(editorSettings.appearanceMode))
@@ -461,7 +721,7 @@ export function MainLayout(): React.JSX.Element {
     window.api.session.getDocument(document.path).then((result) => {
       if (cancelled) return
       if (result.ok && result.data) {
-        setEditorMode(result.data.mode)
+        setEditorMode(normalizeEditorMode(result.data.mode))
         setCursorPosition(result.data.cursorLine, result.data.cursorColumn)
       }
     })
@@ -640,6 +900,8 @@ export function MainLayout(): React.JSX.Element {
   )
 
   const downloadUpdate = useCallback(async (): Promise<void> => {
+    setUpdaterDialog(null)
+
     const result = await window.api.updater.downloadUpdate()
 
     if (!result.ok) {
@@ -648,6 +910,8 @@ export function MainLayout(): React.JSX.Element {
   }, [])
 
   const installUpdate = useCallback(async (): Promise<void> => {
+    setUpdaterDialog(null)
+
     const result = await window.api.updater.quitAndInstall()
 
     if (!result.ok) {
@@ -655,68 +919,54 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [])
 
-  const handleUpdaterStatus = useCallback(
-    (status: UpdaterStatus): void => {
-      setUpdaterStatus(status)
+  const handleUpdaterStatus = useCallback((status: UpdaterStatus): void => {
+    setUpdaterStatus(status)
 
-      if (status.state === 'available') {
-        updaterManualCheckRef.current = false
+    if (status.state === 'available') {
+      updaterManualCheckRef.current = false
 
-        const version = status.version ?? status.updatedAt
-        if (updaterAvailablePromptRef.current === version) {
-          return
-        }
-
-        updaterAvailablePromptRef.current = version
-        Modal.confirm({
-          title: status.version ? `发现新版本 ${status.version}` : '发现新版本',
-          content: status.releaseNotes || status.message,
-          okText: '下载更新',
-          cancelText: '稍后',
-          onOk: () => {
-            void downloadUpdate()
-          }
-        })
+      const version = status.version ?? status.updatedAt
+      if (updaterAvailablePromptRef.current === version) {
         return
       }
 
-      if (status.state === 'downloaded') {
-        const version = status.version ?? status.updatedAt
-        if (updaterInstallPromptRef.current === version) {
-          return
-        }
+      updaterAvailablePromptRef.current = version
+      setUpdaterDialog('available')
+      return
+    }
 
-        updaterInstallPromptRef.current = version
-        Modal.confirm({
-          title: '更新已准备就绪',
-          content: status.version
-            ? `版本 ${status.version} 已下载，重启后会完成安装。`
-            : '更新已下载，重启后会完成安装。',
-          okText: '重启安装',
-          cancelText: '稍后',
-          onOk: () => {
-            void installUpdate()
-          }
-        })
+    if (status.state === 'downloading') {
+      setUpdaterDialog(null)
+      return
+    }
+
+    if (status.state === 'downloaded') {
+      const version = status.version ?? status.updatedAt
+      if (updaterInstallPromptRef.current === version) {
         return
       }
 
-      if (status.state === 'not-available' && updaterManualCheckRef.current) {
-        updaterManualCheckRef.current = false
-        Toast.success(status.message)
-        return
-      }
+      updaterInstallPromptRef.current = version
+      setUpdaterDialog('downloaded')
+      return
+    }
 
-      if (status.state === 'error' && updaterManualCheckRef.current) {
-        updaterManualCheckRef.current = false
-        Toast.error(status.error || status.message)
-      }
-    },
-    [downloadUpdate, installUpdate]
-  )
+    if (status.state === 'not-available' && updaterManualCheckRef.current) {
+      updaterManualCheckRef.current = false
+      Toast.success(status.message)
+      return
+    }
+
+    if (status.state === 'error' && updaterManualCheckRef.current) {
+      updaterManualCheckRef.current = false
+      Toast.error(status.error || status.message)
+    }
+  }, [])
 
   const checkForUpdates = useCallback(async (): Promise<void> => {
     updaterManualCheckRef.current = true
+    updaterAvailablePromptRef.current = undefined
+    updaterInstallPromptRef.current = undefined
     Toast.info('正在检查更新')
 
     const result = await window.api.updater.checkForUpdates()
@@ -724,8 +974,11 @@ export function MainLayout(): React.JSX.Element {
     if (!result.ok) {
       updaterManualCheckRef.current = false
       Toast.error(result.error.message)
+      return
     }
-  }, [])
+
+    handleUpdaterStatus(result.data)
+  }, [handleUpdaterStatus])
 
   useEffect(() => {
     return window.api.document.onExportProgress((progress) => {
@@ -798,11 +1051,6 @@ export function MainLayout(): React.JSX.Element {
         return
       }
       if (e.key === '2' && e.shiftKey) {
-        e.preventDefault()
-        setEditorMode('split')
-        return
-      }
-      if (e.key === '3' && e.shiftKey) {
         e.preventDefault()
         setEditorMode('preview-edit')
         return
@@ -901,50 +1149,75 @@ export function MainLayout(): React.JSX.Element {
     let cancelled = false
 
     const timer = window.setTimeout(() => {
-      if (cancelled) {
-        return
-      }
-
-      hasInitializedRef.current = true
-      void refreshRecent()
-
-      window.api.app.getPendingOpenFile().then((result) => {
-        if (result.ok && result.data) {
-          void openPath(result.data, { mode: 'preview-edit' })
+      ;(async () => {
+        if (cancelled) {
           return
         }
 
-        window.api.preferences.getEditor().then((result) => {
-          if (!result.ok) {
-            Toast.error(result.error.message)
-            return
-          }
+        hasInitializedRef.current = true
+        void refreshRecent()
 
-          if (!result.data.hasSeenWelcome) {
-            void window.api.preferences.updateEditor({ hasSeenWelcome: true })
-            return
-          }
+        const pendingOpenFileResult = await window.api.app.getPendingOpenFile()
+        if (cancelled) return
 
-          window.api.session.getLastDocument().then((sessionResult) => {
-            if (sessionResult.ok && sessionResult.data) {
-              void openPath(sessionResult.data.path, { mode: sessionResult.data.mode })
-            }
-          })
-        })
-      })
-
-      window.api.recent.listWorkspaces().then((result) => {
-        if (result.ok && result.data[0]) {
-          void loadWorkspace(result.data[0].path)
+        if (pendingOpenFileResult.ok && pendingOpenFileResult.data) {
+          openEditorView()
+          await openPath(pendingOpenFileResult.data, { mode: 'preview-edit' })
+          return
         }
-      })
+
+        const preferenceResult = await window.api.preferences.getEditor()
+        if (cancelled) return
+
+        if (!preferenceResult.ok) {
+          Toast.error(preferenceResult.error.message)
+          return
+        }
+
+        const recentWorkspaceResult = await window.api.recent.listWorkspaces()
+        if (cancelled) return
+        const recentWorkspace = recentWorkspaceResult.ok ? recentWorkspaceResult.data[0] : undefined
+
+        if (!preferenceResult.data.hasSeenWelcome) {
+          replaceTabs([
+            {
+              document: createWelcomeDocument(),
+              editorMode: preferenceResult.data.defaultMode
+            }
+          ])
+          void window.api.preferences.updateEditor({ hasSeenWelcome: true })
+          if (recentWorkspace) {
+            await loadWorkspace(recentWorkspace.path)
+          }
+          return
+        }
+
+        const lastDocumentResult = await window.api.session.getLastDocument()
+        if (cancelled) return
+
+        if (lastDocumentResult.ok && lastDocumentResult.data) {
+          const opened = await openPath(lastDocumentResult.data.path, {
+            mode: normalizeEditorMode(lastDocumentResult.data.mode)
+          })
+
+          if (opened && recentWorkspace) {
+            await loadWorkspace(recentWorkspace.path)
+          }
+
+          return
+        }
+
+        if (recentWorkspace) {
+          await loadWorkspace(recentWorkspace.path)
+        }
+      })()
     }, 0)
 
     return () => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [loadWorkspace, openPath, refreshRecent])
+  }, [loadWorkspace, openEditorView, openPath, refreshRecent, replaceTabs])
 
   useEffect(() => {
     return window.api.workspace.onDidChange(() => {
@@ -1008,6 +1281,7 @@ export function MainLayout(): React.JSX.Element {
 
       const files = Array.from(e.dataTransfer.files)
       if (files.length === 0) return
+      let firstOpenedFilePath: string | undefined
 
       const firstFilePath = getDroppedFilePath(files[0])
       if (files.length === 1 && firstFilePath) {
@@ -1024,10 +1298,17 @@ export function MainLayout(): React.JSX.Element {
         if (filePath && /\.(md|markdown|mdown|mkd|txt)$/i.test(filePath)) {
           openEditorView()
           await openPathRef.current?.(filePath, { mode: 'preview-edit' })
+          firstOpenedFilePath ??= filePath
         }
       }
+
+      if (firstOpenedFilePath) {
+        await refreshRecentRef.current?.()
+        setSelectedRecentPath(firstOpenedFilePath)
+        void loadRecentActivity(firstOpenedFilePath)
+      }
     },
-    [openEditorView]
+    [loadRecentActivity, openEditorView]
   )
 
   const createWorkspaceEntry = useCallback(
@@ -1090,13 +1371,16 @@ export function MainLayout(): React.JSX.Element {
         workspaceRoot={workspaceRoot}
         workspaceTree={workspaceTree}
         recentFiles={recentFiles}
-        selectedPath={document.path}
+        historyTimeline={historyTimeline}
+        historyBranches={historyBranches}
+        selectedPath={activeView === 'recent' ? selectedRecentPath : document.path}
         expandedPaths={expandedWorkspacePaths}
         onNew={() => {
           openEditorView()
           void createDocument()
         }}
         onOpenEditor={openEditorView}
+        onOpenRecent={openRecentView}
         onOpenSettings={openSettingsView}
         onOpenWorkspace={() => void openWorkspace()}
         onResizeStart={handleSidebarResizeStart}
@@ -1104,6 +1388,10 @@ export function MainLayout(): React.JSX.Element {
         onOpenFile={(path) => {
           openEditorView()
           void openPath(path)
+        }}
+        onSelectRecentFile={(path) => {
+          setActiveView('recent')
+          void loadRecentActivity(path)
         }}
         onExpandedPathsChange={setExpandedWorkspacePaths}
         onCreateWorkspaceEntry={createWorkspaceEntry}
@@ -1136,21 +1424,23 @@ export function MainLayout(): React.JSX.Element {
               onReorder={reorderTabs}
               onNewTab={handleNewTab}
             />
-            <section className="editor-host" data-editor-mode={editorMode}>
+            <section ref={editorHostRef} className="editor-host" data-editor-mode={editorMode}>
               {activeTab ? (
-                <MarkdownEditor
-                  mode={editorMode}
-                  dirty={document.dirty}
-                  content={document.content}
-                  settings={editorSettings}
-                  currentPath={document.path}
-                  workspaceRoot={workspaceRoot}
-                  anchorTarget={pendingAnchor}
-                  onChange={setContent}
-                  onCursorChange={(position) => setCursorPosition(position.line, position.column)}
-                  onOpenDocumentLink={openPathFromLink}
-                  onLinkError={(message) => Toast.error(message)}
-                />
+                <Suspense fallback={<EditorLoadingFallback />}>
+                  <MarkdownEditor
+                    mode={editorMode}
+                    dirty={document.dirty}
+                    content={document.content}
+                    settings={editorSettings}
+                    currentPath={document.path}
+                    workspaceRoot={workspaceRoot}
+                    anchorTarget={pendingAnchor}
+                    onChange={setContent}
+                    onCursorChange={(position) => setCursorPosition(position.line, position.column)}
+                    onOpenDocumentLink={openPathFromLink}
+                    onLinkError={(message) => Toast.error(message)}
+                  />
+                </Suspense>
               ) : (
                 <div className="empty-editor" />
               )}
@@ -1163,15 +1453,31 @@ export function MainLayout(): React.JSX.Element {
               showLineNumbers={editorSettings.showLineNumbers}
             />
           </>
-        ) : (
-          <SettingsPage
-            settings={editorSettings}
-            onBack={openEditorView}
-            onChange={(nextSettings) => {
-              updateSettings(nextSettings)
+        ) : activeView === 'recent' ? (
+          <RecentWorkbench
+            activity={recentActivity}
+            recentFiles={recentFiles}
+            selectedPath={selectedRecentPath}
+            customCss={editorSettings.customPreviewCss}
+            onSelectFile={(path) => void loadRecentActivity(path)}
+            onOpenInEditor={(path) => {
+              openEditorView()
+              void openPath(path, { mode: 'preview-edit' })
             }}
-            onReset={() => void resetSettings()}
           />
+        ) : (
+          <Suspense fallback={<SettingsLoadingFallback />}>
+            <SettingsPage
+              settings={editorSettings}
+              updaterStatus={updaterStatus}
+              onBack={openEditorView}
+              onChange={(nextSettings) => {
+                updateSettings(nextSettings)
+              }}
+              onReset={() => void resetSettings()}
+              onCheckForUpdates={() => void checkForUpdates()}
+            />
+          </Suspense>
         )}
       </main>
       <Modal
@@ -1180,6 +1486,7 @@ export function MainLayout(): React.JSX.Element {
         footer={null}
         closable={false}
         maskClosable={false}
+        centered
         width={420}
       >
         {exportProgress ? (
@@ -1190,11 +1497,62 @@ export function MainLayout(): React.JSX.Element {
         ) : null}
       </Modal>
       <Modal
+        visible={updaterDialog === 'available' && updaterStatus?.state === 'available'}
+        title={updaterStatus?.version ? `发现新版本 ${updaterStatus.version}` : '发现新版本'}
+        okText="下载更新"
+        cancelText="稍后"
+        centered
+        width={560}
+        onOk={() => void downloadUpdate()}
+        onCancel={() => setUpdaterDialog(null)}
+      >
+        {updaterStatus ? (
+          <div className="updater-dialog-content">
+            <div className="updater-dialog-meta">
+              {updaterStatus.releaseName ? <span>{updaterStatus.releaseName}</span> : null}
+              {updaterStatus.releaseDate ? (
+                <span>发布于 {formatUpdateDate(updaterStatus.releaseDate)}</span>
+              ) : null}
+            </div>
+            <Typography.Text type="tertiary">{updaterStatus.message}</Typography.Text>
+            <div className="updater-release-notes" aria-label="更新日志">
+              <div className="updater-release-notes-title">更新日志</div>
+              <pre>{getUpdateNotes(updaterStatus)}</pre>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
+        visible={updaterDialog === 'downloaded' && updaterStatus?.state === 'downloaded'}
+        title="更新已准备就绪"
+        okText="重启安装"
+        cancelText="稍后"
+        centered
+        width={520}
+        onOk={() => void installUpdate()}
+        onCancel={() => setUpdaterDialog(null)}
+      >
+        {updaterStatus ? (
+          <div className="updater-dialog-content">
+            <Typography.Text>
+              {updaterStatus.version
+                ? `版本 ${updaterStatus.version} 已下载，重启后会完成安装。`
+                : '更新已下载，重启后会完成安装。'}
+            </Typography.Text>
+            <div className="updater-release-notes" aria-label="更新日志">
+              <div className="updater-release-notes-title">更新日志</div>
+              <pre>{getUpdateNotes(updaterStatus)}</pre>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
         visible={updaterStatus?.state === 'downloading'}
         title="正在下载更新"
         footer={null}
         closable={false}
         maskClosable={false}
+        centered
         width={420}
       >
         {updaterStatus ? (

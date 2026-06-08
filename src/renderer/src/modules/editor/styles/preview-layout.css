@@ -1,0 +1,236 @@
+.preview-pane {
+  min-width: 0;
+  overflow: auto;
+  background: var(--surface-base);
+}
+
+.markdown-preview {
+  --color-text: var(--text-primary);
+  --color-text-light: var(--text-secondary);
+  --color-text-3: var(--text-tertiary);
+  --color-border: var(--line-soft);
+  --color-background-soft: var(--brand-softer);
+  --color-background-mute: var(--surface-muted);
+  --color-primary: var(--brand-active);
+  --color-link: var(--brand-active);
+  --color-reference: var(--brand-soft);
+  --color-reference-text: var(--brand-active);
+  --color-reference-background: var(--brand-softer);
+  --markdown-color-text: var(--color-text);
+  --markdown-color-text-muted: var(--color-text-3);
+  --markdown-color-border: var(--color-border);
+  --markdown-color-background-soft: var(--color-background-soft);
+  --markdown-color-background-mute: var(--color-background-mute);
+  --markdown-color-primary: var(--color-primary);
+  --markdown-color-link: var(--color-link);
+  --markdown-color-reference: var(--color-reference);
+  --markdown-color-reference-text: var(--color-reference-text);
+  --markdown-color-reference-background: var(--color-reference-background);
+  --code-font-family:
+    ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-height: 100%;
+  margin: 0;
+  padding: 24px clamp(20px, 4vw, 32px) 96px;
+  color: var(--markdown-color-text);
+  font-size: var(--preview-font-size, 16px);
+  line-height: var(--preview-line-height, 1.6);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
+}
+
+.markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.markdown-preview-edit {
+  height: 100%;
+  overflow: auto;
+  width: 100%;
+  margin: 0;
+  padding: 24px 32px 96px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface-base);
+  box-shadow: none;
+  caret-color: var(--semi-color-primary);
+  outline: none;
+}
+
+.markdown-preview-edit[data-preview-centered='true'] {
+  padding-right: max(48px, calc((100% - var(--preview-max-width, 920px)) / 2));
+  padding-left: max(48px, calc((100% - var(--preview-max-width, 920px)) / 2));
+}
+
+.preview-edit-shell {
+  --preview-edit-content-width: var(--preview-max-width, 920px);
+  --preview-edit-page-padding-x: clamp(32px, 6vw, 96px);
+  --preview-edit-outline-width: 260px;
+
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) var(--preview-edit-outline-width);
+  min-height: 100%;
+  overflow: visible;
+  background: var(--surface-base);
+  font-size: var(--preview-font-size, 16px);
+  line-height: var(--preview-line-height, 1.82);
+}
+
+.preview-edit-prosemirror {
+  grid-row: 2;
+  grid-column: 1;
+  width: 100%;
+  min-height: calc(100% - 40px);
+  overflow: visible;
+}
+
+.preview-edit-shell[data-width-mode='wide'] {
+  --preview-edit-content-width: calc(var(--preview-max-width, 920px) + 420px);
+  --preview-edit-page-padding-x: clamp(20px, 3vw, 56px);
+}
+
+.preview-edit-shell[data-width-mode='standard'] {
+  --preview-edit-content-width: var(--preview-max-width, 920px);
+  --preview-edit-page-padding-x: clamp(32px, 6vw, 96px);
+}
+
+.preview-edit-shell[data-width-mode='narrow'] {
+  --preview-edit-content-width: max(680px, calc(var(--preview-max-width, 920px) - 220px));
+  --preview-edit-page-padding-x: clamp(40px, 8vw, 128px);
+}
+
+.preview-edit-prosemirror .ProseMirror {
+  box-sizing: border-box;
+  width: min(
+    var(--preview-edit-content-width),
+    calc(100% - var(--preview-edit-page-padding-x) * 2)
+  );
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 32px 96px;
+  color: var(--text-primary);
+  font-family:
+    JetBrains Mono,
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    Liberation Mono,
+    monospace;
+  outline: none;
+  -webkit-text-decoration-skip: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-edit-prosemirror .ProseMirror > :first-child {
+  margin-top: 0;
+}
+
+.preview-edit-shell .format-toolbar {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.preview-edit-shell .document-outline {
+  position: sticky;
+  top: 64px;
+  right: auto;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: start;
+  width: var(--preview-edit-outline-width);
+  max-height: min(72vh, calc(100vh - var(--titlebar-height) - 128px));
+}
+
+.editor-with-outline {
+  --document-outline-width: 260px;
+
+  display: grid;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) var(--document-outline-width);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.editor-with-outline:has(> .document-outline[data-collapsed='true']) {
+  --document-outline-width: 48px;
+}
+
+.editor-with-outline > .source-editor {
+  grid-row: 1;
+  grid-column: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-with-outline > .document-outline {
+  position: relative;
+  top: auto;
+  right: auto;
+  grid-row: 1;
+  grid-column: 2;
+  width: var(--document-outline-width);
+  height: 100%;
+  max-height: none;
+  padding: 12px 18px 12px 16px;
+  background: var(--surface-base);
+}
+
+.editor-mode-shell {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.preview-edit-shell-readonly .markdown-preview {
+  font-size: var(--preview-font-size, 16px);
+  line-height: var(--preview-line-height, 1.82);
+}
+
+.preview-readonly-pane {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+.preview-edit-shell-readonly[data-preview-centered='true'] .markdown-preview {
+  width: min(var(--preview-max-width, 920px), calc(100% - 64px));
+  margin: 0 auto;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.preview-advanced-notice {
+  position: sticky;
+  z-index: 6;
+  top: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  color: #8f5b00;
+  background: #fff7e8;
+  font-size: 13px;
+}
+
+.preview-pane {
+  background: var(--surface-base);
+}
+
+.markdown-preview-edit,
+.preview-edit-shell {
+  background: var(--surface-base);
+}

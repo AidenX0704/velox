@@ -1,0 +1,753 @@
+.markdown-code-block {
+  /* --- 🌈 基础变量：更纯净的背景与更柔和的边框 --- */
+  --code-bg: #f7f8fa;
+  --code-toolbar-bg: #ffffff;
+  --code-toolbar-hover-bg: #f2f3f5;
+  --code-toolbar-active-bg: #e5e6eb;
+  --code-text: var(--text-primary, #1d2129);
+  --code-muted: #4e5969;
+  --code-border: rgba(29, 33, 41, 0.08);
+  --code-border-strong: rgba(29, 33, 41, 0.15);
+  --code-accent: var(--brand-active, #1677ff);
+
+  /* 阴影：收敛弥散范围，增加 1px 的高光收边 */
+  --code-popover-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+
+  /* 语法高亮 (保持不变) */
+  --syntax-keyword: #7c3aed;
+  --syntax-string: #047857;
+  --syntax-comment: #86909c;
+  --syntax-number: #b45309;
+  --syntax-type: #0f766e;
+  --syntax-tag: #be123c;
+
+  position: relative;
+  overflow: visible;
+  margin: 1.5em 0;
+  padding: 0 !important;
+  border: 1px solid var(--code-border) !important;
+  border-radius: 8px !important;
+  background: var(--code-bg) !important;
+  font-family: var(--code-font-family, ui-monospace, SFMono-Regular, Consolas, monospace);
+  box-shadow: none !important;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.markdown-code-block:hover,
+.markdown-code-block:focus-within {
+  border-color: var(--code-border-strong) !important;
+}
+
+/* --- 🌙 暗色模式 --- */
+[data-color-mode='dark'] .markdown-code-block {
+  --code-bg: #16181d;
+  --code-toolbar-bg: #1e222a;
+  --code-toolbar-hover-bg: #2b303b;
+  --code-toolbar-active-bg: #353b47;
+  --code-muted: #86909c;
+  --code-border: rgba(255, 255, 255, 0.08);
+  --code-border-strong: rgba(255, 255, 255, 0.16);
+  --code-popover-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
+
+  --syntax-keyword: #a78bfa;
+  --syntax-string: #34d399;
+  --syntax-comment: #9ca3af;
+  --syntax-number: #fbbf24;
+  --syntax-type: #2dd4bf;
+  --syntax-tag: #fb7185;
+}
+
+/* =========================================
+   🔧 工具栏 (Toolbar)
+========================================= */
+.markdown-code-toolbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  gap: 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--code-border);
+  border-radius: 8px 8px 0 0;
+  background: var(--code-toolbar-bg);
+  color: var(--code-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.markdown-code-title {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+  color: var(--code-muted);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.markdown-code-title-text {
+  overflow: hidden;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-code-title-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--code-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.markdown-code-title-fold[hidden] {
+  display: none;
+}
+
+.markdown-code-title-fold:hover,
+.markdown-code-title-fold:focus-visible {
+  color: var(--code-text);
+  background: var(--code-toolbar-hover-bg);
+  outline: none;
+}
+
+.markdown-code-title-fold::before {
+  width: 14px;
+  height: 14px;
+  background-color: currentColor;
+  content: '';
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M7 9.5 12 14l5-4.5H7Z'/%3E%3C/svg%3E");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+/* =========================================
+   📝 语言选择器 (Language Picker)
+========================================= */
+.markdown-code-language {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  border: none !important; /* 移除外边框，保持清爽 */
+  border-radius: 4px;
+  color: var(--code-muted);
+  background: transparent;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.markdown-code-language-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.markdown-code-language-trigger {
+  cursor: pointer;
+  max-width: min(172px, 32vw);
+  padding: 0 24px 0 10px;
+  outline: none;
+  color: var(--code-muted) !important;
+  border: 1px solid transparent !important;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.markdown-code-language-trigger span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-code-language-trigger::after {
+  position: absolute;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  background-color: currentColor;
+  content: '';
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  opacity: 0.78;
+}
+
+.markdown-code-language-trigger:hover,
+.markdown-code-language-trigger:focus-visible,
+.markdown-code-language-trigger[aria-expanded='true'] {
+  background-color: var(--code-toolbar-hover-bg) !important;
+  color: var(--code-text) !important;
+}
+
+.markdown-code-language-trigger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(var(--theme-accent-rgb, 22, 119, 255), 0.14);
+}
+
+.markdown-code-language-trigger:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.markdown-code-language-trigger:disabled:hover {
+  background: transparent !important;
+  color: var(--code-muted) !important;
+}
+
+.markdown-code-language-trigger:disabled::after {
+  opacity: 0.45;
+}
+
+/* 下拉面板 */
+.markdown-code-language-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 240px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--code-popover-shadow);
+  color: #1d2129;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+[data-color-mode='dark'] .markdown-code-language-menu {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: var(--surface-raised, #232731);
+  color: var(--text-primary);
+}
+
+.markdown-code-language-search {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e5e6eb;
+  background: inherit;
+}
+
+[data-color-mode='dark'] .markdown-code-language-search {
+  border-bottom-color: var(--line-soft, rgba(255, 255, 255, 0.08));
+}
+
+.markdown-code-language-search::before {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  background: #86909c;
+  content: '';
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.markdown-code-language-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: #1d2129;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+[data-color-mode='dark'] .markdown-code-language-search input {
+  color: var(--text-primary);
+}
+
+.markdown-code-language-search input::placeholder {
+  color: #86909c;
+}
+
+.markdown-code-language-list {
+  max-height: 272px;
+  padding: 4px 0;
+  overflow: auto;
+  scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+  scrollbar-width: thin;
+}
+
+.markdown-code-language-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown-code-language-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown-code-language-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  background-clip: content-box;
+}
+
+.markdown-code-language-option,
+.markdown-code-language-empty {
+  display: flex;
+  align-items: center;
+  width: calc(100% - 8px);
+  min-height: 32px;
+  margin: 0 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  color: #1d2129;
+  background: transparent;
+  font-size: 13px;
+  line-height: 32px;
+  text-align: left;
+}
+
+[data-color-mode='dark'] .markdown-code-language-option,
+[data-color-mode='dark'] .markdown-code-language-empty {
+  color: var(--text-primary);
+}
+
+.markdown-code-language-option {
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.markdown-code-language-option:hover,
+.markdown-code-language-option:focus-visible {
+  background: #f2f3f5;
+  outline: none;
+}
+
+[data-color-mode='dark'] .markdown-code-language-option:hover,
+[data-color-mode='dark'] .markdown-code-language-option:focus-visible {
+  background: var(--surface-hover, #353b47);
+}
+
+.markdown-code-language-option[aria-selected='true'] {
+  color: #1677ff;
+}
+
+.markdown-code-language-option[aria-selected='true']::after {
+  width: 16px;
+  height: 16px;
+  margin-left: 12px;
+  background: currentColor;
+  content: '';
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.markdown-code-language-empty {
+  color: #86909c;
+}
+
+/* =========================================
+   🔘 操作区与按钮 (Actions)
+========================================= */
+.markdown-code-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* 垂直居中、更短更淡的分割线 */
+.markdown-code-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 0;
+  width: 28px;
+  min-width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 4px;
+  color: var(--code-muted);
+  background: transparent;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.markdown-code-action:hover {
+  color: var(--code-text);
+  background: var(--code-toolbar-hover-bg);
+}
+
+.markdown-code-action:active {
+  background: var(--code-toolbar-active-bg);
+}
+
+.markdown-code-action:focus-visible {
+  color: var(--code-text);
+  background: var(--code-toolbar-hover-bg);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--theme-accent-rgb, 22, 119, 255), 0.14);
+}
+
+/* 修正原生 span，取消 margin，交由 flex gap 处理 */
+.markdown-code-action span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.markdown-code-title-fold span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.markdown-code-action::before {
+  flex: 0 0 auto;
+  content: '';
+  width: 14px;
+  height: 14px;
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  mask-position: center;
+}
+
+.markdown-code-action-copy::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.markdown-code-action-wrap::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7h11a4 4 0 0 1 0 8H7'/%3E%3Cpath d='m10 12-3 3 3 3'/%3E%3Cpath d='M3 12h4'/%3E%3C/svg%3E");
+}
+
+.markdown-code-action-fold::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* =========================================
+   💡 状态变化 (States)
+========================================= */
+.markdown-code-block[data-collapsed='true'] .markdown-code-title-fold::before,
+.markdown-code-block[data-collapsed='true'] .markdown-code-action-fold::before {
+  transform: rotate(-90deg);
+}
+
+.markdown-code-block[data-wrap='true'] .markdown-code-action-wrap {
+  color: var(--code-accent);
+  background: rgba(22, 119, 255, 0.08); /* 选中的浅底色反馈 */
+}
+
+.markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy {
+  color: #10b981 !important;
+}
+
+.markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/xml' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* =========================================
+   💻 代码正文区 (Code Content)
+========================================= */
+.markdown-code-pre {
+  display: grid;
+  grid-template-columns: auto 1fr; /* 自适应行号宽度 */
+  overflow: auto;
+  padding: 0 !important;
+  margin: 0;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+  background: transparent;
+}
+
+.markdown-code-line-numbers {
+  display: block;
+  min-width: 40px; /* 留足行号宽度 */
+  padding: 16px 12px 16px 16px;
+  color: rgba(29, 33, 41, 0.4); /* 更柔和的行号颜色 */
+  font-family: var(--code-font-family);
+  font-size: 13.5px;
+  line-height: 1.6;
+  text-align: right;
+  white-space: pre;
+  user-select: none;
+}
+
+.markdown-code-block code {
+  display: block;
+  overflow: visible;
+  padding: 16px 16px 16px 12px;
+  color: var(--code-text);
+  background: transparent;
+  font-family: var(--code-font-family);
+  font-size: 13.5px;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.markdown-code-content {
+  position: relative;
+  display: block;
+  min-width: 0;
+  overflow: auto;
+}
+
+.markdown-code-block[data-collapsed='true'] {
+  padding-bottom: 0 !important;
+}
+
+.markdown-code-block[data-collapsed='true'] .markdown-code-pre {
+  display: none;
+}
+
+.markdown-code-block[data-collapsed='true']::after {
+  display: block;
+  padding: 12px 16px 16px;
+  color: var(--code-muted);
+  font-size: 12px;
+  content: '代码块已折叠';
+  font-style: italic;
+}
+
+.markdown-code-block[data-wrap='true'] .markdown-code-pre {
+  overflow-x: hidden;
+}
+
+.markdown-code-block[data-wrap='true'] code,
+.markdown-code-block[data-wrap='true'] .markdown-code-editor-layer,
+.markdown-code-block[data-wrap='true'] .markdown-code-highlight-layer {
+  min-width: 0 !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+.markdown-code-block .shiki {
+  margin: 0;
+  background: transparent !important;
+}
+
+.markdown-code-block .shiki code {
+  background: transparent !important;
+}
+
+.markdown-code-raw {
+  display: none;
+}
+
+/* =========================================
+   ✏️ ProseMirror 编辑器兼容
+========================================= */
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-editor-layer,
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-highlight-layer {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: max-content;
+  padding: 16px 16px 16px 12px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  tab-size: inherit;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+  text-decoration: none;
+  text-decoration-line: none;
+}
+
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-editor-layer {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+  color: transparent !important;
+  caret-color: var(--text-primary);
+  background: transparent !important;
+  outline: none;
+  text-shadow: none;
+  -webkit-text-fill-color: transparent;
+}
+
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block:focus-within {
+  outline: none;
+}
+
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block.ProseMirror-selectednode {
+  border-color: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.38) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--theme-accent-rgb, 22, 119, 255), 0.12) !important;
+}
+
+.preview-edit-prosemirror
+  .ProseMirror
+  .preview-edit-code-block
+  .markdown-code-editor-layer::selection {
+  color: transparent;
+  background: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.28);
+}
+
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-pre {
+  position: relative;
+}
+
+.preview-edit-prosemirror
+  .ProseMirror
+  .preview-edit-code-block[data-collapsed='true']
+  .markdown-code-pre {
+  display: none;
+}
+
+/* =========================================
+   🎨 hljs 语法高亮 (保持不变)
+========================================= */
+.markdown-code-block .hljs {
+  color: inherit;
+  background: transparent;
+}
+
+.markdown-code-block .hljs-keyword,
+.markdown-code-block .hljs-selector-tag,
+.markdown-code-block .hljs-title.function_ {
+  color: var(--syntax-keyword, #7c3aed);
+  font-weight: 600;
+}
+
+.markdown-code-block .hljs-built_in,
+.markdown-code-block .hljs-type,
+.markdown-code-block .hljs-class .hljs-title {
+  color: var(--syntax-type, #0f766e);
+}
+
+.markdown-code-block .hljs-string,
+.markdown-code-block .hljs-attr,
+.markdown-code-block .hljs-symbol,
+.markdown-code-block .hljs-template-variable {
+  color: var(--syntax-string, #047857);
+}
+
+.markdown-code-block .hljs-number,
+.markdown-code-block .hljs-literal,
+.markdown-code-block .hljs-variable,
+.markdown-code-block .hljs-params {
+  color: var(--syntax-number, #b45309);
+}
+
+.markdown-code-block .hljs-comment,
+.markdown-code-block .hljs-quote {
+  color: var(--syntax-comment, #86909c);
+  font-style: italic;
+}
+
+.markdown-code-block .hljs-meta,
+.markdown-code-block .hljs-doctag,
+.markdown-code-block .hljs-tag,
+.markdown-code-block .hljs-name {
+  color: var(--syntax-tag, #be123c);
+}
+
+.markdown-code-block .hljs-operator,
+.markdown-code-block .hljs-punctuation {
+  color: var(--text-secondary);
+}
+
+.markdown-code-block .hljs-addition {
+  color: #047857;
+  background: rgba(0, 168, 112, 0.1);
+}
+
+.markdown-code-block .hljs-deletion {
+  color: #b91c1c;
+  background: rgba(247, 105, 100, 0.12);
+}
+
+/* 移动端适配 */
+@media (hover: none), (max-width: 760px) {
+  .markdown-code-actions {
+    opacity: 1;
+    transform: none;
+  }
+}

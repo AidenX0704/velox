@@ -1,22 +1,74 @@
 import { useState } from 'react'
 import { Typography } from '@douyinfe/semi-ui'
 import {
+  IconBranch,
+  IconClock,
   IconFile,
   IconFolderOpenStroked,
   IconFolderStroked,
+  IconGit,
   IconHistory,
   IconPlusStroked,
+  IconSave,
   IconSettingStroked
 } from '@douyinfe/semi-icons'
-import type { RecentFileRecord, WorkspaceEntry } from '../../../shared/types'
+import type {
+  HistoryBranchRecord,
+  HistoryEventType,
+  HistoryTimelineEntry,
+  RecentFileRecord,
+  WorkspaceEntry
+} from '../../../shared/types'
 import { BrandLogo } from '../components/BrandLogo'
 import { WorkspaceTree } from './WorkspaceTree'
 
-type AppView = 'editor' | 'settings'
+type AppView = 'editor' | 'recent' | 'settings'
 type SidebarPanelTab = 'workspace' | 'recent'
+type RecentView = 'files' | 'history' | 'branches'
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
+}
+
+function formatRelativeTime(value: string): string {
+  const timestamp = new Date(value).getTime()
+  const diff = Date.now() - timestamp
+
+  if (!Number.isFinite(timestamp)) return ''
+  if (diff < 60_000) return '刚刚'
+
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 60) return `${minutes} 分钟前`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} 天前`
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value))
+}
+
+function getEventLabel(type: HistoryEventType): string {
+  switch (type) {
+    case 'open':
+      return '打开'
+    case 'save':
+      return '保存'
+    case 'snapshot':
+      return '快照'
+    case 'branch_create':
+      return '分支'
+    case 'branch_advance':
+      return '推进'
+    case 'restore':
+      return '回溯'
+  }
 }
 
 interface SidebarProps {
@@ -26,13 +78,17 @@ interface SidebarProps {
   workspaceRoot: string | null
   workspaceTree: WorkspaceEntry[]
   recentFiles: RecentFileRecord[]
+  historyTimeline: HistoryTimelineEntry[]
+  historyBranches: HistoryBranchRecord[]
   selectedPath?: string
   expandedPaths?: string[]
   onNew: () => void
   onOpenEditor: () => void
+  onOpenRecent: () => void
   onOpenSettings: () => void
   onOpenWorkspace: () => void
   onOpenFile: (path: string) => void
+  onSelectRecentFile: (path: string) => void
   onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void
   onResizeByKeyboard: (delta: number) => void
   onExpandedPathsChange?: (paths: string[]) => void
@@ -52,13 +108,17 @@ export function Sidebar({
   workspaceRoot,
   workspaceTree,
   recentFiles,
+  historyTimeline,
+  historyBranches,
   selectedPath,
   expandedPaths,
   onNew,
   onOpenEditor,
+  onOpenRecent,
   onOpenSettings,
   onOpenWorkspace,
   onOpenFile,
+  onSelectRecentFile,
   onResizeStart,
   onResizeByKeyboard,
   onExpandedPathsChange,
@@ -67,6 +127,7 @@ export function Sidebar({
   onDeleteWorkspaceEntry
 }: SidebarProps): React.JSX.Element {
   const [panelTab, setPanelTab] = useState<SidebarPanelTab>('workspace')
+  const [recentView, setRecentView] = useState<RecentView>('files')
   const singleFileEntry: WorkspaceEntry | null =
     !workspaceRoot && selectedPath
       ? {
@@ -88,6 +149,7 @@ export function Sidebar({
             onClick={onOpenEditor}
           >
             <BrandLogo className="activity-brand-logo" size={28} />
+            <span className="activity-label">编辑</span>
           </button>
           <button
             className="activity-item"
@@ -101,19 +163,21 @@ export function Sidebar({
             }}
           >
             <IconFolderStroked />
+            <span className="activity-label">资源</span>
           </button>
           <button
             className="activity-item"
-            data-active={activeView === 'editor' && panelTab === 'recent'}
+            data-active={activeView === 'recent'}
             type="button"
             title="最近文件"
             aria-label="最近文件"
             onClick={() => {
               setPanelTab('recent')
-              onOpenEditor()
+              onOpenRecent()
             }}
           >
             <IconHistory />
+            <span className="activity-label">最近</span>
           </button>
           <button
             className="activity-item"
@@ -123,6 +187,7 @@ export function Sidebar({
             onClick={onNew}
           >
             <IconPlusStroked />
+            <span className="activity-label">新建</span>
           </button>
         </div>
         <div className="activity-bar-bottom">
@@ -135,6 +200,7 @@ export function Sidebar({
             onClick={onOpenSettings}
           >
             <IconSettingStroked />
+            <span className="activity-label">设置</span>
           </button>
         </div>
       </nav>
@@ -195,28 +261,150 @@ export function Sidebar({
         ) : (
           <section className="sidebar-panel" role="tabpanel" aria-label="最近文件">
             <div className="recent-panel-header">
-              <IconFile />
-              <Typography.Text className="recent-panel-title">最近打开</Typography.Text>
+              {recentView === 'files' ? (
+                <IconFile />
+              ) : recentView === 'history' ? (
+                <IconGit />
+              ) : (
+                <IconBranch />
+              )}
+              <Typography.Text className="recent-panel-title">
+                {recentView === 'files'
+                  ? '最近打开'
+                  : recentView === 'history'
+                    ? '历史时间线'
+                    : '分支推进'}
+              </Typography.Text>
             </div>
-            <div className="recent-file-list">
-              {recentFiles.map((file) => (
-                <button
-                  key={file.path}
-                  className="recent-file-item"
-                  type="button"
-                  title={file.path}
-                  onClick={() => onOpenFile(file.path)}
-                >
-                  <span className="recent-file-title">{file.title}</span>
-                  <span className="recent-file-path">{file.path}</span>
-                </button>
-              ))}
-              {recentFiles.length === 0 ? (
-                <Typography.Text className="recent-file-empty" type="tertiary">
-                  暂无最近文件
-                </Typography.Text>
-              ) : null}
+            <div className="recent-view-tabs" role="tablist" aria-label="最近视图">
+              <button
+                className="recent-view-tab"
+                data-active={recentView === 'files'}
+                type="button"
+                onClick={() => setRecentView('files')}
+              >
+                最近
+              </button>
+              <button
+                className="recent-view-tab"
+                data-active={recentView === 'history'}
+                type="button"
+                onClick={() => setRecentView('history')}
+              >
+                历史
+              </button>
+              <button
+                className="recent-view-tab"
+                data-active={recentView === 'branches'}
+                type="button"
+                onClick={() => setRecentView('branches')}
+              >
+                分支
+              </button>
             </div>
+            {recentView === 'files' ? (
+              <div className="recent-file-list">
+                {recentFiles.map((file) => (
+                  <button
+                    key={file.path}
+                    className="recent-file-item"
+                    type="button"
+                    title={file.path}
+                    data-active={activeView === 'recent' && selectedPath === file.path}
+                    onClick={() => onSelectRecentFile(file.path)}
+                  >
+                    <span className="recent-file-title">{file.title}</span>
+                    <span className="recent-file-path">{file.path}</span>
+                    <span className="recent-file-meta">
+                      {formatRelativeTime(file.lastOpenedAt)}
+                    </span>
+                  </button>
+                ))}
+                {recentFiles.length === 0 ? (
+                  <Typography.Text className="recent-file-empty" type="tertiary">
+                    暂无最近文件
+                  </Typography.Text>
+                ) : null}
+              </div>
+            ) : null}
+            {recentView === 'history' ? (
+              <div className="history-timeline-list">
+                {historyTimeline.map((entry) => (
+                  <button
+                    key={entry.id}
+                    className="history-timeline-item"
+                    type="button"
+                    title={entry.documentPath}
+                    onClick={() => {
+                      if (entry.documentPath) {
+                        onSelectRecentFile(entry.documentPath)
+                      }
+                    }}
+                  >
+                    <span className="history-timeline-node" data-type={entry.type}>
+                      {entry.type === 'save' || entry.type === 'restore' ? (
+                        <IconSave />
+                      ) : (
+                        <IconClock />
+                      )}
+                    </span>
+                    <span className="history-timeline-copy">
+                      <span className="history-timeline-title">{entry.title}</span>
+                      <span className="history-timeline-path">
+                        {entry.documentTitle ?? entry.documentPath ?? '未知文档'}
+                      </span>
+                      <span className="history-timeline-meta">
+                        {getEventLabel(entry.type)}
+                        {entry.branchName ? ` · ${entry.branchName}` : ''}
+                        {' · '}
+                        {formatRelativeTime(entry.createdAt)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {historyTimeline.length === 0 ? (
+                  <Typography.Text className="recent-file-empty" type="tertiary">
+                    保存文档后会生成历史节点
+                  </Typography.Text>
+                ) : null}
+              </div>
+            ) : null}
+            {recentView === 'branches' ? (
+              <div className="history-branch-list">
+                {historyBranches.map((branch) => (
+                  <button
+                    key={branch.id}
+                    className="history-branch-item"
+                    type="button"
+                    title={branch.documentPath}
+                    data-active={activeView === 'recent' && selectedPath === branch.documentPath}
+                    onClick={() => onSelectRecentFile(branch.documentPath)}
+                  >
+                    <span className="history-branch-icon">
+                      <IconBranch />
+                    </span>
+                    <span className="history-branch-copy">
+                      <span className="history-branch-title">
+                        {branch.name}
+                        {branch.headSnapshotId ? (
+                          <span className="history-branch-head">#{branch.headSnapshotId}</span>
+                        ) : null}
+                      </span>
+                      <span className="history-branch-path">{branch.documentTitle}</span>
+                      <span className="history-branch-meta">
+                        {branch.headSnapshotId ? '已推进' : '等待首个快照'} ·{' '}
+                        {formatRelativeTime(branch.updatedAt)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {historyBranches.length === 0 ? (
+                  <Typography.Text className="recent-file-empty" type="tertiary">
+                    保存文档后会创建 main 分支
+                  </Typography.Text>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         )}
       </div>

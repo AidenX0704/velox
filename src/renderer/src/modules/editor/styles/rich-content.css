@@ -1,0 +1,283 @@
+.preview-edit-prosemirror .ProseMirror strong {
+  font-weight: 700;
+}
+
+.preview-edit-prosemirror .ProseMirror em {
+  font-style: italic;
+}
+
+.preview-edit-prosemirror .ProseMirror del,
+.preview-edit-prosemirror .ProseMirror s {
+  text-decoration: line-through;
+}
+
+.preview-edit-prosemirror .ProseMirror h1,
+.preview-edit-prosemirror .ProseMirror h2,
+.preview-edit-prosemirror .ProseMirror h3,
+.preview-edit-prosemirror .ProseMirror h4 {
+  margin: 1.35em 0 0.65em;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.preview-edit-prosemirror .ProseMirror h1 {
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 2.18em;
+}
+
+.preview-edit-prosemirror .ProseMirror h2 {
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 1.58em;
+}
+
+.preview-edit-prosemirror .ProseMirror p,
+.preview-edit-prosemirror .ProseMirror ul,
+.preview-edit-prosemirror .ProseMirror ol,
+.preview-edit-prosemirror .ProseMirror blockquote,
+.preview-edit-prosemirror .ProseMirror pre {
+  margin: 0.75em 0;
+}
+
+.preview-edit-prosemirror .ProseMirror ul,
+.preview-edit-prosemirror .ProseMirror ol {
+  padding-left: 1.65em;
+  list-style-position: outside;
+}
+
+.preview-edit-prosemirror .ProseMirror li,
+.markdown-preview li {
+  margin: 0.28em 0;
+  padding-left: 0.2em;
+}
+
+.preview-edit-prosemirror .ProseMirror li > p,
+.markdown-preview li > p {
+  margin: 0.18em 0;
+}
+
+.preview-edit-prosemirror .ProseMirror li > ul,
+.preview-edit-prosemirror .ProseMirror li > ol,
+.markdown-preview li > ul,
+.markdown-preview li > ol {
+  margin: 0.24em 0;
+}
+
+.preview-edit-prosemirror .ProseMirror ol ol,
+.markdown-preview ol ol {
+  list-style-type: lower-alpha;
+}
+
+.preview-edit-prosemirror .ProseMirror ol ol ol,
+.markdown-preview ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.preview-edit-prosemirror .ProseMirror blockquote {
+  position: relative;
+  padding: 0.72em 1em 0.72em 1.15em;
+  border: 1px solid transparent;
+  border-left: 3px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.38);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: rgba(148, 163, 184, 0.1);
+  font-style: normal;
+}
+
+.preview-edit-prosemirror .ProseMirror code {
+  padding: 0.12em 0.38em;
+  border: 1px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.08);
+  border-radius: 5px;
+  color: #c2410c;
+  background: rgba(148, 163, 184, 0.12);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    monospace;
+  font-size: 0.9em;
+}
+
+.preview-edit-prosemirror .ProseMirror pre {
+  overflow: auto;
+  padding: 0;
+  background: transparent;
+}
+
+.preview-edit-prosemirror .ProseMirror .preview-edit-code-block {
+  padding: 0;
+}
+
+.preview-edit-prosemirror .ProseMirror pre code {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+}
+
+.preview-edit-prosemirror .ProseMirror-selectednode {
+  outline: 2px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.28);
+  outline-offset: 2px;
+}
+
+.katex,
+mjx-container {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 2px;
+  margin-top: -2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overflow-wrap: break-word;
+  vertical-align: middle;
+}
+
+.katex-display {
+  display: block;
+  margin: 0.75em 0;
+  padding: 0.35em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-preview .katex {
+  color: var(--markdown-color-link);
+}
+
+.markdown-preview .katex-display {
+  color: var(--markdown-color-text);
+}
+
+.preview-edit-prosemirror .ProseMirror table {
+  width: 100%;
+  margin: 0.9em 0;
+  border-spacing: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.preview-edit-prosemirror .ProseMirror th,
+.preview-edit-prosemirror .ProseMirror td {
+  position: relative;
+  min-width: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.preview-edit-prosemirror .ProseMirror th {
+  font-weight: 650;
+  background: var(--surface-muted);
+}
+
+.preview-edit-prosemirror .ProseMirror tr:nth-child(even) td {
+  background: var(--surface-muted);
+}
+
+.preview-edit-prosemirror .ProseMirror .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  content: '';
+  background: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.14);
+}
+
+.preview-edit-prosemirror .ProseMirror .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  z-index: 20;
+  width: 4px;
+  pointer-events: none;
+  background: var(--brand-active);
+}
+
+.preview-edit-prosemirror .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+.preview-edit-prosemirror .ProseMirror .velox-math-block {
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.14);
+  border-radius: 12px;
+  color: var(--brand-active);
+  background: var(--brand-softer);
+}
+
+.preview-edit-prosemirror .ProseMirror .velox-inline-math {
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+  color: var(--brand-active);
+  background: var(--brand-soft);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.markdown-preview ul,
+.preview-edit-prosemirror .ProseMirror ul {
+  list-style-type: disc;
+}
+
+.preview-edit-prosemirror .ProseMirror li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+  list-style: none;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-checkbox {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 0.35em 0 0;
+  accent-color: var(--brand-active);
+  cursor: pointer;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-edit-prosemirror .ProseMirror li:not(.task-list-item) > .task-list-item-content {
+  display: contents;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-content > :first-child {
+  margin-top: 0;
+}
+
+.preview-edit-prosemirror .ProseMirror .task-list-item-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview ul ul,
+.preview-edit-prosemirror .ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.markdown-preview ul ul ul,
+.preview-edit-prosemirror .ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
+.markdown-preview ol,
+.preview-edit-prosemirror .ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.markdown-preview li::marker,
+.preview-edit-prosemirror .ProseMirror li::marker {
+  color: var(--text-secondary);
+  font-weight: 600;
+}

@@ -1,0 +1,115 @@
+.document-link-preview-card {
+  position: fixed;
+  z-index: 1300;
+  width: min(360px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  line-height: 1.5;
+  text-align: left;
+  user-select: text;
+}
+
+.document-link-preview-loading {
+  padding: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.document-link-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 8px;
+}
+
+.document-link-preview-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-link-preview-close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.document-link-preview-close:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.document-link-preview-path {
+  overflow: hidden;
+  padding: 0 14px 10px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-link-preview-excerpt {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  color: var(--text-primary);
+  background: var(--surface-muted);
+  font-family: var(--code-font-family);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.document-link-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.document-link-preview-open {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-on-brand);
+  background: var(--markdown-color-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.document-link-preview-open:hover {
+  background: var(--theme-accent-hover, #245bdb);
+}

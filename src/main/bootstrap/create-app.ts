@@ -5,6 +5,7 @@ import { environment } from './environment'
 import { registerSecurityGuards } from './security'
 import { getDatabase } from '../database/database'
 import { DocumentSessionRepository } from '../database/repositories/document-session-repository'
+import { HistoryRepository } from '../database/repositories/history-repository'
 import { PreferencesRepository } from '../database/repositories/preferences-repository'
 import { RecentRepository } from '../database/repositories/recent-repository'
 import { WorkspaceStateRepository } from '../database/repositories/workspace-state-repository'
@@ -13,6 +14,7 @@ import { AppService } from '../services/app-service'
 import { DocumentSessionService } from '../services/document-session-service'
 import { DocumentService } from '../services/document-service'
 import { ExportService } from '../services/export-service'
+import { HistoryService } from '../services/history-service'
 import { logger, registerProcessLogging } from '../services/log-service'
 import { MenuService } from '../services/menu-service'
 import { PreferencesService } from '../services/preferences-service'
@@ -98,11 +100,13 @@ export async function createApp(): Promise<void> {
   const database = getDatabase()
   const settingsService = new SettingsService()
   const recentService = new RecentService(new RecentRepository(database))
+  const historyService = new HistoryService(new HistoryRepository(database))
   const updaterService = new UpdaterService()
   const services = {
     appService: new AppService(),
-    documentService: new DocumentService(settingsService, recentService),
+    documentService: new DocumentService(settingsService, recentService, historyService),
     exportService: new ExportService(),
+    historyService,
     settingsService,
     preferencesService: new PreferencesService(new PreferencesRepository(database)),
     recentService,
@@ -121,7 +125,9 @@ export async function createApp(): Promise<void> {
 
   windowManager.createMainWindow()
 
-  void updaterService.checkForUpdates()
+  setTimeout(() => {
+    void updaterService.checkForUpdates()
+  }, 5000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

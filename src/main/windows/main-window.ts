@@ -6,6 +6,21 @@ import { getMainWindowBounds, saveMainWindowState, shouldMaximizeMainWindow } fr
 import icon from '../../../resources/icon.png?asset'
 
 export function createMainWindow(): BrowserWindow {
+  let hasShown = false
+  const showMainWindow = (): void => {
+    if (hasShown || mainWindow.isDestroyed()) {
+      return
+    }
+
+    hasShown = true
+
+    if (shouldMaximizeMainWindow()) {
+      mainWindow.maximize()
+    }
+
+    mainWindow.show()
+  }
+
   const mainWindow = new BrowserWindow({
     ...getMainWindowBounds(),
     minWidth: 760,
@@ -13,8 +28,8 @@ export function createMainWindow(): BrowserWindow {
     show: false,
     ...(process.platform === 'darwin'
       ? {
-          titleBarStyle: 'hiddenInset' as const,
-          trafficLightPosition: { x: 16, y: 18 }
+          titleBarStyle: 'hidden' as const,
+          trafficLightPosition: { x: 2, y: 2 }
         }
       : { frame: false }),
     autoHideMenuBar: true,
@@ -28,12 +43,9 @@ export function createMainWindow(): BrowserWindow {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    if (shouldMaximizeMainWindow()) {
-      mainWindow.maximize()
-    }
-
-    mainWindow.show()
+  mainWindow.once('ready-to-show', showMainWindow)
+  mainWindow.webContents.once('did-finish-load', () => {
+    setTimeout(showMainWindow, 120)
   })
 
   mainWindow.on('close', () => {

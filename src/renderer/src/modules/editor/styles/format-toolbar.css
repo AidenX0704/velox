@@ -1,0 +1,91 @@
+/* ==================== Format Toolbar ==================== */
+
+.format-toolbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 40px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-raised);
+  user-select: none;
+}
+
+.format-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.format-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--line-soft);
+}
+
+.format-toolbar-btn {
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 6px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  color: var(--text-secondary) !important;
+}
+
+.format-toolbar-btn:hover {
+  color: var(--text-primary) !important;
+  background: var(--surface-hover) !important;
+}
+
+.format-toolbar-btn .semi-button-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.format-toolbar-code {
+  font-family: var(--code-font-family);
+  font-size: 12px !important;
+  letter-spacing: -0.02em;
+}
+
+.format-heading-select,
+.format-font-size-select {
+  min-width: 56px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+.format-toolbar-chevron {
+  margin-left: 2px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.format-heading-option {
+  font-weight: 600;
+}
+
+.format-heading-option.h1 {
+  font-size: 18px;
+}
+
+.format-heading-option.h2 {
+  font-size: 16px;
+}
+
+.format-heading-option.h3 {
+  font-size: 14px;
+}
+
+.format-heading-option.h4 {
+  font-size: 13px;
+}

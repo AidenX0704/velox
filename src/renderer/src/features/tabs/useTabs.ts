@@ -10,7 +10,7 @@ function generateTabId(): string {
 
 function createTabState(
   document: TabDocument,
-  editorMode: EditorMode = 'split',
+  editorMode: EditorMode = 'preview-edit',
   pinned = false
 ): TabState {
   return {
@@ -28,13 +28,13 @@ const welcomeContent = `# Welcome to Velox
 Velox 是一个正在构建中的类 Typora Markdown 编辑器。
 
 - 支持源码模式
-- 支持源码 / 预览分栏
-- 支持基础预览模式
+- 支持实时预览编辑
+- 支持源码编辑
 
 从左上角打开 Markdown 文件，或直接开始编写。
 `
 
-function createWelcomeDocument(): TabDocument {
+export function createWelcomeDocument(): TabDocument {
   return {
     title: 'Welcome.md',
     content: welcomeContent,
@@ -51,6 +51,7 @@ export function useTabs(): {
   setContent: (content: string) => void
   setCursorPosition: (line: number, column: number) => void
   addTab: (document: TabDocument, editorMode?: EditorMode, pinned?: boolean) => string
+  replaceTabs: (documents: Array<{ document: TabDocument; editorMode?: EditorMode }>) => void
   closeTab: (tabId: string, options?: { force?: boolean }) => boolean
   closeOtherTabs: (tabId: string, options?: { force?: boolean }) => void
   closeAllTabs: (options?: { force?: boolean }) => void
@@ -64,10 +65,7 @@ export function useTabs(): {
   updateTabDocument: (tabId: string, document: Partial<TabDocument>) => void
   findTabByPath: (path: string) => TabState | undefined
 } {
-  const [tabs, setTabs] = useState<TabState[]>(() => {
-    const welcomeTab = createTabState(createWelcomeDocument())
-    return [welcomeTab]
-  })
+  const [tabs, setTabs] = useState<TabState[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null)
   const activeTabIdRef = useRef(activeTabId)
 
@@ -86,7 +84,7 @@ export function useTabs(): {
   )
 
   const addTab = useCallback(
-    (document: TabDocument, editorMode: EditorMode = 'split', pinned = false): string => {
+    (document: TabDocument, editorMode: EditorMode = 'preview-edit', pinned = false): string => {
       const existing = document.path
         ? tabs.find((t) => t.document.path === document.path)
         : undefined
@@ -101,6 +99,18 @@ export function useTabs(): {
       return newTab.id
     },
     [tabs, updateActiveTabId]
+  )
+
+  const replaceTabs = useCallback(
+    (documents: Array<{ document: TabDocument; editorMode?: EditorMode }>): void => {
+      const nextTabs = documents.map(({ document, editorMode }) =>
+        createTabState(document, editorMode)
+      )
+
+      setTabs(nextTabs)
+      updateActiveTabId(nextTabs.at(-1)?.id ?? null)
+    },
+    [updateActiveTabId]
   )
 
   const closeTab = useCallback(
@@ -282,6 +292,7 @@ export function useTabs(): {
     setContent,
     setCursorPosition,
     addTab,
+    replaceTabs,
     closeTab,
     closeOtherTabs,
     closeAllTabs,

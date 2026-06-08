@@ -13,6 +13,7 @@ import {
   IconSunStroked
 } from '@douyinfe/semi-icons'
 import type { AppInfo } from '../../../shared/types'
+import type { UpdaterStatus } from '../../../shared/types'
 import {
   themeColorPresets,
   type AppearanceMode,
@@ -32,13 +33,15 @@ import {
 
 interface SettingsPageProps {
   settings: MarkdownEditorPreferences
+  updaterStatus: UpdaterStatus | null
   onBack: () => void
   onChange: (settings: MarkdownEditorPreferences) => void
   onReset: () => void
+  onCheckForUpdates: () => void
 }
 
 type SettingsPatch = Partial<MarkdownEditorPreferences>
-type PreferenceSection = 'interface' | 'source' | 'preview' | 'shortcuts' | 'export'
+type PreferenceSection = 'interface' | 'source' | 'preview' | 'shortcuts' | 'export' | 'updates'
 
 const appearanceModeOptions: Array<{
   value: AppearanceMode
@@ -59,14 +62,17 @@ const preferenceSections: Array<{
   { id: 'source', label: '源码编辑', icon: <IconCodeStroked /> },
   { id: 'preview', label: '预览渲染', icon: <IconArticle /> },
   { id: 'shortcuts', label: '快捷键', icon: <IconSettingStroked /> },
-  { id: 'export', label: '导出默认项', icon: <IconExport /> }
+  { id: 'export', label: '导出默认项', icon: <IconExport /> },
+  { id: 'updates', label: '应用更新', icon: <IconRefresh /> }
 ]
 
 export function SettingsPage({
   settings,
+  updaterStatus,
   onBack,
   onChange,
-  onReset
+  onReset,
+  onCheckForUpdates
 }: SettingsPageProps): React.JSX.Element {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
 
@@ -287,23 +293,16 @@ export function SettingsPage({
             id="settings-preview"
             icon={<IconArticle />}
             title="预览渲染"
-            description="控制分栏预览和预览模式的版心、字号与同步策略。"
+            description="控制实时预览编辑的版心、字号与渲染样式。"
           >
-            <SettingRow title="滚动同步" description="分栏模式下同步源码与预览滚动位置">
-              <Switch
-                checked={settings.splitScrollSync}
-                onChange={(splitScrollSync) => updateSettings({ splitScrollSync })}
-              />
-            </SettingRow>
-            <SettingSeparator />
-            <SettingRow title="预览居中" description="分栏预览内容使用居中版心">
+            <SettingRow title="预览居中" description="预览编辑内容使用居中版心">
               <Switch
                 checked={settings.previewCentered}
                 onChange={(previewCentered) => updateSettings({ previewCentered })}
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览最大宽度" description="控制分栏居中预览与预览模式的内容宽度">
+            <SettingRow title="预览最大宽度" description="控制预览编辑内容宽度">
               <InputNumber
                 min={680}
                 max={1800}
@@ -314,7 +313,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览字号" description="分栏预览与预览共用字号">
+            <SettingRow title="预览字号" description="预览编辑字号">
               <InputNumber
                 min={13}
                 max={24}
@@ -324,7 +323,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览行高" description="分栏预览与预览共用行高">
+            <SettingRow title="预览行高" description="预览编辑行高">
               <InputNumber
                 min={1.4}
                 max={2.4}
@@ -334,7 +333,7 @@ export function SettingsPage({
               />
             </SettingRow>
             <SettingSeparator />
-            <SettingRow title="预览页宽" description="仅影响类 Typora 的预览模式">
+            <SettingRow title="预览页宽" description="控制类 Typora 预览编辑版心">
               <Select
                 style={{ width: 165 }}
                 value={settings.previewEditWidthMode}
@@ -476,12 +475,43 @@ export function SettingsPage({
             </SettingRow>
           </SettingsCard>
 
+          <SettingsCard
+            id="settings-updates"
+            icon={<IconRefresh />}
+            title="应用更新"
+            description="查看当前版本状态，并手动检查是否有可用更新。"
+          >
+            <SettingRow
+              title="当前版本"
+              description={appInfo?.isPackaged ? '正式安装版本' : '开发环境'}
+            >
+              <div className="settings-version-value">v{appInfo?.version ?? '-'}</div>
+            </SettingRow>
+            <SettingSeparator />
+            <SettingRow title="更新状态" description={updaterStatus?.message ?? '尚未检查更新'}>
+              <span className="settings-update-state" data-state={updaterStatus?.state ?? 'idle'}>
+                {getUpdaterStateLabel(updaterStatus)}
+              </span>
+            </SettingRow>
+            <SettingSeparator />
+            <SettingRow title="手动检查" description="立即连接更新源并获取最新版本信息">
+              <Button
+                icon={<IconRefresh />}
+                loading={updaterStatus?.state === 'checking'}
+                disabled={updaterStatus?.state === 'downloading'}
+                onClick={onCheckForUpdates}
+              >
+                检查更新
+              </Button>
+            </SettingRow>
+          </SettingsCard>
+
           <section className="settings-about-card">
             <BrandLogo className="settings-about-logo" />
             <div className="settings-about-content">
               <Typography.Title heading={6}>Velox Markdown Editor</Typography.Title>
               <Typography.Paragraph type="tertiary" spacing="extended">
-                面向桌面写作场景的 Markdown 编辑器，提供源码、分栏预览和预览体验。
+                面向桌面写作场景的 Markdown 编辑器，提供源码和实时预览编辑体验。
               </Typography.Paragraph>
               <div className="settings-about-meta">
                 <span>版本 {appInfo?.version ?? '-'}</span>
@@ -494,6 +524,29 @@ export function SettingsPage({
       </div>
     </section>
   )
+}
+
+function getUpdaterStateLabel(status: UpdaterStatus | null): string {
+  if (!status) {
+    return '未检查'
+  }
+
+  switch (status.state) {
+    case 'idle':
+      return '待检查'
+    case 'checking':
+      return '检查中'
+    case 'available':
+      return status.version ? `发现 v${status.version}` : '发现新版本'
+    case 'not-available':
+      return '已是最新'
+    case 'downloading':
+      return `下载中 ${Math.round(status.percent ?? 0)}%`
+    case 'downloaded':
+      return '等待安装'
+    case 'error':
+      return '检查失败'
+  }
 }
 
 function SettingsCard({

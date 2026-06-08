@@ -1,4 +1,9 @@
-import { codeBlockSelectors, copyCodeBlock, toggleCodeBlockFold } from './codeBlockModel'
+import {
+  codeBlockSelectors,
+  copyCodeBlock,
+  toggleCodeBlockFold,
+  toggleCodeBlockWrap
+} from './codeBlockModel'
 
 export function handleCodeBlockAction(actionButton: HTMLButtonElement): boolean {
   const codeBlock = actionButton.closest<HTMLElement>(codeBlockSelectors.root)
@@ -14,6 +19,11 @@ export function handleCodeBlockAction(actionButton: HTMLButtonElement): boolean 
 
   if (actionButton.dataset.codeAction === 'fold') {
     toggleCodeBlockFold(codeBlock, actionButton)
+    return true
+  }
+
+  if (actionButton.dataset.codeAction === 'wrap') {
+    toggleCodeBlockWrap(codeBlock, actionButton)
     return true
   }
 

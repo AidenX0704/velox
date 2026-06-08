@@ -137,7 +137,7 @@ function WorkspaceTreeContent({
       type: 'create',
       parentPath,
       entryType: type,
-      initialValue: type === 'file' ? 'Untitled.md' : 'New Folder'
+      initialValue: type === 'file' ? 'undefined.md' : 'New Folder'
     })
   }
 

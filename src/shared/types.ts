@@ -112,6 +112,64 @@ export interface RecentWorkspaceRecord {
   pinned: boolean
 }
 
+export type HistoryEventType =
+  | 'open'
+  | 'save'
+  | 'snapshot'
+  | 'branch_create'
+  | 'branch_advance'
+  | 'restore'
+
+export interface HistoryTimelineEntry {
+  id: number
+  documentId?: number
+  documentPath?: string
+  documentTitle?: string
+  branchId?: number
+  branchName?: string
+  snapshotId?: number
+  type: HistoryEventType
+  title: string
+  details: Record<string, unknown>
+  createdAt: string
+}
+
+export interface HistoryBranchRecord {
+  id: number
+  documentId: number
+  documentPath: string
+  documentTitle: string
+  name: string
+  headSnapshotId?: number
+  forkedFromSnapshotId?: number
+  archived: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HistoryDocumentActivity {
+  path: string
+  title: string
+  currentContent: string
+  headSnapshot?: {
+    id: number
+    branchName: string
+    content: string
+    createdAt: string
+  }
+  diff: {
+    addedLines: number
+    removedLines: number
+    unchanged: boolean
+    lines: Array<{
+      type: 'added' | 'removed' | 'context'
+      text: string
+    }>
+  }
+  timeline: HistoryTimelineEntry[]
+  branches: HistoryBranchRecord[]
+}
+
 export interface WorkspaceStateRecord {
   workspacePath: string
   expandedPaths: string[]
@@ -209,6 +267,11 @@ export interface VeloxAPI {
     listFiles: () => Promise<Result<RecentFileRecord[]>>
     listWorkspaces: () => Promise<Result<RecentWorkspaceRecord[]>>
     clear: () => Promise<Result<void>>
+  }
+  history: {
+    listTimeline: (path?: string) => Promise<Result<HistoryTimelineEntry[]>>
+    listBranches: (path?: string) => Promise<Result<HistoryBranchRecord[]>>
+    getDocumentActivity: (path: string) => Promise<Result<HistoryDocumentActivity>>
   }
   document: {
     createUntitled: () => Promise<Result<DocumentData>>

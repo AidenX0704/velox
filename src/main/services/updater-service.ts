@@ -149,8 +149,43 @@ function createUpdateInfoStatus(
     version: info.version,
     releaseName: info.releaseName ?? undefined,
     releaseDate: info.releaseDate,
-    releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined
+    releaseNotes: normalizeReleaseNotes(info.releaseNotes)
   })
+}
+
+function normalizeReleaseNotes(releaseNotes: unknown): string | undefined {
+  if (typeof releaseNotes === 'string') {
+    return releaseNotes.trim() || undefined
+  }
+
+  if (!Array.isArray(releaseNotes)) {
+    return undefined
+  }
+
+  const notes = releaseNotes
+    .map((note) => {
+      if (typeof note === 'string') {
+        return note
+      }
+
+      if (note && typeof note === 'object') {
+        const noteRecord = note as Record<string, unknown>
+        const version = typeof noteRecord['version'] === 'string' ? noteRecord['version'] : ''
+        const noteText = typeof noteRecord['note'] === 'string' ? noteRecord['note'] : ''
+
+        if (version && noteText) {
+          return `## ${version}\n\n${noteText}`
+        }
+
+        return noteText || version
+      }
+
+      return ''
+    })
+    .map((note) => note.trim())
+    .filter(Boolean)
+
+  return notes.length > 0 ? notes.join('\n\n') : undefined
 }
 
 function createDownloadStatus(progress: ProgressInfo): UpdaterStatus {

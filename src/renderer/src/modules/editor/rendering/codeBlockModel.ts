@@ -9,7 +9,7 @@ export const codeBlockSelectors = {
   rawCode: '[data-raw-code]'
 } as const
 
-export type CodeBlockAction = 'copy' | 'fold'
+export type CodeBlockAction = 'copy' | 'fold' | 'wrap'
 
 export function applyCodeBlockMeta(
   codeBlock: HTMLElement,
@@ -24,20 +24,20 @@ export function applyCodeBlockMeta(
 }
 
 export function readCodeBlockRawCode(codeBlock: HTMLElement): string | null {
-  const codeElement = codeBlock.querySelector<HTMLElement>(
-    `${codeBlockSelectors.editorLayer}, ${codeBlockSelectors.rawCode}`
-  )
-  const rawCode = codeElement?.dataset.rawCode
+  const editorLayer = codeBlock.querySelector<HTMLElement>(codeBlockSelectors.editorLayer)
 
-  if (!rawCode) {
+  if (editorLayer) {
+    return editorLayer.textContent ?? ''
+  }
+
+  const rawCodeElement = codeBlock.querySelector<HTMLElement>(codeBlockSelectors.rawCode)
+
+  if (!rawCodeElement?.hasAttribute('data-raw-code')) {
     return null
   }
 
-  try {
-    return decodeURIComponent(rawCode)
-  } catch {
-    return rawCode
-  }
+  const rawCode = rawCodeElement.dataset.rawCode ?? ''
+  return decodeRawCode(rawCode)
 }
 
 export async function copyCodeBlock(codeBlock: HTMLElement): Promise<void> {
@@ -72,6 +72,31 @@ export function toggleCodeBlockFold(
   }
 }
 
+export function toggleCodeBlockWrap(
+  codeBlock: HTMLElement,
+  actionButton?: HTMLButtonElement
+): void {
+  const wrapped = codeBlock.dataset.wrap === 'true'
+  const nextWrapped = !wrapped
+  codeBlock.dataset.wrap = String(nextWrapped)
+
+  if (actionButton) {
+    actionButton.setAttribute('aria-pressed', String(nextWrapped))
+  }
+}
+
+export function getCodeLineCount(code: string): number {
+  if (!code) {
+    return 1
+  }
+
+  return code.split(/\r\n|\r|\n/).length
+}
+
+export function renderCodeLineNumbers(lineCount: number): string {
+  return Array.from({ length: Math.max(1, lineCount) }, (_, index) => String(index + 1)).join('\n')
+}
+
 function setCodeBlockCopied(codeBlock: HTMLElement): void {
   codeBlock.dataset.copyState = 'copied'
   window.setTimeout(() => {
@@ -79,4 +104,12 @@ function setCodeBlockCopied(codeBlock: HTMLElement): void {
       delete codeBlock.dataset.copyState
     }
   }, 1200)
+}
+
+function decodeRawCode(rawCode: string): string {
+  try {
+    return decodeURIComponent(rawCode)
+  } catch {
+    return rawCode
+  }
 }

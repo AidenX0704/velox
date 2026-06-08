@@ -6,17 +6,17 @@
 [![React](https://img.shields.io/badge/React-19-149eca?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-Velox 是一个基于 Electron、React 与 TypeScript 构建的高性能桌面端 Markdown 编辑器，目标是提供现代化的沉浸式所见即所得写作体验，同时保留纯粹的源码编辑、分栏预览、灵活的主题定制和完备的本地桌面应用能力。
+Velox 是一个基于 Electron、React 与 TypeScript 构建的高性能桌面端 Markdown 编辑器，目标是提供现代化的沉浸式所见即所得写作体验，同时保留纯粹的源码编辑、灵活的主题定制和完备的本地桌面应用能力。
 
 > 项目仍处于早期开发阶段。欢迎 Star、试用、提交 Issue 或 Pull Request。
 
 ## 预览
 
-Velox 当前提供源码编辑、分栏预览和所见即所得的富文本编辑等三种工作模式，并支持主题色、亮色、黑色和跟随系统外观自动切换。
+Velox 当前提供源码编辑和所见即所得的预览编辑两种工作模式，并支持主题色、亮色、黑色和跟随系统外观自动切换。
 
 ## 特性
 
-- **多编辑模式**：支持源码编辑、源码/预览分栏、所见即所得富文本编辑。
+- **双编辑模式**：支持源码编辑和所见即所得富文本编辑。
 - **Markdown 增强渲染**：支持标题、引用、列表、任务列表、表格、代码块、公式和常见排版能力。
 - **代码块体验**：支持代码高亮、语言标识、自动检测、复制代码、折叠/展开代码块。
 - **预览编辑能力**：基于 ProseMirror 实现文档结构的直接编辑，支持基础块、列表、表格、行内公式与块级公式。

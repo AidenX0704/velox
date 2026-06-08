@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
 import {
   IconCodeStroked,
-  IconColumnsStroked,
   IconEyeOpenedStroked,
   IconExport,
   IconFile,
@@ -30,7 +29,6 @@ interface TitleBarProps {
 
 const modeOptions: Array<SegmentOption<EditorMode>> = [
   { value: 'source', label: editorModeLabels.source, icon: <IconCodeStroked /> },
-  { value: 'split', label: editorModeLabels.split, icon: <IconColumnsStroked /> },
   {
     value: 'preview-edit',
     label: editorModeLabels['preview-edit'],

@@ -147,17 +147,10 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     category: 'navigation'
   },
   {
-    id: 'modeSplit',
-    label: '分栏模式',
-    description: '切换到分栏预览视图',
-    defaultKey: 'Mod+Shift+2',
-    category: 'navigation'
-  },
-  {
     id: 'modePreview',
     label: '预览编辑模式',
     description: '切换到所见即所得视图',
-    defaultKey: 'Mod+Shift+3',
+    defaultKey: 'Mod+Shift+2',
     category: 'navigation'
   }
 ]

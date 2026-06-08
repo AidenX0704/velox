@@ -1,6 +1,6 @@
 import type { EditorPreferences } from '../../../../../shared/preferences'
 
-export type EditorMode = 'source' | 'split' | 'preview-edit'
+export type EditorMode = 'source' | 'preview-edit'
 
 export interface CursorPosition {
   line: number
@@ -9,13 +9,11 @@ export interface CursorPosition {
 
 export interface EditorSession {
   cursor: CursorPosition
-  splitRatio: number
 }
 
 export type MarkdownEditorPreferences = EditorPreferences
 
 export const editorModeLabels: Record<EditorMode, string> = {
   source: '源码',
-  split: '分栏',
   'preview-edit': '预览'
 }

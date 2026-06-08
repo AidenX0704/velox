@@ -25,6 +25,11 @@ export const ipcChannels = {
     listWorkspaces: 'recent:list-workspaces',
     clear: 'recent:clear'
   },
+  history: {
+    listTimeline: 'history:list-timeline',
+    listBranches: 'history:list-branches',
+    getDocumentActivity: 'history:get-document-activity'
+  },
   document: {
     createUntitled: 'document:create-untitled',
     open: 'document:open',
