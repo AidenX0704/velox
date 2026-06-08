@@ -61,7 +61,10 @@ export function createCodeBlockNodeView(
     contentDOM.style.setProperty('--code-language', languageMeta.displayName)
     shell.lineNumbers.textContent = renderCodeLineNumbers(getCodeLineCount(code))
 
-    if (code !== lastRenderedCode || languageMeta.highlightLanguage !== lastRenderedHighlightLanguage) {
+    if (
+      code !== lastRenderedCode ||
+      languageMeta.highlightLanguage !== lastRenderedHighlightLanguage
+    ) {
       lastRenderedCode = code
       lastRenderedHighlightLanguage = languageMeta.highlightLanguage
       highlightLayer.innerHTML = highlightCodeSync(code, languageMeta.highlightLanguage)
@@ -116,6 +119,23 @@ export function createCodeBlockNodeView(
         currentNode
       )
       syncRenderedCode()
+      return true
+    },
+    ignoreMutation(mutation) {
+      if (mutation.type === 'selection') {
+        return false
+      }
+
+      const target = mutation.target
+
+      if (!(target instanceof Node)) {
+        return true
+      }
+
+      if (target === contentDOM || contentDOM.contains(target)) {
+        return mutation.type === 'attributes'
+      }
+
       return true
     },
     destroy() {

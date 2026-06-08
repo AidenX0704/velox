@@ -5,6 +5,7 @@ import type { EditorView } from 'prosemirror-view'
 import type { MarkType, NodeType } from 'prosemirror-model'
 import type { Command } from 'prosemirror-state'
 import { NodeSelection, TextSelection } from 'prosemirror-state'
+import { setBlockType } from 'prosemirror-commands'
 import { wrapInList, liftListItem } from 'prosemirror-schema-list'
 import type { SourceMarkdownFormatAction } from '../source/SourceMarkdownEditor'
 
@@ -69,6 +70,25 @@ function setBlockTypeCommand(nodeType: NodeType, attrs?: Record<string, unknown>
       dispatch(tr)
     }
     return true
+  }
+}
+
+function toggleCodeBlockCommand(): Command {
+  return (state, dispatch) => {
+    const { code_block: codeBlock, paragraph } = state.schema.nodes
+
+    if (!codeBlock || !paragraph) {
+      return false
+    }
+
+    const { $from } = state.selection
+    const parent = $from.parent
+
+    if (parent.type === codeBlock) {
+      return setBlockType(paragraph)(state, dispatch)
+    }
+
+    return setBlockType(codeBlock)(state, dispatch)
   }
 }
 
@@ -342,9 +362,9 @@ export function FormatToolbar({
       return
     }
     if (isBlockActive('code_block')) {
-      execCommand(setBlockTypeCommand(v.state.schema.nodes.paragraph))
+      execCommand(toggleCodeBlockCommand())
     } else {
-      execCommand(setBlockTypeCommand(v.state.schema.nodes.code_block))
+      execCommand(toggleCodeBlockCommand())
     }
   }, [isBlockActive, execCommand, execMarkdownFormat, view])
 
