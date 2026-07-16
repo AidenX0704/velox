@@ -1,16 +1,19 @@
 import { useState } from 'react'
-import { Typography } from '@douyinfe/semi-ui'
+import { Toast, Typography } from '@douyinfe/semi-ui'
 import {
+  IconBellStroked,
   IconBranch,
   IconClock,
+  IconExit,
   IconFile,
-  IconFolderOpenStroked,
   IconFolderStroked,
   IconGit,
-  IconHistory,
-  IconPlusStroked,
+  IconHelpCircleStroked,
+  IconRefresh,
   IconSave,
-  IconSettingStroked
+  IconSearchStroked,
+  IconSettingStroked,
+  IconUserCircleStroked
 } from '@douyinfe/semi-icons'
 import type {
   HistoryBranchRecord,
@@ -19,12 +22,12 @@ import type {
   RecentFileRecord,
   WorkspaceEntry
 } from '../../../shared/types'
-import { BrandLogo } from '../components/BrandLogo'
 import { WorkspaceTree } from './WorkspaceTree'
 
 type AppView = 'editor' | 'recent' | 'settings'
 type SidebarPanelTab = 'workspace' | 'recent'
 type RecentView = 'files' | 'history' | 'branches'
+type ActivityPlaceholder = 'search' | null
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
@@ -71,6 +74,10 @@ function getEventLabel(type: HistoryEventType): string {
   }
 }
 
+function showComingSoon(feature: string): void {
+  Toast.info(`${feature}功能正在规划中`)
+}
+
 interface SidebarProps {
   activeView: AppView
   visible: boolean
@@ -82,9 +89,7 @@ interface SidebarProps {
   historyBranches: HistoryBranchRecord[]
   selectedPath?: string
   expandedPaths?: string[]
-  onNew: () => void
   onOpenEditor: () => void
-  onOpenRecent: () => void
   onOpenSettings: () => void
   onOpenWorkspace: () => void
   onOpenFile: (path: string) => void
@@ -112,9 +117,7 @@ export function Sidebar({
   historyBranches,
   selectedPath,
   expandedPaths,
-  onNew,
   onOpenEditor,
-  onOpenRecent,
   onOpenSettings,
   onOpenWorkspace,
   onOpenFile,
@@ -128,6 +131,8 @@ export function Sidebar({
 }: SidebarProps): React.JSX.Element {
   const [panelTab, setPanelTab] = useState<SidebarPanelTab>('workspace')
   const [recentView, setRecentView] = useState<RecentView>('files')
+  const [activePlaceholder, setActivePlaceholder] = useState<ActivityPlaceholder>(null)
+  const [profileCardVisible, setProfileCardVisible] = useState(false)
   const singleFileEntry: WorkspaceEntry | null =
     !workspaceRoot && selectedPath
       ? {
@@ -136,58 +141,138 @@ export function Sidebar({
           type: 'file'
         }
       : null
+  const isWorkspaceActivityActive =
+    activeView === 'editor' && panelTab === 'workspace' && activePlaceholder === null
+
+  const closeProfileCard = (): void => {
+    setProfileCardVisible(false)
+  }
+
+  const openSettingsFromProfile = (): void => {
+    closeProfileCard()
+    setActivePlaceholder(null)
+    onOpenSettings()
+  }
+
+  const checkForUpdatesFromProfile = async (): Promise<void> => {
+    closeProfileCard()
+    const result = await window.api.updater.checkForUpdates()
+    if (result.ok) {
+      Toast.info(result.data.message)
+    } else {
+      Toast.error(result.error.message)
+    }
+  }
+
+  const openHelp = (): void => {
+    closeProfileCard()
+    void window.api.shell.openExternal('https://velox.app')
+  }
+
+  const showComingSoonFromProfile = (feature: string): void => {
+    closeProfileCard()
+    showComingSoon(feature)
+  }
+
+  const renderProfileCard = (
+    <div className="profile-card" role="menu" aria-label="用户快捷操作">
+      <div className="profile-card-header">
+        <div className="profile-card-avatar" aria-hidden="true">
+          V
+        </div>
+        <div className="profile-card-user">
+          <span className="profile-card-name">Velox 用户</span>
+          <span className="profile-card-meta">本地工作区</span>
+        </div>
+      </div>
+      <div className="profile-card-actions">
+        <button
+          className="profile-card-action"
+          type="button"
+          role="menuitem"
+          onClick={() => showComingSoonFromProfile('个人中心')}
+        >
+          <IconUserCircleStroked />
+          <span>个人中心</span>
+        </button>
+        <button
+          className="profile-card-action"
+          type="button"
+          role="menuitem"
+          onClick={openSettingsFromProfile}
+        >
+          <IconSettingStroked />
+          <span>偏好设置</span>
+        </button>
+        <button
+          className="profile-card-action"
+          type="button"
+          role="menuitem"
+          onClick={() => showComingSoonFromProfile('通知')}
+        >
+          <IconBellStroked />
+          <span>通知中心</span>
+        </button>
+        <button
+          className="profile-card-action"
+          type="button"
+          role="menuitem"
+          onClick={() => void checkForUpdatesFromProfile()}
+        >
+          <IconRefresh />
+          <span>检查更新</span>
+        </button>
+        <button className="profile-card-action" type="button" role="menuitem" onClick={openHelp}>
+          <IconHelpCircleStroked />
+          <span>帮助与反馈</span>
+        </button>
+      </div>
+      <div className="profile-card-footer">
+        <button
+          className="profile-card-action profile-card-action-danger"
+          type="button"
+          role="menuitem"
+          onClick={() => showComingSoonFromProfile('账户')}
+        >
+          <IconExit />
+          <span>退出登录</span>
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <aside className="sidebar" data-visible={visible}>
       <nav className="activity-bar" aria-label="功能导航">
         <div className="activity-bar-top">
           <button
-            className="activity-brand"
-            type="button"
-            title="返回编辑器"
-            aria-label="返回编辑器"
-            onClick={onOpenEditor}
-          >
-            <BrandLogo className="activity-brand-logo" size={28} />
-            <span className="activity-label">编辑</span>
-          </button>
-          <button
             className="activity-item"
-            data-active={activeView === 'editor' && panelTab === 'workspace'}
+            data-active={isWorkspaceActivityActive}
             type="button"
-            title="资源管理器"
-            aria-label="资源管理器"
+            title="文档"
+            aria-label="文档"
             onClick={() => {
               setPanelTab('workspace')
+              setActivePlaceholder(null)
               onOpenEditor()
             }}
           >
-            <IconFolderStroked />
-            <span className="activity-label">资源</span>
+            <IconFile />
+            <span className="activity-label">文档</span>
           </button>
           <button
             className="activity-item"
-            data-active={activeView === 'recent'}
+            data-active={activePlaceholder === 'search'}
             type="button"
-            title="最近文件"
-            aria-label="最近文件"
+            title="搜索"
+            aria-label="搜索"
             onClick={() => {
-              setPanelTab('recent')
-              onOpenRecent()
+              setActivePlaceholder('search')
+              onOpenEditor()
             }}
           >
-            <IconHistory />
-            <span className="activity-label">最近</span>
-          </button>
-          <button
-            className="activity-item"
-            type="button"
-            title="新建文档"
-            aria-label="新建文档"
-            onClick={onNew}
-          >
-            <IconPlusStroked />
-            <span className="activity-label">新建</span>
+            <IconSearchStroked />
+            <span className="activity-label">搜索</span>
           </button>
         </div>
         <div className="activity-bar-bottom">
@@ -197,30 +282,43 @@ export function Sidebar({
             type="button"
             title="设置"
             aria-label="设置"
-            onClick={onOpenSettings}
+            onClick={() => {
+              setActivePlaceholder(null)
+              onOpenSettings()
+            }}
           >
             <IconSettingStroked />
             <span className="activity-label">设置</span>
           </button>
+          <div className="activity-avatar-wrap">
+            <button
+              className="activity-avatar"
+              type="button"
+              title="用户"
+              aria-label={profileCardVisible ? '关闭用户快捷操作' : '打开用户快捷操作'}
+              aria-expanded={profileCardVisible}
+              onClick={() => setProfileCardVisible((current) => !current)}
+            >
+              <span className="activity-avatar-initial">V</span>
+            </button>
+            {profileCardVisible ? renderProfileCard : null}
+          </div>
         </div>
       </nav>
+      {profileCardVisible ? (
+        <button
+          className="profile-card-backdrop"
+          type="button"
+          aria-label="关闭用户快捷操作"
+          onClick={closeProfileCard}
+        />
+      ) : null}
 
       <div className="sidebar-pane">
         <header className="sidebar-pane-header">
           <Typography.Text className="sidebar-pane-title" strong>
             {panelTab === 'workspace' ? '资源管理器' : '最近文件'}
           </Typography.Text>
-          {panelTab === 'workspace' ? (
-            <button
-              className="sidebar-pane-action"
-              type="button"
-              title="打开文件夹"
-              aria-label="打开文件夹"
-              onClick={onOpenWorkspace}
-            >
-              <IconFolderOpenStroked />
-            </button>
-          ) : null}
         </header>
 
         {panelTab === 'workspace' ? (
@@ -413,7 +511,7 @@ export function Sidebar({
         role="separator"
         aria-label="调整资源管理器宽度"
         aria-orientation="vertical"
-        aria-valuemin={180}
+        aria-valuemin={220}
         aria-valuemax={480}
         aria-valuenow={paneWidth}
         tabIndex={visible ? 0 : -1}

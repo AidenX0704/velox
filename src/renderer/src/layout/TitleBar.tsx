@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
+import { Dropdown, Tooltip } from '@douyinfe/semi-ui'
 import {
   IconCodeStroked,
   IconEyeOpenedStroked,
   IconExport,
   IconFile,
+  IconFolderOpenStroked,
   IconImage,
   IconImageStroked,
+  IconMoreStroked,
   IconPdf,
+  IconPlusStroked,
   IconSaveStroked,
-  IconSidebar
+  IconSearchStroked,
+  IconSettingStroked
 } from '@douyinfe/semi-icons'
 import type { ExportFormat } from '../../../shared/export'
 import { Segment, type SegmentOption } from '../components/Segment'
@@ -19,11 +23,13 @@ import { editorModeLabels } from '../modules/editor/model/types'
 interface TitleBarProps {
   mode: EditorMode
   platform: string
-  showSidebar: boolean
   onModeChange: (mode: EditorMode) => void
-  onToggleSidebar: () => void
+  onNew: () => void
   onOpen: () => void
+  onOpenWorkspace: () => void
   onSave: () => void
+  onSearch: () => void
+  onOpenSettings: () => void
   onExport: (format: ExportFormat) => void
 }
 
@@ -47,11 +53,13 @@ function WindowsCaptionIcon({
 export function TitleBar({
   mode,
   platform,
-  showSidebar,
   onModeChange,
-  onToggleSidebar,
+  onNew,
   onOpen,
+  onOpenWorkspace,
   onSave,
+  onSearch,
+  onOpenSettings,
   onExport
 }: TitleBarProps): React.JSX.Element {
   const [isMaximized, setIsMaximized] = useState(false)
@@ -92,60 +100,27 @@ export function TitleBar({
   return (
     <header className="titlebar" data-platform={platform}>
       <div className="titlebar-left">
-        <Tooltip content={showSidebar ? '隐藏左侧面板' : '显示左侧面板'} position="bottom">
-          <button
-            className="titlebar-tool-button"
-            data-active={showSidebar}
-            type="button"
-            aria-label={showSidebar ? '隐藏左侧面板' : '显示左侧面板'}
-            onClick={onToggleSidebar}
-          >
-            <IconSidebar />
-          </button>
-        </Tooltip>
         <div className="titlebar-icon-group" aria-label="文件操作">
           <Tooltip content="打开 Markdown 文件" position="bottom">
-            <Button
-              icon={<IconFile />}
-              size="small"
-              theme="borderless"
+            <button
+              className="titlebar-tool-button"
+              type="button"
               aria-label="打开 Markdown 文件"
               onClick={onOpen}
-            />
+            >
+              <IconFile />
+            </button>
           </Tooltip>
           <Tooltip content="保存当前文档" position="bottom">
-            <Button
-              icon={<IconSaveStroked />}
-              size="small"
-              theme="borderless"
+            <button
+              className="titlebar-tool-button"
+              type="button"
               aria-label="保存当前文档"
               onClick={onSave}
-            />
+            >
+              <IconSaveStroked />
+            </button>
           </Tooltip>
-          <Dropdown
-            position="bottomLeft"
-            render={
-              <Dropdown.Menu>
-                <Dropdown.Item icon={<IconPdf />} onClick={() => onExport('pdf')}>
-                  导出 PDF
-                </Dropdown.Item>
-                <Dropdown.Item icon={<IconImageStroked />} onClick={() => onExport('png')}>
-                  导出 PNG
-                </Dropdown.Item>
-                <Dropdown.Item icon={<IconImage />} onClick={() => onExport('jpeg')}>
-                  导出 JPEG
-                </Dropdown.Item>
-                <Dropdown.Item icon={<IconFile />} onClick={() => onExport('docx')}>
-                  导出 Word
-                </Dropdown.Item>
-                <Dropdown.Item icon={<IconFile />} onClick={() => onExport('html')}>
-                  导出 HTML
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            }
-          >
-            <Button icon={<IconExport />} size="small" theme="borderless" aria-label="导出文档" />
-          </Dropdown>
         </div>
       </div>
       <div className="titlebar-actions">
@@ -157,6 +132,56 @@ export function TitleBar({
           size="small"
           onChange={onModeChange}
         />
+        <Dropdown
+          position="bottomRight"
+          render={
+            <Dropdown.Menu>
+              <Dropdown.Item icon={<IconPlusStroked />} onClick={onNew}>
+                新建文档
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconFile />} onClick={onOpen}>
+                打开文件
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconFolderOpenStroked />} onClick={onOpenWorkspace}>
+                打开文件夹
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconSaveStroked />} onClick={onSave}>
+                保存文档
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconSearchStroked />} onClick={onSearch}>
+                文档内搜索
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item icon={<IconPdf />} onClick={() => onExport('pdf')}>
+                导出 PDF
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconImageStroked />} onClick={() => onExport('png')}>
+                导出 PNG
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconImage />} onClick={() => onExport('jpeg')}>
+                导出 JPEG
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconExport />} onClick={() => onExport('docx')}>
+                导出 Word
+              </Dropdown.Item>
+              <Dropdown.Item icon={<IconExport />} onClick={() => onExport('html')}>
+                导出 HTML
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item icon={<IconSettingStroked />} onClick={onOpenSettings}>
+                偏好设置
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          }
+        >
+          <button
+            className="titlebar-tool-button titlebar-more-button"
+            type="button"
+            aria-label="更多操作"
+          >
+            <IconMoreStroked />
+          </button>
+        </Dropdown>
         <div className="window-controls" aria-label="窗口控制">
           <button
             type="button"

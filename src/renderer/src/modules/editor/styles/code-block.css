@@ -1,19 +1,14 @@
 .markdown-code-block {
-  /* --- 🌈 基础变量：更纯净的背景与更柔和的边框 --- */
-  --code-bg: #f7f8fa;
-  --code-toolbar-bg: #ffffff;
-  --code-toolbar-hover-bg: #f2f3f5;
-  --code-toolbar-active-bg: #e5e6eb;
+  --code-bg: #f8fafc;
+  --code-toolbar-bg: rgba(255, 255, 255, 0.84);
+  --code-toolbar-hover-bg: #eef2f7;
+  --code-toolbar-active-bg: #e2e8f0;
   --code-text: var(--text-primary, #1d2129);
-  --code-muted: #4e5969;
-  --code-border: rgba(29, 33, 41, 0.08);
-  --code-border-strong: rgba(29, 33, 41, 0.15);
+  --code-muted: #64748b;
+  --code-border: rgba(100, 116, 139, 0.18);
+  --code-border-strong: rgba(100, 116, 139, 0.28);
   --code-accent: var(--brand-active, #1677ff);
-
-  /* 阴影：收敛弥散范围，增加 1px 的高光收边 */
-  --code-popover-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
-
-  /* 语法高亮 (保持不变) */
+  --code-popover-shadow: 0 18px 46px rgba(15, 23, 42, 0.14);
   --syntax-keyword: #7c3aed;
   --syntax-string: #047857;
   --syntax-comment: #86909c;
@@ -23,34 +18,34 @@
 
   position: relative;
   overflow: visible;
-  margin: 1.5em 0;
+  margin: 1.55em 0;
   padding: 0 !important;
   border: 1px solid var(--code-border) !important;
   border-radius: 8px !important;
   background: var(--code-bg) !important;
   font-family: var(--code-font-family, ui-monospace, SFMono-Regular, Consolas, monospace);
-  box-shadow: none !important;
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.07) !important;
   transition:
     border-color 140ms ease,
-    background 140ms ease;
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .markdown-code-block:hover,
 .markdown-code-block:focus-within {
   border-color: var(--code-border-strong) !important;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.1) !important;
 }
 
-/* --- 🌙 暗色模式 --- */
 [data-color-mode='dark'] .markdown-code-block {
   --code-bg: #16181d;
-  --code-toolbar-bg: #1e222a;
+  --code-toolbar-bg: rgba(30, 34, 42, 0.9);
   --code-toolbar-hover-bg: #2b303b;
   --code-toolbar-active-bg: #353b47;
   --code-muted: #86909c;
   --code-border: rgba(255, 255, 255, 0.08);
   --code-border-strong: rgba(255, 255, 255, 0.16);
   --code-popover-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
-
   --syntax-keyword: #a78bfa;
   --syntax-string: #34d399;
   --syntax-comment: #9ca3af;
@@ -59,9 +54,12 @@
   --syntax-tag: #fb7185;
 }
 
-/* =========================================
-   🔧 工具栏 (Toolbar)
-========================================= */
+[data-color-mode='dark'] .markdown-code-block,
+[data-color-mode='dark'] .markdown-code-block:hover,
+[data-color-mode='dark'] .markdown-code-block:focus-within {
+  box-shadow: none !important;
+}
+
 .markdown-code-toolbar {
   position: relative;
   z-index: 3;
@@ -144,9 +142,6 @@
   mask-size: contain;
 }
 
-/* =========================================
-   📝 语言选择器 (Language Picker)
-========================================= */
 .markdown-code-language {
   display: inline-flex;
   align-items: center;
@@ -154,7 +149,7 @@
   min-width: 0;
   height: 24px;
   padding: 0 8px;
-  border: none !important; /* 移除外边框，保持清爽 */
+  border: none !important;
   border-radius: 4px;
   color: var(--code-muted);
   background: transparent;
@@ -236,7 +231,6 @@
   opacity: 0.45;
 }
 
-/* 下拉面板 */
 .markdown-code-language-menu {
   position: absolute;
   z-index: 40;
@@ -393,9 +387,6 @@
   color: #86909c;
 }
 
-/* =========================================
-   🔘 操作区与按钮 (Actions)
-========================================= */
 .markdown-code-actions {
   display: flex;
   align-items: center;
@@ -404,7 +395,6 @@
   min-width: 0;
 }
 
-/* 垂直居中、更短更淡的分割线 */
 .markdown-code-action {
   display: inline-flex;
   align-items: center;
@@ -450,7 +440,6 @@
   box-shadow: 0 0 0 2px rgba(var(--theme-accent-rgb, 22, 119, 255), 0.14);
 }
 
-/* 修正原生 span，取消 margin，交由 flex gap 处理 */
 .markdown-code-action span {
   position: absolute;
   width: 1px;
@@ -496,9 +485,6 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
-/* =========================================
-   💡 状态变化 (States)
-========================================= */
 .markdown-code-block[data-collapsed='true'] .markdown-code-title-fold::before,
 .markdown-code-block[data-collapsed='true'] .markdown-code-action-fold::before {
   transform: rotate(-90deg);
@@ -506,7 +492,7 @@
 
 .markdown-code-block[data-wrap='true'] .markdown-code-action-wrap {
   color: var(--code-accent);
-  background: rgba(22, 119, 255, 0.08); /* 选中的浅底色反馈 */
+  background: rgba(22, 119, 255, 0.08);
 }
 
 .markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy {
@@ -514,15 +500,12 @@
 }
 
 .markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy::before {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/xml' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
-/* =========================================
-   💻 代码正文区 (Code Content)
-========================================= */
 .markdown-code-pre {
   display: grid;
-  grid-template-columns: auto 1fr; /* 自适应行号宽度 */
+  grid-template-columns: auto 1fr;
   overflow: auto;
   padding: 0 !important;
   margin: 0;
@@ -533,9 +516,9 @@
 
 .markdown-code-line-numbers {
   display: block;
-  min-width: 40px; /* 留足行号宽度 */
+  min-width: 40px;
   padding: 16px 12px 16px 16px;
-  color: rgba(29, 33, 41, 0.4); /* 更柔和的行号颜色 */
+  color: rgba(100, 116, 139, 0.62);
   font-family: var(--code-font-family);
   font-size: 13.5px;
   line-height: 1.6;
@@ -606,9 +589,6 @@
   display: none;
 }
 
-/* =========================================
-   ✏️ ProseMirror 编辑器兼容
-========================================= */
 .preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-editor-layer,
 .preview-edit-prosemirror .ProseMirror .preview-edit-code-block .markdown-code-highlight-layer {
   display: block;
@@ -681,9 +661,6 @@
   display: none;
 }
 
-/* =========================================
-   🎨 hljs 语法高亮 (保持不变)
-========================================= */
 .markdown-code-block .hljs {
   color: inherit;
   background: transparent;
@@ -744,7 +721,6 @@
   background: rgba(247, 105, 100, 0.12);
 }
 
-/* 移动端适配 */
 @media (hover: none), (max-width: 760px) {
   .markdown-code-actions {
     opacity: 1;

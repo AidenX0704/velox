@@ -5,9 +5,12 @@ import type { EditorView } from 'prosemirror-view'
 import type { MarkType, NodeType } from 'prosemirror-model'
 import type { Command } from 'prosemirror-state'
 import { NodeSelection, TextSelection } from 'prosemirror-state'
+import { isInTable } from 'prosemirror-tables'
 import { setBlockType } from 'prosemirror-commands'
 import { wrapInList, liftListItem } from 'prosemirror-schema-list'
 import type { SourceMarkdownFormatAction } from '../source/SourceMarkdownEditor'
+import { RICH_EDITOR_STATE_EVENT } from './editorEvents'
+import { TableToolbar } from './TableToolbar'
 
 interface FormatToolbarProps {
   view?: EditorView | null
@@ -191,6 +194,7 @@ export function FormatToolbar({
   const [cursorMarks, setCursorMarks] = useState<Set<string>>(new Set())
   const [currentBlockType, setCurrentBlockType] = useState<string>('paragraph')
   const [blockLevel, setBlockLevel] = useState<number>(0)
+  const [tableContext, setTableContext] = useState(false)
 
   useEffect(() => {
     if (!view) return
@@ -218,17 +222,20 @@ export function FormatToolbar({
       }
 
       setCursorMarks(marks)
+      setTableContext(isInTable(view.state))
     }
 
     update()
     view.dom.addEventListener('input', update)
     view.dom.addEventListener('click', update)
     view.dom.addEventListener('keyup', update)
+    view.dom.addEventListener(RICH_EDITOR_STATE_EVENT, update)
 
     return () => {
       view.dom.removeEventListener('input', update)
       view.dom.removeEventListener('click', update)
       view.dom.removeEventListener('keyup', update)
+      view.dom.removeEventListener(RICH_EDITOR_STATE_EVENT, update)
     }
   }, [view])
 
@@ -442,6 +449,10 @@ export function FormatToolbar({
   const canFormat = Boolean(view || onMarkdownFormat)
 
   if (!canFormat) return null
+
+  if (view && tableContext) {
+    return <TableToolbar view={view} />
+  }
 
   return (
     <div className="format-toolbar" onMouseDown={preventFocusLoss}>

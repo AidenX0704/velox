@@ -3,6 +3,8 @@ import { getCodeLanguageMeta } from '../markdown/codeLanguage'
 import { handleCodeBlockAction } from '../rendering/blockActions'
 import { highlightCodeToHtml } from '../rendering/codeHighlight'
 import { getCodeLineCount, renderCodeLineNumbers } from '../rendering/codeBlockModel'
+import { isMermaidLanguage } from '../services/mermaidRenderer'
+import { MermaidDiagram } from './MermaidDiagram'
 
 interface CodeBlockProps {
   code: string
@@ -14,6 +16,14 @@ interface CodeBlockProps {
  * In this mode, the language is read-only as it's driven by the source markdown.
  */
 export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
+  if (isMermaidLanguage(language)) {
+    return <MermaidDiagram definition={code} />
+  }
+
+  return <HighlightedCodeBlock code={code} language={language} />
+}
+
+function HighlightedCodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
   const languageMeta = useMemo(() => getCodeLanguageMeta(language), [language])
   const lineNumbers = useMemo(() => renderCodeLineNumbers(getCodeLineCount(code)), [code])

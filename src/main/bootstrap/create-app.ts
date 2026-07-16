@@ -27,6 +27,14 @@ import { WorkspaceService } from '../services/workspace-service'
 import { WindowManager } from '../windows/window-manager'
 import { ipcChannels } from '../../shared/channels'
 
+const supportedDocumentExtensions = /\.(md|markdown|mdown|mkd|txt)$/i
+let windowManager: WindowManager | undefined
+let pendingOpenFile: string | null = null
+
+function isSupportedDocumentPath(filePath: string): boolean {
+  return supportedDocumentExtensions.test(filePath)
+}
+
 function getOpenFilePathFromArgs(argv: string[]): string | null {
   // On Windows/Linux, the file path is the last argument when opening a file
   // Skip arguments that are flags (start with --)
@@ -41,7 +49,7 @@ function getOpenFilePathFromArgs(argv: string[]): string | null {
     const filePath = isAbsolute(arg) ? arg : resolve(arg)
 
     // Check if it's a markdown file
-    if (/\.(md|markdown|mdown|mkd|txt)$/i.test(filePath)) {
+    if (isSupportedDocumentPath(filePath)) {
       return filePath
     }
   }
@@ -49,7 +57,41 @@ function getOpenFilePathFromArgs(argv: string[]): string | null {
   return null
 }
 
-let pendingOpenFile: string | null = null
+function openDocumentFromSystem(filePath: string): void {
+  if (!isSupportedDocumentPath(filePath)) {
+    return
+  }
+
+  if (!app.isReady()) {
+    pendingOpenFile = filePath
+    return
+  }
+
+  const mainWindow = windowManager?.ensureMainWindow()
+
+  if (!mainWindow) {
+    pendingOpenFile = filePath
+    return
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  mainWindow.focus()
+
+  if (mainWindow.webContents.isLoading()) {
+    pendingOpenFile = filePath
+    return
+  }
+
+  mainWindow.webContents.send(ipcChannels.app.openFile, filePath)
+}
+
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  openDocumentFromSystem(filePath)
+})
 
 export async function createApp(): Promise<void> {
   registerProcessLogging()
@@ -61,7 +103,8 @@ export async function createApp(): Promise<void> {
     return
   }
 
-  const windowManager = new WindowManager()
+  const appWindowManager = new WindowManager()
+  windowManager = appWindowManager
 
   // Check for file path in command line arguments at startup
   const startupFilePath = getOpenFilePathFromArgs(process.argv)
@@ -71,20 +114,21 @@ export async function createApp(): Promise<void> {
   }
 
   app.on('second-instance', (_event, argv) => {
-    const mainWindow = windowManager.ensureMainWindow()
-
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore()
-    }
-
-    mainWindow.focus()
-
     // Get file path from second instance arguments
     const filePath = getOpenFilePathFromArgs(argv)
     if (filePath) {
       logger.info(`File path from second instance: ${filePath}`)
-      mainWindow.webContents.send(ipcChannels.app.openFile, filePath)
+      openDocumentFromSystem(filePath)
+      return
     }
+
+    const mainWindow = windowManager?.ensureMainWindow()
+
+    if (mainWindow?.isMinimized()) {
+      mainWindow.restore()
+    }
+
+    mainWindow?.focus()
   })
 
   await app.whenReady()
@@ -119,11 +163,11 @@ export async function createApp(): Promise<void> {
 
   registerIpc(services)
 
-  new MenuService(windowManager).install()
+  new MenuService(appWindowManager).install()
 
   updaterService.install()
 
-  windowManager.createMainWindow()
+  appWindowManager.createMainWindow()
 
   setTimeout(() => {
     void updaterService.checkForUpdates()
@@ -131,7 +175,7 @@ export async function createApp(): Promise<void> {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      windowManager.createMainWindow()
+      appWindowManager.createMainWindow()
     }
   })
 

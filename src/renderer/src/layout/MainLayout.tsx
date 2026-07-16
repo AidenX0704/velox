@@ -17,6 +17,7 @@ import {
 } from '../features/theme/theme'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
+import { SettingsPage } from './SettingsPanel'
 import { TitleBar } from './TitleBar'
 
 type AppView = 'editor' | 'recent' | 'settings'
@@ -28,20 +29,14 @@ const MarkdownEditor = lazy(() =>
   }))
 )
 
-const SettingsPage = lazy(() =>
-  import('./SettingsPanel').then((module) => ({
-    default: module.SettingsPage
-  }))
-)
-
 const MarkdownPreview = lazy(() =>
   import('../modules/editor/preview/MarkdownPreview').then((module) => ({
     default: module.MarkdownPreview
   }))
 )
 
-const defaultSidebarPaneWidth = 236
-const minSidebarPaneWidth = 180
+const defaultSidebarPaneWidth = 280
+const minSidebarPaneWidth = 220
 const maxSidebarPaneWidth = 480
 const sidebarPaneWidthStorageKey = 'velox:sidebar-pane-width'
 
@@ -87,10 +82,6 @@ function EditorLoadingFallback(): React.JSX.Element {
       </div>
     </div>
   )
-}
-
-function SettingsLoadingFallback(): React.JSX.Element {
-  return <div className="empty-editor" aria-label="正在加载设置" />
 }
 
 function formatActivityTime(value?: string): string {
@@ -286,10 +277,12 @@ export function MainLayout(): React.JSX.Element {
   const [isDragging, setIsDragging] = useState(false)
   const [isResizingSidebar, setIsResizingSidebar] = useState(false)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
+  const [searchRequestId, setSearchRequestId] = useState(0)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
   const editorHostRef = useRef<HTMLElement | null>(null)
+  const revealWorkspacePaneRef = useRef<string | null>(null)
   const updaterManualCheckRef = useRef(false)
   const updaterAvailablePromptRef = useRef<string | undefined>(undefined)
   const updaterInstallPromptRef = useRef<string | undefined>(undefined)
@@ -303,6 +296,7 @@ export function MainLayout(): React.JSX.Element {
     setEditorMode,
     setContent,
     setCursorPosition,
+    setTabScrollTop,
     addTab,
     replaceTabs,
     closeTab,
@@ -323,7 +317,9 @@ export function MainLayout(): React.JSX.Element {
   const openPathRef = useRef<
     ((path: string, options?: { mode?: EditorMode }) => Promise<boolean>) | undefined
   >(undefined)
-  const loadWorkspaceRef = useRef<((path: string) => Promise<void>) | undefined>(undefined)
+  const loadWorkspaceRef = useRef<
+    ((path: string, options?: { revealPane?: boolean }) => Promise<void>) | undefined
+  >(undefined)
   const refreshRecentRef = useRef<
     (() => Promise<import('../../../shared/types').RecentFileRecord[]>) | undefined
   >(undefined)
@@ -381,16 +377,6 @@ export function MainLayout(): React.JSX.Element {
       Toast.error(result.error.message)
     }
   }, [])
-
-  const openRecentView = useCallback((): void => {
-    setActiveView('recent')
-    void refreshRecent().then((files) => {
-      const nextPath = selectedRecentPath ?? files[0]?.path
-      if (nextPath) {
-        void loadRecentActivity(nextPath)
-      }
-    })
-  }, [loadRecentActivity, refreshRecent, selectedRecentPath])
 
   const saveDocument = useCallback(async (): Promise<void> => {
     if (!activeTab) return
@@ -510,8 +496,11 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [findTabByPath, setActiveTabId, addTab, refreshRecent])
 
-  const loadWorkspace = useCallback(async (path: string) => {
+  const loadWorkspace = useCallback(async (path: string, options?: { revealPane?: boolean }) => {
     setWorkspaceRoot(path)
+    if (options?.revealPane) {
+      revealWorkspacePaneRef.current = path
+    }
     const treeResult = await window.api.workspace.getTree(path)
     if (treeResult.ok) {
       setWorkspaceTree(treeResult.data)
@@ -540,7 +529,7 @@ export function MainLayout(): React.JSX.Element {
       return
     }
     if (!result.data) return
-    await loadWorkspace(result.data)
+    await loadWorkspace(result.data, { revealPane: true })
     void refreshRecent()
   }, [loadWorkspace, refreshRecent])
 
@@ -704,14 +693,16 @@ export function MainLayout(): React.JSX.Element {
       if (cancelled) return
       if (result.ok && result.data) {
         setExpandedWorkspacePaths(result.data.expandedPaths)
-        updateSettings({ showSidebar: result.data.sidebarVisible })
+        if (revealWorkspacePaneRef.current === workspaceRoot) {
+          revealWorkspacePaneRef.current = null
+        }
       }
     })
 
     return () => {
       cancelled = true
     }
-  }, [updateSettings, workspaceRoot])
+  }, [workspaceRoot])
 
   useEffect(() => {
     if (!document.path) return
@@ -739,10 +730,10 @@ export function MainLayout(): React.JSX.Element {
       void window.api.workspace.updateState({
         workspacePath: workspaceRoot,
         expandedPaths: expandedWorkspacePaths,
-        sidebarVisible: editorSettings.showSidebar
+        sidebarVisible: true
       })
     }, 250)
-  }, [editorSettings.showSidebar, expandedWorkspacePaths, workspaceRoot])
+  }, [expandedWorkspacePaths, workspaceRoot])
 
   useEffect(() => {
     if (!document.path) return
@@ -785,6 +776,11 @@ export function MainLayout(): React.JSX.Element {
   const openSettingsView = useCallback((): void => {
     setActiveView('settings')
   }, [])
+
+  const triggerDocumentSearch = useCallback((): void => {
+    openEditorView()
+    setSearchRequestId((current) => current + 1)
+  }, [openEditorView])
 
   const handleSidebarResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -1024,6 +1020,11 @@ export function MainLayout(): React.JSX.Element {
         void createDocument()
         return
       }
+      if (e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        triggerDocumentSearch()
+        return
+      }
       if (e.key === 'w') {
         e.preventDefault()
         if (activeTab) {
@@ -1055,11 +1056,6 @@ export function MainLayout(): React.JSX.Element {
         setEditorMode('preview-edit')
         return
       }
-      if (e.key === '\\') {
-        e.preventDefault()
-        updateSettings({ showSidebar: !editorSettings.showSidebar })
-        return
-      }
     }
 
     window.addEventListener('keydown', handleGlobalKeyDown)
@@ -1069,14 +1065,13 @@ export function MainLayout(): React.JSX.Element {
     openDocument,
     createDocument,
     setEditorMode,
-    editorSettings.showSidebar,
-    updateSettings,
     activeTab,
     handleCloseTab,
     switchToNextTab,
     switchToPreviousTab,
     switchToTabByIndex,
-    openEditorView
+    openEditorView,
+    triggerDocumentSearch
   ])
 
   useEffect(() => {
@@ -1287,7 +1282,7 @@ export function MainLayout(): React.JSX.Element {
       if (files.length === 1 && firstFilePath) {
         const statResult = await window.api.workspace.getTree(firstFilePath)
         if (statResult.ok) {
-          await loadWorkspaceRef.current?.(firstFilePath)
+          await loadWorkspaceRef.current?.(firstFilePath, { revealPane: true })
           void refreshRecentRef.current?.()
           return
         }
@@ -1349,13 +1344,15 @@ export function MainLayout(): React.JSX.Element {
     return false
   }, [])
 
+  const isSidebarVisible = true
+
   return (
     <div
       className="app-shell"
       data-color-mode={resolvedAppearanceMode}
       data-appearance-mode={editorSettings.appearanceMode}
       data-platform={platform}
-      data-sidebar-visible={editorSettings.showSidebar}
+      data-sidebar-visible={isSidebarVisible}
       data-view={activeView}
       data-dragging={isDragging}
       data-resizing-sidebar={isResizingSidebar}
@@ -1366,7 +1363,7 @@ export function MainLayout(): React.JSX.Element {
     >
       <Sidebar
         activeView={activeView}
-        visible={editorSettings.showSidebar}
+        visible={isSidebarVisible}
         paneWidth={sidebarPaneWidth}
         workspaceRoot={workspaceRoot}
         workspaceTree={workspaceTree}
@@ -1375,12 +1372,7 @@ export function MainLayout(): React.JSX.Element {
         historyBranches={historyBranches}
         selectedPath={activeView === 'recent' ? selectedRecentPath : document.path}
         expandedPaths={expandedWorkspacePaths}
-        onNew={() => {
-          openEditorView()
-          void createDocument()
-        }}
         onOpenEditor={openEditorView}
-        onOpenRecent={openRecentView}
         onOpenSettings={openSettingsView}
         onOpenWorkspace={() => void openWorkspace()}
         onResizeStart={handleSidebarResizeStart}
@@ -1404,11 +1396,13 @@ export function MainLayout(): React.JSX.Element {
             <TitleBar
               mode={editorMode}
               platform={platform}
-              showSidebar={editorSettings.showSidebar}
               onModeChange={setEditorMode}
-              onToggleSidebar={() => updateSettings({ showSidebar: !editorSettings.showSidebar })}
+              onNew={handleNewTab}
               onOpen={() => void openDocument()}
+              onOpenWorkspace={() => void openWorkspace()}
               onSave={() => void saveDocument()}
+              onSearch={triggerDocumentSearch}
+              onOpenSettings={openSettingsView}
               onExport={(format) => void handleExport(format)}
             />
             <TabBar
@@ -1428,6 +1422,7 @@ export function MainLayout(): React.JSX.Element {
               {activeTab ? (
                 <Suspense fallback={<EditorLoadingFallback />}>
                   <MarkdownEditor
+                    key={activeTab.id}
                     mode={editorMode}
                     dirty={document.dirty}
                     content={document.content}
@@ -1435,8 +1430,11 @@ export function MainLayout(): React.JSX.Element {
                     currentPath={document.path}
                     workspaceRoot={workspaceRoot}
                     anchorTarget={pendingAnchor}
+                    searchRequestId={searchRequestId}
+                    initialScrollTop={activeTab.scrollTop}
                     onChange={setContent}
                     onCursorChange={(position) => setCursorPosition(position.line, position.column)}
+                    onScrollTopChange={(scrollTop) => setTabScrollTop(activeTab.id, scrollTop)}
                     onOpenDocumentLink={openPathFromLink}
                     onLinkError={(message) => Toast.error(message)}
                   />
@@ -1466,18 +1464,16 @@ export function MainLayout(): React.JSX.Element {
             }}
           />
         ) : (
-          <Suspense fallback={<SettingsLoadingFallback />}>
-            <SettingsPage
-              settings={editorSettings}
-              updaterStatus={updaterStatus}
-              onBack={openEditorView}
-              onChange={(nextSettings) => {
-                updateSettings(nextSettings)
-              }}
-              onReset={() => void resetSettings()}
-              onCheckForUpdates={() => void checkForUpdates()}
-            />
-          </Suspense>
+          <SettingsPage
+            settings={editorSettings}
+            updaterStatus={updaterStatus}
+            onBack={openEditorView}
+            onChange={(nextSettings) => {
+              updateSettings(nextSettings)
+            }}
+            onReset={() => void resetSettings()}
+            onCheckForUpdates={() => void checkForUpdates()}
+          />
         )}
       </main>
       <Modal

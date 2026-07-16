@@ -2,17 +2,19 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { searchKeymap } from '@codemirror/search'
-import { Compartment, EditorState } from '@codemirror/state'
-import type { Extension } from '@codemirror/state'
+import { Compartment, EditorState, StateField } from '@codemirror/state'
+import type { Extension, Text } from '@codemirror/state'
 import {
+  Decoration,
   EditorView,
   highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
   lineNumbers
 } from '@codemirror/view'
+import type { DecorationSet } from '@codemirror/view'
 import type { CursorPosition } from '../model/types'
+import { findTextSearchMatches } from '../services/documentSearch'
 
 function wrapSelection(view: EditorView, before: string, after: string): boolean {
   const { from, to } = view.state.selection.main
@@ -178,9 +180,14 @@ interface SourceMarkdownEditorProps {
   showLineNumbers: boolean
   fontSize: number
   lineHeight: number
+  searchQuery?: string
+  activeSearchMatchIndex?: number
+  initialScrollTop?: number
   onChange: (value: string) => void
   onCursorChange: (position: CursorPosition) => void
   onScrollRatioChange?: (ratio: number) => void
+  onScrollTopChange?: (scrollTop: number) => void
+  onSearchMatchCountChange?: (count: number) => void
 }
 
 export interface SourceMarkdownEditorHandle {
@@ -201,9 +208,14 @@ export const SourceMarkdownEditor = forwardRef<
     showLineNumbers,
     fontSize,
     lineHeight,
+    searchQuery = '',
+    activeSearchMatchIndex = 0,
+    initialScrollTop = 0,
     onChange,
     onCursorChange,
-    onScrollRatioChange
+    onScrollRatioChange,
+    onScrollTopChange,
+    onSearchMatchCountChange
   },
   ref
 ): React.JSX.Element {
@@ -212,11 +224,17 @@ export const SourceMarkdownEditor = forwardRef<
   const onChangeRef = useRef(onChange)
   const onCursorChangeRef = useRef(onCursorChange)
   const onScrollRatioChangeRef = useRef(onScrollRatioChange)
+  const onScrollTopChangeRef = useRef(onScrollTopChange)
+  const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange)
   const valueRef = useRef(value)
+  const initialScrollTopRef = useRef(initialScrollTop)
+  const searchQueryRef = useRef(searchQuery)
+  const activeSearchMatchIndexRef = useRef(activeSearchMatchIndex)
   const initialOptionsRef = useRef({ fontSize, lineHeight, showLineNumbers, wordWrap })
   const lineNumbersCompartmentRef = useRef(new Compartment())
   const wrappingCompartmentRef = useRef(new Compartment())
   const themeCompartmentRef = useRef(new Compartment())
+  const searchCompartmentRef = useRef(new Compartment())
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -229,6 +247,14 @@ export const SourceMarkdownEditor = forwardRef<
   useEffect(() => {
     onScrollRatioChangeRef.current = onScrollRatioChange
   }, [onScrollRatioChange])
+
+  useEffect(() => {
+    onScrollTopChangeRef.current = onScrollTopChange
+  }, [onScrollTopChange])
+
+  useEffect(() => {
+    onSearchMatchCountChangeRef.current = onSearchMatchCountChange
+  }, [onSearchMatchCountChange])
 
   useImperativeHandle(ref, () => ({
     scrollToRatio(ratio: number) {
@@ -298,13 +324,19 @@ export const SourceMarkdownEditor = forwardRef<
         markdown(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         highlightActiveLine(),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+        keymap.of([...defaultKeymap, ...historyKeymap]),
         markdownKeymap,
+        searchCompartmentRef.current.of(
+          createSearchHighlightExtension(searchQueryRef.current, activeSearchMatchIndexRef.current)
+        ),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const nextValue = update.state.doc.toString()
             valueRef.current = nextValue
             onChangeRef.current(nextValue)
+            onSearchMatchCountChangeRef.current?.(
+              findTextSearchMatches(nextValue, searchQueryRef.current).length
+            )
           }
 
           if (update.selectionSet || update.docChanged || update.focusChanged) {
@@ -329,18 +361,46 @@ export const SourceMarkdownEditor = forwardRef<
     })
     const handleScroll = (): void => {
       onScrollRatioChangeRef.current?.(getScrollRatio(view.scrollDOM))
+      onScrollTopChangeRef.current?.(view.scrollDOM.scrollTop)
     }
+    const restoreScrollFrame = window.requestAnimationFrame(() => {
+      view.scrollDOM.scrollTop = initialScrollTopRef.current
+    })
 
     viewRef.current = view
     view.scrollDOM.addEventListener('scroll', handleScroll, { passive: true })
     onCursorChangeRef.current(getCursorPosition(view))
 
     return () => {
+      window.cancelAnimationFrame(restoreScrollFrame)
       view.scrollDOM.removeEventListener('scroll', handleScroll)
       view.destroy()
       viewRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const view = viewRef.current
+    searchQueryRef.current = searchQuery
+    activeSearchMatchIndexRef.current = activeSearchMatchIndex
+
+    const matches = findTextSearchMatches(
+      view?.state.doc.toString() ?? valueRef.current,
+      searchQuery
+    )
+    onSearchMatchCountChangeRef.current?.(matches.length)
+
+    if (!view) {
+      return
+    }
+
+    view.dispatch({
+      effects: searchCompartmentRef.current.reconfigure(
+        createSearchHighlightExtension(searchQuery, activeSearchMatchIndex)
+      )
+    })
+    scrollToSourceSearchMatch(view, matches, activeSearchMatchIndex)
+  }, [activeSearchMatchIndex, searchQuery])
 
   useEffect(() => {
     const view = viewRef.current
@@ -380,6 +440,60 @@ export const SourceMarkdownEditor = forwardRef<
 
 function createLineNumberExtensions(showLineNumbers: boolean): Extension {
   return showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []
+}
+
+function createSearchHighlightExtension(query: string, activeIndex: number): Extension {
+  if (!query.trim()) {
+    return []
+  }
+
+  return StateField.define<DecorationSet>({
+    create(state) {
+      return createSearchDecorations(state.doc, query, activeIndex)
+    },
+    update(decorations, transaction) {
+      if (transaction.docChanged) {
+        return createSearchDecorations(transaction.state.doc, query, activeIndex)
+      }
+
+      return decorations.map(transaction.changes)
+    },
+    provide: (field) => EditorView.decorations.from(field)
+  })
+}
+
+function createSearchDecorations(doc: Text, query: string, activeIndex: number): DecorationSet {
+  const matches = findTextSearchMatches(doc.toString(), query)
+  const safeActiveIndex = matches.length > 0 ? Math.min(activeIndex, matches.length - 1) : -1
+
+  return Decoration.set(
+    matches.map((match, index) =>
+      Decoration.mark({
+        class:
+          index === safeActiveIndex
+            ? 'editor-search-match editor-search-match-active'
+            : 'editor-search-match'
+      }).range(match.from, match.to)
+    ),
+    true
+  )
+}
+
+function scrollToSourceSearchMatch(
+  view: EditorView,
+  matches: ReturnType<typeof findTextSearchMatches>,
+  activeIndex: number
+): void {
+  if (matches.length === 0) {
+    return
+  }
+
+  const match = matches[Math.min(activeIndex, matches.length - 1)]
+
+  view.dispatch({
+    selection: { anchor: match.from, head: match.to },
+    effects: EditorView.scrollIntoView(match.from, { y: 'center', yMargin: 96 })
+  })
 }
 
 function createEditorTheme(fontSize: number, lineHeight: number): Extension {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import type { InputRule } from 'prosemirror-inputrules'
 import type { Transaction } from 'prosemirror-state'
 import { EditorState } from 'prosemirror-state'
+import { CellSelection, mergeCells } from 'prosemirror-tables'
 import {
   createMarkdownInputRules,
   normalizeRichMarkdown,
@@ -9,6 +10,7 @@ import {
   richMarkdownSchema,
   serializeRichMarkdown
 } from './markdownModel'
+import { renderMultimdTableBlocks } from '../markdown/multimdTable'
 
 interface MarkdownFixture {
   name: string
@@ -62,6 +64,21 @@ const fixtures: MarkdownFixture[] = [
     includes: ['| 名称 | 值 |', '| **A** | `1` |']
   },
   {
+    name: 'table alignment',
+    input: ['| 左 | 中 | 右 |', '| :--- | :---: | ---: |', '| A | B | 100 |'].join('\n'),
+    includes: ['| :--- | :---: | ---: |', '| A | B | 100 |']
+  },
+  {
+    name: 'merged table cells',
+    input: [
+      '| 阶段 | 进度 | 说明 |',
+      '| :--- | :---: | --- |',
+      '| 设计 || 已完成 |',
+      '| ^^ | 开发 | 进行中 |'
+    ].join('\n'),
+    includes: ['| 设计 || 已完成 |', '| ^^ | 开发 | 进行中 |']
+  },
+  {
     name: 'math block and inline math',
     input: ['行内公式 $a+b$', '', '$$', 'E=mc^2', '$$'].join('\n'),
     includes: ['$a+b$', '$$', 'E=mc^2']
@@ -81,6 +98,30 @@ for (const fixture of fixtures) {
     )
   }
 }
+
+const renderedMergedTable = renderMultimdTableBlocks(
+  ['| A | B | C |', '| --- | :---: | ---: |', '| 合并 || 3 |', '| ^^ | 2 | 4 |'].join('\n')
+)
+
+assert.match(renderedMergedTable, /colspan="2"/)
+assert.match(renderedMergedTable, /rowspan="2"/)
+assert.match(renderedMergedTable, /align="center"/)
+
+assertMergedCellSerialization({
+  name: 'horizontal merge command',
+  markdown: ['| H1 | H2 | H3 |', '| --- | --- | --- |', '| A | B | C |'].join('\n'),
+  anchorCellIndex: 3,
+  headCellIndex: 4,
+  expected: '|| C |'
+})
+
+assertMergedCellSerialization({
+  name: 'vertical merge command',
+  markdown: ['| H1 | H2 |', '| --- | --- |', '| A | B |', '| C | D |'].join('\n'),
+  anchorCellIndex: 2,
+  headCellIndex: 4,
+  expected: '| ^^ | D |'
+})
 
 assertInputRule({
   name: 'horizontal rule input',
@@ -104,6 +145,52 @@ assertInputRule({
 })
 
 console.log(`rich markdown fixtures passed: ${fixtures.length}`)
+
+function assertMergedCellSerialization({
+  name,
+  markdown,
+  anchorCellIndex,
+  headCellIndex,
+  expected
+}: {
+  name: string
+  markdown: string
+  anchorCellIndex: number
+  headCellIndex: number
+  expected: string
+}): void {
+  const doc = parseRichMarkdown(markdown)
+  const cellPositions: number[] = []
+
+  doc.descendants((node, position) => {
+    if (node.type.spec.tableRole === 'cell' || node.type.spec.tableRole === 'header_cell') {
+      cellPositions.push(position)
+    }
+  })
+
+  const state = EditorState.create({
+    doc,
+    schema: richMarkdownSchema,
+    selection: CellSelection.create(
+      doc,
+      cellPositions[anchorCellIndex],
+      cellPositions[headCellIndex]
+    )
+  })
+  let nextState = state
+
+  assert.equal(
+    mergeCells(state, (transaction) => {
+      nextState = state.apply(transaction)
+    }),
+    true,
+    `${name}: expected merge command to be available`
+  )
+  assert.ok(
+    serializeRichMarkdown(nextState.doc).includes(expected),
+    `${name}: expected serialized markdown to include ${expected}`
+  )
+}
 
 function assertInputRule({
   name,

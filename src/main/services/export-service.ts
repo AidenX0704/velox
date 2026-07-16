@@ -976,7 +976,15 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
     }
 
     body {
-      padding: 42px 30px;
+      padding: 48px 30px 64px;
+      color: #1e293b;
+      font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      line-height: 1.72;
     }
 
     .markdown-export {
@@ -992,19 +1000,36 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
     h6 {
       margin: 1.55em 0 0.6em;
       color: #0f172a;
-      line-height: 1.28;
+      font-weight: 760;
+      line-height: 1.2;
+      letter-spacing: 0;
       break-after: avoid;
     }
 
     h1 {
       margin-top: 0;
-      padding-bottom: 0.35em;
-      border-bottom: 1px solid #e2e8f0;
-      font-size: 2rem;
+      padding-bottom: 0.42em;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+      font-size: 2.35rem;
+      line-height: 1.08;
     }
 
     h2 {
-      font-size: 1.55rem;
+      position: relative;
+      padding-bottom: 0.34em;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      font-size: 1.68rem;
+    }
+
+    h2::after {
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 56px;
+      height: 2px;
+      border-radius: 999px;
+      background: rgba(22, 119, 255, 0.26);
+      content: "";
     }
 
     h3 {
@@ -1015,6 +1040,9 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
     ul,
     ol,
     blockquote,
+    details,
+    dl,
+    figure,
     table,
     pre {
       margin-top: 0;
@@ -1026,25 +1054,79 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
       text-decoration: none;
     }
 
+    a:hover {
+      text-decoration: underline;
+    }
+
     blockquote {
-      padding: 0.2em 0 0.2em 1em;
-      border-left: 4px solid #cbd5e1;
+      padding: 0.9em 1.05em 0.9em 1.2em;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-left: 4px solid rgba(22, 119, 255, 0.5);
+      border-radius: 8px;
       color: #475569;
+      background: linear-gradient(90deg, rgba(22, 119, 255, 0.08), transparent 58%), #ffffff;
+      break-inside: avoid;
+    }
+
+    blockquote > :first-child {
+      margin-top: 0;
+    }
+
+    blockquote > :last-child {
+      margin-bottom: 0;
+    }
+
+    details {
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 8px;
+      background: #ffffff;
+      break-inside: avoid;
+    }
+
+    summary {
+      min-height: 42px;
+      padding: 10px 14px;
+      cursor: pointer;
+      color: #0f172a;
+      font-weight: 720;
+    }
+
+    details[open] summary {
+      border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+      background: #f8fafc;
     }
 
     img {
       display: block;
       max-width: 100%;
       height: auto;
-      margin: 1.2em auto;
-      border-radius: 6px;
+      margin: 1.45em auto;
+      border-radius: 8px;
+      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
+    }
+
+    figure:not(.markdown-code-block) {
+      margin: 1.7em 0;
+      break-inside: avoid;
+    }
+
+    figure:not(.markdown-code-block) > img {
+      margin-bottom: 0.65em;
+    }
+
+    figure:not(.markdown-code-block) > figcaption {
+      color: #64748b;
+      font-size: 0.88em;
+      text-align: center;
     }
 
     code {
-      padding: 0.12em 0.32em;
-      border-radius: 4px;
-      color: #334155;
-      background: #f1f5f9;
+      padding: 0.13em 0.42em;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 6px;
+      color: #b45309;
+      background: rgba(148, 163, 184, 0.13);
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
       font-size: 0.9em;
     }
@@ -1052,10 +1134,11 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
     pre.markdown-code-block {
       overflow: auto;
       padding: 14px 16px;
-      border: 1px solid #e2e8f0;
+      border: 1px solid rgba(100, 116, 139, 0.18);
       border-radius: 8px;
       background: #f8fafc;
       break-inside: avoid;
+      box-shadow: 0 18px 46px rgba(15, 23, 42, 0.07);
     }
 
     pre.markdown-code-block code {
@@ -1068,16 +1151,30 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
 
     table {
       width: 100%;
-      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-spacing: 0;
+      border-collapse: separate;
+      border-radius: 8px;
       break-inside: avoid;
     }
 
     th,
     td {
-      padding: 8px 10px;
-      border: 1px solid #cbd5e1;
+      padding: 10px 12px;
+      border-right: 1px solid rgba(148, 163, 184, 0.24);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.24);
       text-align: left;
       vertical-align: top;
+    }
+
+    th:last-child,
+    td:last-child {
+      border-right: 0;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
     }
 
     th {
@@ -1085,8 +1182,128 @@ function createExportCss(pageSize: ExportPdfPageSize): string {
       font-weight: 700;
     }
 
+    tbody tr:nth-child(even) {
+      background: rgba(148, 163, 184, 0.05);
+    }
+
     input[type='checkbox'] {
       margin-right: 0.45em;
+    }
+
+    kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.9em;
+      padding: 0.14em 0.5em;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-bottom: 2px solid rgba(100, 116, 139, 0.45);
+      border-radius: 6px;
+      color: #0f172a;
+      background: #ffffff;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.78em;
+      font-weight: 650;
+      vertical-align: 0.08em;
+    }
+
+    mark {
+      padding: 0.06em 0.28em;
+      border-radius: 5px;
+      color: #0f172a;
+      background: linear-gradient(180deg, transparent 24%, rgba(250, 204, 21, 0.3) 24%);
+    }
+
+    abbr[title] {
+      cursor: help;
+      text-decoration: underline dotted #64748b;
+      text-underline-offset: 0.16em;
+    }
+
+    time {
+      color: #64748b;
+      font-variant-numeric: tabular-nums;
+    }
+
+    ins {
+      padding: 0 0.12em;
+      border-radius: 4px;
+      background: rgba(34, 197, 94, 0.12);
+      text-decoration: none;
+    }
+
+    s,
+    strike,
+    del {
+      text-decoration: line-through;
+      text-decoration-color: rgba(30, 41, 59, 0.68);
+    }
+
+    q {
+      color: #0f172a;
+      quotes: '"' '"' "'" "'";
+    }
+
+    q::before,
+    q::after {
+      color: #64748b;
+    }
+
+    samp,
+    tt,
+    var {
+      padding: 0.08em 0.28em;
+      border-radius: 5px;
+      background: rgba(148, 163, 184, 0.13);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.9em;
+    }
+
+    var {
+      color: #0f172a;
+      font-style: italic;
+    }
+
+    ruby {
+      ruby-align: center;
+    }
+
+    rt {
+      color: #64748b;
+      font-size: 0.62em;
+      line-height: 1.2;
+    }
+
+    rp {
+      color: #64748b;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: minmax(120px, 0.32fr) minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 8px;
+      background: #ffffff;
+      break-inside: avoid;
+    }
+
+    dt,
+    dd {
+      min-width: 0;
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    }
+
+    dt {
+      color: #64748b;
+      background: #f8fafc;
+      font-weight: 720;
+    }
+
+    dd {
+      overflow-wrap: anywhere;
     }
 
     .katex-display {

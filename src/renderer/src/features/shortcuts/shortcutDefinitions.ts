@@ -38,13 +38,6 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     defaultKey: 'Mod+N',
     category: 'global'
   },
-  {
-    id: 'toggleSidebar',
-    label: '切换侧边栏',
-    description: '显示或隐藏左侧导航面板',
-    defaultKey: 'Mod+\\',
-    category: 'global'
-  },
 
   {
     id: 'bold',

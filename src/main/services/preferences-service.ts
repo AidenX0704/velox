@@ -4,6 +4,7 @@ import {
   type EditorPreferences,
   type EditorPreferencesPatch
 } from '../../shared/preferences'
+import type { ExportPreferences } from '../../shared/export'
 import { PreferencesRepository } from '../database/repositories/preferences-repository'
 
 const editorPreferencesKey = 'editorPreferences'
@@ -15,13 +16,33 @@ export class PreferencesService {
     const stored = this.preferencesRepository.get<Partial<EditorPreferences>>(editorPreferencesKey)
     const hasExistingPreferences = stored !== undefined
 
+    // Filter out unknown keys from stored preferences to avoid carrying over legacy settings
+    const cleanStored: Partial<EditorPreferences> = {}
+    if (stored) {
+      for (const key of Object.keys(defaultEditorPreferences)) {
+        if (key !== 'export' && key in stored) {
+          ;(cleanStored as any)[key] = (stored as any)[key]
+        }
+      }
+    }
+
+    // Filter out unknown keys from stored export preferences
+    const cleanExport: Partial<ExportPreferences> = {}
+    if (stored?.export) {
+      for (const key of Object.keys(defaultEditorPreferences.export)) {
+        if (key in stored.export) {
+          cleanExport[key] = (stored.export as any)[key]
+        }
+      }
+    }
+
     const preferences = {
       ...defaultEditorPreferences,
       hasSeenWelcome: hasExistingPreferences,
-      ...stored,
+      ...cleanStored,
       export: {
         ...defaultEditorPreferences.export,
-        ...stored?.export
+        ...cleanExport
       }
     }
 

@@ -1,18 +1,21 @@
 .markdown-frontmatter {
-  margin: 0 0 24px;
+  margin: 0 0 28px;
   overflow: hidden;
-  border: 1px solid var(--markdown-color-border);
+  border: 1px solid var(--markdown-token-border, var(--markdown-color-border));
   border-radius: 8px;
-  background: var(--surface-raised);
+  background:
+    linear-gradient(180deg, rgba(var(--theme-accent-rgb, 22, 119, 255), 0.06), transparent 72px),
+    var(--surface-raised);
+  box-shadow: var(--markdown-card-shadow, none);
 }
 
 .markdown-frontmatter-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--markdown-color-border);
-  background: var(--markdown-color-background-mute);
+  gap: 8px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--markdown-token-border, var(--markdown-color-border));
+  background: transparent;
 }
 
 .markdown-frontmatter-kicker {
@@ -29,7 +32,7 @@
   padding: 0 !important;
   border: 0 !important;
   color: var(--markdown-color-text);
-  font-size: 1.35em !important;
+  font-size: 1.45em !important;
   line-height: 1.25 !important;
 }
 
@@ -54,8 +57,8 @@
 .markdown-frontmatter-row dt,
 .markdown-frontmatter-row dd {
   min-width: 0;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--markdown-color-border);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--markdown-token-border, var(--markdown-color-border));
 }
 
 .markdown-frontmatter-row:last-child dt,
@@ -65,7 +68,7 @@
 
 .markdown-frontmatter-row dt {
   color: var(--markdown-color-text-muted);
-  background: var(--markdown-color-background-mute);
+  background: rgba(148, 163, 184, 0.07);
   font-size: 12px;
   font-weight: 700;
 }
@@ -78,14 +81,14 @@
 .markdown-frontmatter-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 7px;
 }
 
 .markdown-frontmatter-list code {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 2px 7px !important;
+  min-height: 24px;
+  padding: 2px 8px !important;
   margin: 0 !important;
   border: 1px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.18);
   border-radius: 999px !important;

@@ -19,6 +19,7 @@ function createTabState(
     editorMode,
     cursorLine: 1,
     cursorColumn: 1,
+    scrollTop: 0,
     pinned
   }
 }
@@ -50,6 +51,7 @@ export function useTabs(): {
   setEditorMode: (mode: EditorMode) => void
   setContent: (content: string) => void
   setCursorPosition: (line: number, column: number) => void
+  setTabScrollTop: (tabId: string, scrollTop: number) => void
   addTab: (document: TabDocument, editorMode?: EditorMode, pinned?: boolean) => string
   replaceTabs: (documents: Array<{ document: TabDocument; editorMode?: EditorMode }>) => void
   closeTab: (tabId: string, options?: { force?: boolean }) => boolean
@@ -269,6 +271,20 @@ export function useTabs(): {
     )
   }, [])
 
+  const setTabScrollTop = useCallback((tabId: string, scrollTop: number): void => {
+    const nextScrollTop = Math.max(0, scrollTop)
+
+    setTabs((prev) => {
+      const tab = prev.find((item) => item.id === tabId)
+
+      if (!tab || Math.abs(tab.scrollTop - nextScrollTop) < 0.5) {
+        return prev
+      }
+
+      return prev.map((item) => (item.id === tabId ? { ...item, scrollTop: nextScrollTop } : item))
+    })
+  }, [])
+
   const updateTabDocument = useCallback((tabId: string, document: Partial<TabDocument>): void => {
     setTabs((prev) =>
       prev.map((t) =>
@@ -291,6 +307,7 @@ export function useTabs(): {
     setEditorMode,
     setContent,
     setCursorPosition,
+    setTabScrollTop,
     addTab,
     replaceTabs,
     closeTab,

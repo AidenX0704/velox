@@ -6,4 +6,6 @@
 @import './markdown-content.css';
 @import './link-preview.css';
 @import './code-block.css';
+@import './diagram.css';
 @import './format-toolbar.css';
+@import './search.css';

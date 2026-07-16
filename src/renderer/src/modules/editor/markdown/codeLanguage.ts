@@ -27,7 +27,8 @@ export const commonCodeLanguages = [
   'bash',
   'powershell',
   'dockerfile',
-  'diff'
+  'diff',
+  'mermaid'
 ] as const
 
 const languageAliases: Record<string, string> = {
@@ -52,7 +53,8 @@ const languageAliases: Record<string, string> = {
   html: 'xml',
   svg: 'xml',
   vue: 'xml',
-  patch: 'diff'
+  patch: 'diff',
+  mmd: 'mermaid'
 }
 
 const displayNames: Record<string, string> = {
@@ -91,6 +93,10 @@ function toCssIdentifier(language: string): string {
 }
 
 function getLanguageKind(language: string): string {
+  if (language === 'mermaid') {
+    return 'diagram'
+  }
+
   if (['javascript', 'typescript', 'python', 'ruby', 'php', 'lua', 'perl'].includes(language)) {
     return 'script'
   }

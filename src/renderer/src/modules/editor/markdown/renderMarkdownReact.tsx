@@ -21,6 +21,7 @@ import {
 } from './MarkdownRenderComponents'
 import { slugifyHeading } from '../rendering/headingAnchors'
 import { markdownSanitizeSchema } from './sanitizeSchema'
+import { renderMultimdTableBlocks } from './multimdTable'
 
 const headingSlugCounts = new Map<string, number>()
 const Heading = {
@@ -66,7 +67,7 @@ export function renderMarkdownReact(content: string): ReactNode {
         blockquote: MarkdownBlockquote
       }
     })
-    .processSync(body)
+    .processSync(renderMultimdTableBlocks(body))
 
   if (frontmatter.length > 0) {
     return (

@@ -1,5 +1,6 @@
 import katex from 'katex'
 import MarkdownIt from 'markdown-it'
+import multimdTable from 'markdown-it-multimd-table'
 import texmath from 'markdown-it-texmath'
 import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules'
 import {
@@ -11,7 +12,7 @@ import {
 } from 'prosemirror-markdown'
 import { type Mark, type Node as ProseMirrorNode, Schema } from 'prosemirror-model'
 import { TextSelection } from 'prosemirror-state'
-import { tableNodes } from 'prosemirror-tables'
+import { TableMap, tableNodes } from 'prosemirror-tables'
 
 export const richMarkdownSchema = createMarkdownSchema()
 const markdownParser = createMarkdownParser()
@@ -136,7 +137,24 @@ function createMarkdownSchema(): Schema {
         tableNodes({
           tableGroup: 'block',
           cellContent: 'inline*',
-          cellAttributes: {}
+          cellAttributes: {
+            align: {
+              default: null,
+              validate: (value) => {
+                if (value !== null && !['left', 'center', 'right'].includes(String(value))) {
+                  throw new TypeError('Invalid table cell alignment')
+                }
+              },
+              getFromDOM: (dom) => normalizeTableAlignment(dom.getAttribute('align')),
+              setDOMAttr: (value, attrs) => {
+                const alignment = normalizeTableAlignment(value)
+
+                if (alignment) {
+                  attrs.align = alignment
+                }
+              }
+            }
+          }
         })
       ),
     marks: markdownSchema.spec.marks.append({
@@ -165,6 +183,12 @@ function createMarkdownParser(): MarkdownParser {
     breaks: false
   })
     .enable('table')
+    .use(multimdTable, {
+      rowspan: true,
+      multiline: false,
+      headerless: false,
+      multibody: true
+    })
     .use(texmath, {
       engine: katex,
       delimiters: ['dollars', 'brackets', 'beg_end', 'gitlab'],
@@ -247,8 +271,8 @@ function createMarkdownParser(): MarkdownParser {
     },
     table: { block: 'table' },
     tr: { block: 'table_row' },
-    th: { block: 'table_header' },
-    td: { block: 'table_cell' },
+    th: { block: 'table_header', getAttrs: getTableCellTokenAttrs },
+    td: { block: 'table_cell', getAttrs: getTableCellTokenAttrs },
     thead: { ignore: true },
     tbody: { ignore: true },
     s: { mark: 'strikethrough' },
@@ -339,46 +363,125 @@ function writeMarkdownTable(
   state: Parameters<MarkdownSerializer['nodes']['table']>[0],
   tableNode: ProseMirrorNode
 ): void {
-  const rows: string[][] = []
+  const tableMap = TableMap.get(tableNode)
 
-  tableNode.forEach((rowNode) => {
-    const row: string[] = []
-
-    rowNode.forEach((cellNode) => {
-      row.push(serializeTableCell(cellNode))
-    })
-
-    if (row.length > 0) {
-      rows.push(row)
-    }
-  })
-
-  if (rows.length === 0) {
+  if (tableMap.width === 0 || tableMap.height === 0) {
     return
   }
 
-  const columnCount = Math.max(...rows.map((row) => row.length))
-  const normalizedRows = rows.map((row) => normalizeTableRow(row, columnCount))
+  const rows = Array.from({ length: tableMap.height }, (_, rowIndex) =>
+    serializeTableRow(tableNode, tableMap, rowIndex)
+  )
+  const alignments = Array.from({ length: tableMap.width }, (_, columnIndex) => {
+    const cellPosition = tableMap.map[columnIndex]
+    const cell = tableNode.nodeAt(cellPosition)
+
+    return normalizeTableAlignment(cell?.attrs.align)
+  })
 
   state.ensureNewLine()
-  state.write(formatTableRow(normalizedRows[0]))
+  state.write(rows[0])
   state.write('\n')
-  state.write(formatTableRow(Array.from({ length: columnCount }, () => '---')))
+  state.write(formatTableRow(alignments.map(formatTableAlignmentDelimiter)))
 
-  for (const row of normalizedRows.slice(1)) {
+  for (const row of rows.slice(1)) {
     state.write('\n')
-    state.write(formatTableRow(row))
+    state.write(row)
   }
 
   state.closeBlock(tableNode)
 }
 
-function normalizeTableRow(row: string[], columnCount: number): string[] {
-  return Array.from({ length: columnCount }, (_, index) => row[index] ?? '')
+interface SerializedTableCell {
+  content: string
+  colspan: number
+  rowspanPlaceholder?: boolean
+}
+
+function serializeTableRow(
+  tableNode: ProseMirrorNode,
+  tableMap: TableMap,
+  rowIndex: number
+): string {
+  const cells: SerializedTableCell[] = []
+
+  for (let columnIndex = 0; columnIndex < tableMap.width; columnIndex++) {
+    const cellPosition = tableMap.map[rowIndex * tableMap.width + columnIndex]
+    const originIndex = tableMap.map.indexOf(cellPosition)
+    const originRow = Math.floor(originIndex / tableMap.width)
+    const originColumn = originIndex % tableMap.width
+    const cell = tableNode.nodeAt(cellPosition)
+
+    if (!cell || originColumn !== columnIndex) {
+      continue
+    }
+
+    const colspan = Math.max(Number(cell.attrs.colspan) || 1, 1)
+
+    if (originRow === rowIndex) {
+      cells.push({ content: serializeTableCell(cell), colspan })
+    } else {
+      cells.push({ content: '^^', colspan: 1, rowspanPlaceholder: true })
+    }
+
+    columnIndex += colspan - 1
+  }
+
+  let output = '|'
+
+  for (const cell of cells) {
+    output += ` ${cell.content.trim() || ' '} |`
+
+    if (!cell.rowspanPlaceholder) {
+      output += '|'.repeat(Math.max(cell.colspan - 1, 0))
+    }
+  }
+
+  return output
 }
 
 function formatTableRow(row: string[]): string {
   return `| ${row.map((cell) => cell.trim() || ' ').join(' | ')} |`
+}
+
+function formatTableAlignmentDelimiter(alignment: TableAlignment): string {
+  if (alignment === 'left') {
+    return ':---'
+  }
+
+  if (alignment === 'center') {
+    return ':---:'
+  }
+
+  if (alignment === 'right') {
+    return '---:'
+  }
+
+  return '---'
+}
+
+type TableAlignment = 'left' | 'center' | 'right' | null
+
+function normalizeTableAlignment(value: unknown): TableAlignment {
+  const alignment = String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+  return alignment === 'left' || alignment === 'center' || alignment === 'right' ? alignment : null
+}
+
+function getTableCellTokenAttrs(token: {
+  attrGet: (name: string) => string | null
+}): Record<string, unknown> {
+  const style = token.attrGet('style') ?? ''
+  const alignment = /(?:^|;)\s*text-align\s*:\s*(left|center|right)/i.exec(style)?.[1]
+
+  return {
+    colspan: Math.max(Number(token.attrGet('colspan')) || 1, 1),
+    rowspan: Math.max(Number(token.attrGet('rowspan')) || 1, 1),
+    colwidth: null,
+    align: normalizeTableAlignment(alignment)
+  }
 }
 
 function serializeTableCell(cellNode: ProseMirrorNode): string {

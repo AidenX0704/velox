@@ -14,6 +14,7 @@ export interface TabState {
   editorMode: EditorMode
   cursorLine: number
   cursorColumn: number
+  scrollTop: number
   pinned: boolean
 }
 

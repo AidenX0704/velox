@@ -60,8 +60,7 @@ export const schemas = {
           defaultFormat: z.enum(['html', 'pdf', 'png', 'jpeg', 'docx']).optional()
         })
         .optional()
-    })
-    .strict(),
+    }),
   exportDocument: z
     .object({
       title: nonEmptyString,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   baseKeymap,
   chainCommands,
@@ -15,17 +15,23 @@ import { inputRules } from 'prosemirror-inputrules'
 import { keymap } from 'prosemirror-keymap'
 import { type Node as ProseMirrorNode } from 'prosemirror-model'
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list'
-import { EditorState } from 'prosemirror-state'
+import { EditorState, Plugin, PluginKey, TextSelection } from 'prosemirror-state'
 import { columnResizing, goToNextCell, tableEditing } from 'prosemirror-tables'
-import { EditorView } from 'prosemirror-view'
+import { Decoration, DecorationSet, EditorView } from 'prosemirror-view'
 import { openEditorLink, scrollToEditorAnchor } from '../services/linkNavigation'
 import type { EditorLinkNavigationOptions } from '../services/linkNavigation'
+import {
+  findTextSearchMatches,
+  normalizeSearchQuery,
+  type TextSearchMatch
+} from '../services/documentSearch'
 import { getCodeBlockActionButton, handleCodeBlockAction } from '../rendering/blockActions'
 import { collectHeadingAnchors, type HeadingAnchor } from '../rendering/headingAnchors'
 import { DocumentOutline } from '../outline/DocumentOutline'
 import { createCodeBlockNodeView } from './nodeViews/codeBlockNodeView'
 import { createTaskListItemNodeView } from './nodeViews/taskListItemNodeView'
 import { FormatToolbar } from './FormatToolbar'
+import { RICH_EDITOR_STATE_EVENT } from './editorEvents'
 import type { CursorPosition, MarkdownEditorPreferences } from '../model/types'
 import {
   createMarkdownInputRules,
@@ -41,8 +47,14 @@ interface RichMarkdownEditorProps {
   currentPath?: string
   workspaceRoot?: string | null
   anchorTarget?: string | null
+  searchPanel?: ReactNode
+  searchQuery?: string
+  activeSearchMatchIndex?: number
+  initialScrollTop?: number
+  onSearchMatchCountChange?: (count: number) => void
   onChange: (content: string) => void
   onCursorChange: (position: CursorPosition) => void
+  onScrollTopChange?: (scrollTop: number) => void
   onOpenDocumentLink?: (path: string, anchor?: string) => boolean | void | Promise<boolean | void>
   onLinkError?: (message: string) => void
 }
@@ -54,8 +66,14 @@ export function RichMarkdownEditor({
   currentPath,
   workspaceRoot,
   anchorTarget,
+  searchPanel,
+  searchQuery = '',
+  activeSearchMatchIndex = 0,
+  initialScrollTop = 0,
+  onSearchMatchCountChange,
   onChange,
   onCursorChange,
+  onScrollTopChange,
   onOpenDocumentLink,
   onLinkError
 }: RichMarkdownEditorProps): React.JSX.Element {
@@ -63,8 +81,13 @@ export function RichMarkdownEditor({
   const viewRef = useRef<EditorView | null>(null)
   const contentRef = useRef(content)
   const initialContentRef = useRef(content)
+  const initialScrollTopRef = useRef(initialScrollTop)
   const onChangeRef = useRef(onChange)
   const onCursorChangeRef = useRef(onCursorChange)
+  const onScrollTopChangeRef = useRef(onScrollTopChange)
+  const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange)
+  const searchQueryRef = useRef(searchQuery)
+  const activeSearchMatchIndexRef = useRef(activeSearchMatchIndex)
   const linkNavigationRef = useRef<EditorLinkNavigationOptions>({})
   const headingAnchors = useMemo(() => collectHeadingAnchors(content), [content])
   const [fontSize, setFontSize] = useState(settings.previewFontSize)
@@ -78,6 +101,14 @@ export function RichMarkdownEditor({
   useEffect(() => {
     onCursorChangeRef.current = onCursorChange
   }, [onCursorChange])
+
+  useEffect(() => {
+    onScrollTopChangeRef.current = onScrollTopChange
+  }, [onScrollTopChange])
+
+  useEffect(() => {
+    onSearchMatchCountChangeRef.current = onSearchMatchCountChange
+  }, [onSearchMatchCountChange])
 
   useEffect(() => {
     linkNavigationRef.current = {
@@ -95,7 +126,11 @@ export function RichMarkdownEditor({
 
     const hostElement = hostRef.current
     const view = new EditorView(hostElement, {
-      state: createEditorState(initialContentRef.current),
+      state: createEditorState(
+        initialContentRef.current,
+        searchQueryRef.current,
+        activeSearchMatchIndexRef.current
+      ),
       attributes: {
         spellcheck: 'false',
         autocorrect: 'off',
@@ -112,12 +147,16 @@ export function RichMarkdownEditor({
       dispatchTransaction(transaction) {
         const nextState = view.state.apply(transaction)
         view.updateState(nextState)
+        view.dom.dispatchEvent(new CustomEvent(RICH_EDITOR_STATE_EVENT))
 
         if (transaction.docChanged) {
           const markdown = serializeRichMarkdown(nextState.doc)
           contentRef.current = markdown
           onChangeRef.current(markdown)
         }
+
+        const searchState = richSearchPluginKey.getState(nextState)
+        onSearchMatchCountChangeRef.current?.(searchState?.matches.length ?? 0)
 
         if (transaction.selectionSet || transaction.docChanged) {
           onCursorChangeRef.current(getCursorPosition(nextState.doc, nextState.selection.from))
@@ -128,6 +167,9 @@ export function RichMarkdownEditor({
     viewRef.current = view
     setEditorView(view)
     contentRef.current = initialContentRef.current
+    onSearchMatchCountChangeRef.current?.(
+      richSearchPluginKey.getState(view.state)?.matches.length ?? 0
+    )
     onCursorChangeRef.current(getCursorPosition(view.state.doc, view.state.selection.from))
 
     const handleMouseDown = (event: MouseEvent): void => {
@@ -136,13 +178,27 @@ export function RichMarkdownEditor({
     const handleClick = (event: MouseEvent): void => {
       handleRichEditorClick(hostElement, event, linkNavigationRef.current)
     }
+    const scrollContainer = hostElement.closest<HTMLElement>('.editor-host')
+    const handleScroll = (): void => {
+      if (scrollContainer) {
+        onScrollTopChangeRef.current?.(scrollContainer.scrollTop)
+      }
+    }
+    const restoreScrollFrame = window.requestAnimationFrame(() => {
+      if (scrollContainer) {
+        scrollContainer.scrollTop = initialScrollTopRef.current
+      }
+    })
 
     hostElement.addEventListener('mousedown', handleMouseDown, true)
     hostElement.addEventListener('click', handleClick, true)
+    scrollContainer?.addEventListener('scroll', handleScroll, { passive: true })
 
     return () => {
+      window.cancelAnimationFrame(restoreScrollFrame)
       hostElement.removeEventListener('mousedown', handleMouseDown, true)
       hostElement.removeEventListener('click', handleClick, true)
+      scrollContainer?.removeEventListener('scroll', handleScroll)
       view.destroy()
       viewRef.current = null
       setEditorView(null)
@@ -156,10 +212,36 @@ export function RichMarkdownEditor({
       return
     }
 
-    view.updateState(createEditorState(content))
+    view.updateState(
+      createEditorState(content, searchQueryRef.current, activeSearchMatchIndexRef.current)
+    )
     contentRef.current = content
+    onSearchMatchCountChangeRef.current?.(
+      richSearchPluginKey.getState(view.state)?.matches.length ?? 0
+    )
     onCursorChangeRef.current(getCursorPosition(view.state.doc, view.state.selection.from))
   }, [content])
+
+  useEffect(() => {
+    const view = viewRef.current
+    searchQueryRef.current = searchQuery
+    activeSearchMatchIndexRef.current = activeSearchMatchIndex
+
+    if (!view) {
+      return
+    }
+
+    view.dispatch(
+      view.state.tr.setMeta(richSearchPluginKey, {
+        query: searchQuery,
+        activeIndex: activeSearchMatchIndex
+      } satisfies RichSearchMeta)
+    )
+
+    const searchState = richSearchPluginKey.getState(view.state)
+    onSearchMatchCountChangeRef.current?.(searchState?.matches.length ?? 0)
+    scrollToRichSearchMatch(view, searchState?.matches ?? [], activeSearchMatchIndex)
+  }, [activeSearchMatchIndex, searchQuery])
 
   useEffect(() => {
     if (!anchorTarget || !hostRef.current) {
@@ -237,6 +319,7 @@ export function RichMarkdownEditor({
       data-width-mode={settings.previewEditWidthMode}
     >
       {settings.customPreviewCss ? <style>{settings.customPreviewCss}</style> : null}
+      {searchPanel}
       <DocumentOutline
         headings={headingAnchors}
         dirty={dirty}
@@ -282,10 +365,128 @@ const insertLinkCommand = (
   return true
 }
 
-function createEditorState(markdown: string): EditorState {
+interface RichSearchPluginState {
+  query: string
+  activeIndex: number
+  matches: TextSearchMatch[]
+  decorations: DecorationSet
+}
+
+interface RichSearchMeta {
+  query: string
+  activeIndex: number
+}
+
+const richSearchPluginKey = new PluginKey<RichSearchPluginState>('rich-search')
+
+function createRichSearchPlugin(query: string, activeIndex: number): Plugin<RichSearchPluginState> {
+  return new Plugin<RichSearchPluginState>({
+    key: richSearchPluginKey,
+    state: {
+      init(_, state) {
+        return createRichSearchState(state.doc, query, activeIndex)
+      },
+      apply(transaction, previous, _, nextState) {
+        const meta = transaction.getMeta(richSearchPluginKey) as RichSearchMeta | undefined
+
+        if (!transaction.docChanged && !meta) {
+          return previous
+        }
+
+        return createRichSearchState(
+          nextState.doc,
+          meta?.query ?? previous.query,
+          meta?.activeIndex ?? previous.activeIndex
+        )
+      }
+    },
+    props: {
+      decorations(state) {
+        return richSearchPluginKey.getState(state)?.decorations ?? null
+      }
+    }
+  })
+}
+
+function createRichSearchState(
+  doc: ProseMirrorNode,
+  query: string,
+  activeIndex: number
+): RichSearchPluginState {
+  const normalizedQuery = normalizeSearchQuery(query)
+  const matches = findRichSearchMatches(doc, normalizedQuery)
+  const safeActiveIndex = matches.length > 0 ? Math.min(activeIndex, matches.length - 1) : 0
+  const decorations = DecorationSet.create(
+    doc,
+    matches.map((match, index) =>
+      Decoration.inline(match.from, match.to, {
+        class:
+          index === safeActiveIndex
+            ? 'editor-search-match editor-search-match-active'
+            : 'editor-search-match'
+      })
+    )
+  )
+
+  return {
+    query: normalizedQuery,
+    activeIndex: safeActiveIndex,
+    matches,
+    decorations
+  }
+}
+
+function findRichSearchMatches(doc: ProseMirrorNode, query: string): TextSearchMatch[] {
+  if (!query) {
+    return []
+  }
+
+  const matches: TextSearchMatch[] = []
+
+  doc.descendants((node, position) => {
+    if (!node.isText) {
+      return true
+    }
+
+    for (const match of findTextSearchMatches(node.text ?? '', query)) {
+      matches.push({
+        from: position + match.from,
+        to: position + match.to
+      })
+    }
+
+    return true
+  })
+
+  return matches
+}
+
+function scrollToRichSearchMatch(
+  view: EditorView,
+  matches: TextSearchMatch[],
+  activeIndex: number
+): void {
+  if (matches.length === 0) {
+    return
+  }
+
+  const match = matches[Math.min(activeIndex, matches.length - 1)]
+  view.dispatch(
+    view.state.tr
+      .setSelection(TextSelection.create(view.state.doc, match.from, match.to))
+      .scrollIntoView()
+  )
+}
+
+function createEditorState(
+  markdown: string,
+  searchQuery = '',
+  activeSearchMatchIndex = 0
+): EditorState {
   return EditorState.create({
     doc: parseMarkdown(markdown),
     plugins: [
+      createRichSearchPlugin(searchQuery, activeSearchMatchIndex),
       inputRules({ rules: createMarkdownInputRules() }),
       history(),
       columnResizing(),

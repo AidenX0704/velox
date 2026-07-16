@@ -89,3 +89,64 @@
 .format-heading-option.h4 {
   font-size: 13px;
 }
+
+.table-format-toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.table-format-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.table-toolbar-label {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.table-toolbar-text-btn,
+.table-toolbar-menu-btn {
+  min-width: auto !important;
+  padding-right: 8px !important;
+  padding-left: 8px !important;
+  white-space: nowrap;
+}
+
+.table-toolbar-strike {
+  text-decoration: line-through;
+}
+
+.table-toolbar-align-btn {
+  padding: 0 7px !important;
+}
+
+.table-align-icon {
+  display: flex;
+  flex-direction: column;
+  width: 15px;
+  gap: 2px;
+}
+
+.table-align-icon i {
+  display: block;
+  width: 15px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.table-align-icon i:nth-child(2) {
+  width: 10px;
+}
+
+.table-align-icon-center {
+  align-items: center;
+}
+
+.table-align-icon-right {
+  align-items: flex-end;
+}

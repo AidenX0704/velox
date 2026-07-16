@@ -7,6 +7,18 @@ files:
   - out/**
   - resources/**
   - package.json
+fileAssociations:
+  - ext:
+      - md
+      - markdown
+      - mdown
+      - mkd
+      - txt
+    name: Velox.Markdown
+    description: Markdown Document
+    role: Editor
+    rank: Alternate
+    icon: icon
 asarUnpack:
   - '**/*.node'
   - resources/**
@@ -25,7 +37,7 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
   oneClick: false
-  perMachine: false
+  perMachine: true
   allowToChangeInstallationDirectory: true
 mac:
   icon: build/icon.icns
@@ -61,6 +73,6 @@ publish:
   releaseType: release
 npmRebuild: false
 nodeGypRebuild: false
-compression: maximum
+compression: normal
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
