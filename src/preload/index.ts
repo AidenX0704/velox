@@ -22,6 +22,10 @@ import type {
   UpdaterStatus,
   VeloxAPI,
   WorkspaceEntry,
+  WorkspaceReplaceInput,
+  WorkspaceReplaceResult,
+  WorkspaceSearchInput,
+  WorkspaceSearchResult,
   WorkspaceStateRecord
 } from '../shared/types'
 import type { ExportDocumentInput, ExportDocumentResult, ExportProgress } from '../shared/export'
@@ -123,6 +127,10 @@ const api: VeloxAPI = {
     createEntry: (input) => invoke<string>(ipcChannels.workspace.createEntry, input),
     renameEntry: (input) => invoke<string>(ipcChannels.workspace.renameEntry, input),
     deleteEntry: (input) => invoke<void>(ipcChannels.workspace.deleteEntry, input),
+    search: (input: WorkspaceSearchInput) =>
+      invoke<WorkspaceSearchResult>(ipcChannels.workspace.search, input),
+    replaceAll: (input: WorkspaceReplaceInput) =>
+      invoke<WorkspaceReplaceResult>(ipcChannels.workspace.replaceAll, input),
     onDidChange: (callback) => {
       const listener = (): void => {
         callback()

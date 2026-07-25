@@ -137,6 +137,12 @@ export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.workspace.deleteEntry, schemas.deleteWorkspaceEntry, (input) =>
     services.workspaceService.deleteEntry(input.path)
   )
+  registerIpcHandler(ipcChannels.workspace.search, schemas.workspaceSearch, (input) =>
+    services.workspaceService.search(input)
+  )
+  registerIpcHandler(ipcChannels.workspace.replaceAll, schemas.workspaceReplaceAll, (input) =>
+    services.workspaceService.replaceAll(input)
+  )
   registerIpcHandler(ipcChannels.workspace.getState, schemas.path, (path) =>
     services.workspaceStateService.get(path)
   )

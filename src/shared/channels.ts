@@ -49,6 +49,8 @@ export const ipcChannels = {
     createEntry: 'workspace:create-entry',
     renameEntry: 'workspace:rename-entry',
     deleteEntry: 'workspace:delete-entry',
+    search: 'workspace:search',
+    replaceAll: 'workspace:replace-all',
     didChange: 'workspace:did-change'
   },
   session: {

@@ -57,6 +57,19 @@ export function applyThemeToDocument(options: {
   body.dataset.colorMode = options.resolvedMode
   body.dataset.appearanceMode = options.appearanceMode
 
+  const hoverColor =
+    options.resolvedMode === 'dark'
+      ? mixHex(accentColor, '#ffffff', 0.12)
+      : mixHex(accentColor, '#000000', 0.08)
+  const strongColor =
+    options.resolvedMode === 'dark'
+      ? mixHex(accentColor, '#ffffff', 0.18)
+      : mixHex(accentColor, '#000000', 0.18)
+  const activeColor =
+    options.resolvedMode === 'dark'
+      ? mixHex(accentColor, '#ffffff', 0.08)
+      : mixHex(accentColor, '#000000', 0.18)
+
   if (options.resolvedMode === 'dark') {
     body.setAttribute('theme-mode', 'dark')
   } else {
@@ -66,14 +79,14 @@ export function applyThemeToDocument(options: {
   for (const element of [root, body]) {
     element.style.setProperty('--theme-accent', accentColor)
     element.style.setProperty('--theme-accent-rgb', accentRgb)
-    element.style.setProperty('--theme-accent-strong', mixHex(accentColor, '#000000', 0.18))
-    element.style.setProperty('--theme-accent-hover', mixHex(accentColor, '#000000', 0.08))
-    element.style.setProperty('--theme-accent-active', mixHex(accentColor, '#000000', 0.18))
+    element.style.setProperty('--theme-accent-strong', strongColor)
+    element.style.setProperty('--theme-accent-hover', hoverColor)
+    element.style.setProperty('--theme-accent-active', activeColor)
     element.style.setProperty('--theme-accent-soft', `rgba(${accentRgb}, 0.12)`)
     element.style.setProperty('--theme-accent-softer', `rgba(${accentRgb}, 0.07)`)
     element.style.setProperty('--semi-color-primary', accentColor)
-    element.style.setProperty('--semi-color-primary-hover', mixHex(accentColor, '#000000', 0.08))
-    element.style.setProperty('--semi-color-primary-active', mixHex(accentColor, '#000000', 0.18))
+    element.style.setProperty('--semi-color-primary-hover', hoverColor)
+    element.style.setProperty('--semi-color-primary-active', activeColor)
     element.style.setProperty('--semi-color-primary-light-default', `rgba(${accentRgb}, 0.12)`)
     element.style.setProperty('--semi-color-primary-light-hover', `rgba(${accentRgb}, 0.18)`)
     element.style.setProperty('--semi-color-primary-light-active', `rgba(${accentRgb}, 0.24)`)

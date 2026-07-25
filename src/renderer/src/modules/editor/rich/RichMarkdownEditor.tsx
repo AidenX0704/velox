@@ -49,7 +49,9 @@ interface RichMarkdownEditorProps {
   anchorTarget?: string | null
   searchPanel?: ReactNode
   searchQuery?: string
+  searchCaseSensitive?: boolean
   activeSearchMatchIndex?: number
+  searchNavigationRequestId?: number
   initialScrollTop?: number
   onSearchMatchCountChange?: (count: number) => void
   onChange: (content: string) => void
@@ -68,7 +70,9 @@ export function RichMarkdownEditor({
   anchorTarget,
   searchPanel,
   searchQuery = '',
+  searchCaseSensitive = false,
   activeSearchMatchIndex = 0,
+  searchNavigationRequestId = 0,
   initialScrollTop = 0,
   onSearchMatchCountChange,
   onChange,
@@ -87,6 +91,7 @@ export function RichMarkdownEditor({
   const onScrollTopChangeRef = useRef(onScrollTopChange)
   const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange)
   const searchQueryRef = useRef(searchQuery)
+  const searchCaseSensitiveRef = useRef(searchCaseSensitive)
   const activeSearchMatchIndexRef = useRef(activeSearchMatchIndex)
   const linkNavigationRef = useRef<EditorLinkNavigationOptions>({})
   const headingAnchors = useMemo(() => collectHeadingAnchors(content), [content])
@@ -129,7 +134,8 @@ export function RichMarkdownEditor({
       state: createEditorState(
         initialContentRef.current,
         searchQueryRef.current,
-        activeSearchMatchIndexRef.current
+        activeSearchMatchIndexRef.current,
+        searchCaseSensitiveRef.current
       ),
       attributes: {
         spellcheck: 'false',
@@ -213,7 +219,12 @@ export function RichMarkdownEditor({
     }
 
     view.updateState(
-      createEditorState(content, searchQueryRef.current, activeSearchMatchIndexRef.current)
+      createEditorState(
+        content,
+        searchQueryRef.current,
+        activeSearchMatchIndexRef.current,
+        searchCaseSensitiveRef.current
+      )
     )
     contentRef.current = content
     onSearchMatchCountChangeRef.current?.(
@@ -225,6 +236,7 @@ export function RichMarkdownEditor({
   useEffect(() => {
     const view = viewRef.current
     searchQueryRef.current = searchQuery
+    searchCaseSensitiveRef.current = searchCaseSensitive
     activeSearchMatchIndexRef.current = activeSearchMatchIndex
 
     if (!view) {
@@ -234,14 +246,15 @@ export function RichMarkdownEditor({
     view.dispatch(
       view.state.tr.setMeta(richSearchPluginKey, {
         query: searchQuery,
-        activeIndex: activeSearchMatchIndex
+        activeIndex: activeSearchMatchIndex,
+        caseSensitive: searchCaseSensitive
       } satisfies RichSearchMeta)
     )
 
     const searchState = richSearchPluginKey.getState(view.state)
     onSearchMatchCountChangeRef.current?.(searchState?.matches.length ?? 0)
     scrollToRichSearchMatch(view, searchState?.matches ?? [], activeSearchMatchIndex)
-  }, [activeSearchMatchIndex, searchQuery])
+  }, [activeSearchMatchIndex, searchCaseSensitive, searchNavigationRequestId, searchQuery])
 
   useEffect(() => {
     if (!anchorTarget || !hostRef.current) {
@@ -367,6 +380,7 @@ const insertLinkCommand = (
 
 interface RichSearchPluginState {
   query: string
+  caseSensitive: boolean
   activeIndex: number
   matches: TextSearchMatch[]
   decorations: DecorationSet
@@ -374,17 +388,22 @@ interface RichSearchPluginState {
 
 interface RichSearchMeta {
   query: string
+  caseSensitive: boolean
   activeIndex: number
 }
 
 const richSearchPluginKey = new PluginKey<RichSearchPluginState>('rich-search')
 
-function createRichSearchPlugin(query: string, activeIndex: number): Plugin<RichSearchPluginState> {
+function createRichSearchPlugin(
+  query: string,
+  activeIndex: number,
+  caseSensitive: boolean
+): Plugin<RichSearchPluginState> {
   return new Plugin<RichSearchPluginState>({
     key: richSearchPluginKey,
     state: {
       init(_, state) {
-        return createRichSearchState(state.doc, query, activeIndex)
+        return createRichSearchState(state.doc, query, activeIndex, caseSensitive)
       },
       apply(transaction, previous, _, nextState) {
         const meta = transaction.getMeta(richSearchPluginKey) as RichSearchMeta | undefined
@@ -396,7 +415,8 @@ function createRichSearchPlugin(query: string, activeIndex: number): Plugin<Rich
         return createRichSearchState(
           nextState.doc,
           meta?.query ?? previous.query,
-          meta?.activeIndex ?? previous.activeIndex
+          meta?.activeIndex ?? previous.activeIndex,
+          meta?.caseSensitive ?? previous.caseSensitive
         )
       }
     },
@@ -411,10 +431,11 @@ function createRichSearchPlugin(query: string, activeIndex: number): Plugin<Rich
 function createRichSearchState(
   doc: ProseMirrorNode,
   query: string,
-  activeIndex: number
+  activeIndex: number,
+  caseSensitive: boolean
 ): RichSearchPluginState {
   const normalizedQuery = normalizeSearchQuery(query)
-  const matches = findRichSearchMatches(doc, normalizedQuery)
+  const matches = findRichSearchMatches(doc, normalizedQuery, caseSensitive)
   const safeActiveIndex = matches.length > 0 ? Math.min(activeIndex, matches.length - 1) : 0
   const decorations = DecorationSet.create(
     doc,
@@ -430,13 +451,18 @@ function createRichSearchState(
 
   return {
     query: normalizedQuery,
+    caseSensitive,
     activeIndex: safeActiveIndex,
     matches,
     decorations
   }
 }
 
-function findRichSearchMatches(doc: ProseMirrorNode, query: string): TextSearchMatch[] {
+function findRichSearchMatches(
+  doc: ProseMirrorNode,
+  query: string,
+  caseSensitive: boolean
+): TextSearchMatch[] {
   if (!query) {
     return []
   }
@@ -448,7 +474,7 @@ function findRichSearchMatches(doc: ProseMirrorNode, query: string): TextSearchM
       return true
     }
 
-    for (const match of findTextSearchMatches(node.text ?? '', query)) {
+    for (const match of findTextSearchMatches(node.text ?? '', query, { caseSensitive })) {
       matches.push({
         from: position + match.from,
         to: position + match.to
@@ -481,12 +507,13 @@ function scrollToRichSearchMatch(
 function createEditorState(
   markdown: string,
   searchQuery = '',
-  activeSearchMatchIndex = 0
+  activeSearchMatchIndex = 0,
+  searchCaseSensitive = false
 ): EditorState {
   return EditorState.create({
     doc: parseMarkdown(markdown),
     plugins: [
-      createRichSearchPlugin(searchQuery, activeSearchMatchIndex),
+      createRichSearchPlugin(searchQuery, activeSearchMatchIndex, searchCaseSensitive),
       inputRules({ rules: createMarkdownInputRules() }),
       history(),
       columnResizing(),

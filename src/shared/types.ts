@@ -97,6 +97,54 @@ export interface WorkspaceEntry {
   children?: WorkspaceEntry[]
 }
 
+export interface WorkspaceSearchInput {
+  rootPath: string
+  query: string
+  caseSensitive?: boolean
+}
+
+export interface WorkspaceSearchMatch {
+  index: number
+  line: number
+  column: number
+  before: string
+  match: string
+  after: string
+}
+
+export interface WorkspaceSearchFileResult {
+  path: string
+  name: string
+  relativePath: string
+  matchCount: number
+  matches: WorkspaceSearchMatch[]
+}
+
+export interface WorkspaceSearchResult {
+  totalCount: number
+  files: WorkspaceSearchFileResult[]
+  truncated: boolean
+}
+
+export interface WorkspaceReplaceInput {
+  rootPath: string
+  query: string
+  replacement: string
+  caseSensitive?: boolean
+}
+
+export interface WorkspaceReplaceFileResult {
+  path: string
+  relativePath: string
+  replacements: number
+}
+
+export interface WorkspaceReplaceResult {
+  changedFiles: number
+  replacements: number
+  files: WorkspaceReplaceFileResult[]
+}
+
 export interface RecentFileRecord {
   path: string
   title: string
@@ -300,6 +348,8 @@ export interface VeloxAPI {
     }) => Promise<Result<string>>
     renameEntry: (input: { path: string; newName: string }) => Promise<Result<string>>
     deleteEntry: (input: { path: string }) => Promise<Result<void>>
+    search: (input: WorkspaceSearchInput) => Promise<Result<WorkspaceSearchResult>>
+    replaceAll: (input: WorkspaceReplaceInput) => Promise<Result<WorkspaceReplaceResult>>
     onDidChange: (callback: () => void) => () => void
   }
   session: {

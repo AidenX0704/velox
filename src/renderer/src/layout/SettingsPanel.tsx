@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Input, InputNumber, Select, TextArea, Typography } from '@douyinfe/semi-ui'
 import {
+  IconArrowLeft,
   IconArticle,
-  IconClose,
   IconCodeStroked,
   IconColorPalette,
   IconCommand,
@@ -37,17 +37,7 @@ import {
   detectKeyFromEvent
 } from '../features/shortcuts/shortcutDefinitions'
 
-interface SettingsPageProps {
-  settings: MarkdownEditorPreferences
-  updaterStatus: UpdaterStatus | null
-  onBack: () => void
-  onChange: (settings: MarkdownEditorPreferences) => void
-  onReset: () => void
-  onCheckForUpdates: () => void
-}
-
-type SettingsPatch = Partial<MarkdownEditorPreferences>
-type PreferenceSection =
+export type PreferenceSection =
   | 'general'
   | 'editor'
   | 'markdown'
@@ -58,6 +48,18 @@ type PreferenceSection =
   | 'plugins'
   | 'advanced'
   | 'about'
+
+interface SettingsPageProps {
+  settings: MarkdownEditorPreferences
+  updaterStatus: UpdaterStatus | null
+  initialSection?: PreferenceSection
+  onBack: () => void
+  onChange: (settings: MarkdownEditorPreferences) => void
+  onReset: () => void
+  onCheckForUpdates: () => void
+}
+
+type SettingsPatch = Partial<MarkdownEditorPreferences>
 
 const appearanceModeOptions: Array<{
   value: AppearanceMode
@@ -89,12 +91,15 @@ const preferenceSections: Array<{
 export function SettingsPage({
   settings,
   updaterStatus,
+  initialSection = 'general',
   onBack,
   onChange,
   onReset,
   onCheckForUpdates
 }: SettingsPageProps): React.JSX.Element {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [activeSection, setActiveSection] = useState<PreferenceSection>(initialSection)
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -110,16 +115,39 @@ export function SettingsPage({
     }
   }, [])
 
+  useEffect(() => {
+    if (initialSection === 'general') {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`settings-${initialSection}`)?.scrollIntoView({
+        block: 'start',
+        behavior: 'auto'
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [initialSection])
+
   const updateSettings = (patch: SettingsPatch): void => {
     onChange({ ...settings, ...patch })
   }
 
   const scrollToSection = (section: PreferenceSection): void => {
+    setActiveSection(section)
     document.getElementById(`settings-${section}`)?.scrollIntoView({
       block: 'start',
       behavior: 'smooth'
     })
   }
+
+  const normalizedSettingsSearchQuery = settingsSearchQuery.trim().toLowerCase()
+  const visiblePreferenceSections = normalizedSettingsSearchQuery
+    ? preferenceSections.filter((section) =>
+        `${section.label} ${section.id}`.toLowerCase().includes(normalizedSettingsSearchQuery)
+      )
+    : preferenceSections
 
   const activeThemeColor =
     settings.themeColorPreset === 'custom'
@@ -129,33 +157,41 @@ export function SettingsPage({
 
   return (
     <section className="settings-page">
-      <header className="settings-page-header">
-        <div className="settings-page-title">设置</div>
-        <Input
-          className="settings-search"
-          disabled
-          prefix={<IconSearch />}
-          suffix={<span className="settings-search-shortcut">⌘F</span>}
-          placeholder="搜索设置项..."
-        />
-        <Button
-          aria-label="关闭设置"
-          className="settings-close-button"
-          icon={<IconClose />}
-          theme="borderless"
-          type="tertiary"
-          onClick={onBack}
-        />
-      </header>
-
       <div className="settings-page-content">
         <aside className="settings-page-nav" aria-label="偏好设置分类">
+          <div className="settings-page-nav-header">
+            <div className="settings-page-title-row">
+              <div className="settings-page-title">设置</div>
+              <Button
+                icon={<IconArrowLeft />}
+                size="small"
+                theme="light"
+                type="tertiary"
+                onClick={onBack}
+              >
+                返回编辑
+              </Button>
+            </div>
+            <Input
+              className="settings-search"
+              prefix={<IconSearch />}
+              value={settingsSearchQuery}
+              placeholder="搜索设置项"
+              onChange={setSettingsSearchQuery}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && visiblePreferenceSections[0]) {
+                  event.preventDefault()
+                  scrollToSection(visiblePreferenceSections[0].id)
+                }
+              }}
+            />
+          </div>
           <div className="settings-nav-list">
-            {preferenceSections.map((section) => (
+            {visiblePreferenceSections.map((section) => (
               <button
                 key={section.id}
                 className="settings-nav-item"
-                data-active={section.id === 'general'}
+                data-active={section.id === activeSection}
                 type="button"
                 onClick={() => scrollToSection(section.id)}
               >
@@ -163,10 +199,31 @@ export function SettingsPage({
                 <span>{section.label}</span>
               </button>
             ))}
+            {visiblePreferenceSections.length === 0 ? (
+              <Typography.Text className="settings-nav-empty" type="tertiary">
+                未找到设置项
+              </Typography.Text>
+            ) : null}
           </div>
         </aside>
 
         <main className="settings-page-main">
+          <header className="settings-page-hero">
+            <div>
+              <Typography.Title heading={4}>偏好设置</Typography.Title>
+              <Typography.Text type="tertiary">
+                调整编辑、预览、导出和本地工作区体验。
+              </Typography.Text>
+            </div>
+            <div className="settings-page-hero-actions">
+              <Button icon={<IconRefresh />} theme="light" onClick={onReset}>
+                恢复默认
+              </Button>
+              <Button theme="solid" type="primary" onClick={onBack}>
+                完成
+              </Button>
+            </div>
+          </header>
           <SettingsGroup id="settings-general" title="启动">
             <div className="settings-box settings-box-split">
               <div className="settings-checkbox-list">
@@ -512,7 +569,7 @@ export function SettingsPage({
               恢复默认设置
             </Button>
             <Button theme="solid" type="primary" onClick={onBack}>
-              保存设置
+              完成
             </Button>
           </div>
         </main>
@@ -775,38 +832,83 @@ function ShortcutSettings({
   }, [recordingId, overrides, onChange, handleStopRecord])
 
   const hasOverrides = Object.keys(overrides).length > 0
+  const customShortcutCount = Object.keys(overrides).length
+  const shortcutKeyCounts = shortcutDefinitions.reduce<Map<string, number>>((counts, def) => {
+    const key = getShortcutKey(def, overrides)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+    return counts
+  }, new Map())
+  const conflictGroupCount = Array.from(shortcutKeyCounts.values()).filter(
+    (count) => count > 1
+  ).length
 
   return (
     <div className="shortcut-settings">
-      {hasOverrides ? (
-        <div className="shortcut-reset-bar">
+      <div className="shortcut-overview">
+        <div className="shortcut-overview-copy">
+          <Typography.Text strong>快捷键管理</Typography.Text>
           <Typography.Text type="tertiary">
-            已自定义 {Object.keys(overrides).length} 个快捷键
+            共 {shortcutDefinitions.length} 个命令
+            {customShortcutCount > 0 ? `，已自定义 ${customShortcutCount} 个` : '，全部使用默认值'}
+            {conflictGroupCount > 0 ? `，${conflictGroupCount} 组冲突` : ''}
           </Typography.Text>
-          <Button size="small" theme="borderless" type="tertiary" onClick={handleResetAll}>
-            全部恢复默认
-          </Button>
         </div>
-      ) : null}
+        <Button
+          icon={<IconRefresh />}
+          size="small"
+          theme="light"
+          type="tertiary"
+          disabled={!hasOverrides}
+          onClick={handleResetAll}
+        >
+          全部恢复默认
+        </Button>
+      </div>
 
       {shortcutCategories.map((cat) => {
         const defs = shortcutDefinitions.filter((d) => d.category === cat.id)
         if (defs.length === 0) return null
+        const categoryCustomCount = defs.filter((def) => overrides[def.id] !== undefined).length
+        const categoryConflictCount = defs.filter(
+          (def) => (shortcutKeyCounts.get(getShortcutKey(def, overrides)) ?? 0) > 1
+        ).length
 
         return (
           <div key={cat.id} className="shortcut-category">
             <div className="shortcut-category-header">
-              <Typography.Text strong>{cat.label}</Typography.Text>
+              <div className="shortcut-category-title">
+                <Typography.Text strong>{cat.label}</Typography.Text>
+                <span>{defs.length} 项</span>
+              </div>
+              <div className="shortcut-category-meta">
+                {categoryCustomCount > 0 ? <span>{categoryCustomCount} 个自定义</span> : null}
+                {categoryConflictCount > 0 ? (
+                  <span data-state="warning">{categoryConflictCount} 个冲突</span>
+                ) : null}
+              </div>
             </div>
             {defs.map((def) => {
               const currentKey = getShortcutKey(def, overrides)
               const isCustom = overrides[def.id] !== undefined
               const isRecording = recordingId === def.id
+              const hasConflict = (shortcutKeyCounts.get(currentKey) ?? 0) > 1
 
               return (
-                <div key={def.id} className="shortcut-row">
+                <div
+                  key={def.id}
+                  className="shortcut-row"
+                  data-custom={isCustom}
+                  data-conflict={hasConflict}
+                  data-recording={isRecording}
+                >
                   <div className="shortcut-row-info">
-                    <Typography.Text>{def.label}</Typography.Text>
+                    <div className="shortcut-command-title">
+                      <Typography.Text>{def.label}</Typography.Text>
+                      <div className="shortcut-command-badges">
+                        {isCustom ? <span>自定义</span> : null}
+                        {hasConflict ? <span data-state="warning">冲突</span> : null}
+                      </div>
+                    </div>
                     <Typography.Text type="tertiary" size="small">
                       {def.description}
                     </Typography.Text>
@@ -819,7 +921,7 @@ function ShortcutSettings({
                         onClick={handleStopRecord}
                       >
                         <span className="shortcut-recording-dot" />
-                        请按下快捷键…
+                        按下新的快捷键
                       </button>
                     ) : (
                       <button
@@ -833,16 +935,17 @@ function ShortcutSettings({
                         ))}
                       </button>
                     )}
-                    {isCustom && !isRecording ? (
-                      <button
-                        className="shortcut-reset-btn"
-                        type="button"
-                        title="恢复默认"
-                        onClick={() => handleReset(def.id)}
-                      >
-                        ↺
-                      </button>
-                    ) : null}
+                    <button
+                      className="shortcut-reset-btn"
+                      type="button"
+                      title="恢复默认"
+                      disabled={!isCustom || isRecording}
+                      aria-hidden={!isCustom || isRecording}
+                      data-visible={isCustom && !isRecording}
+                      onClick={() => handleReset(def.id)}
+                    >
+                      <IconRefresh />
+                    </button>
                   </div>
                 </div>
               )

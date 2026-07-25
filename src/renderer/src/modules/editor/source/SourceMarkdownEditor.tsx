@@ -181,7 +181,9 @@ interface SourceMarkdownEditorProps {
   fontSize: number
   lineHeight: number
   searchQuery?: string
+  searchCaseSensitive?: boolean
   activeSearchMatchIndex?: number
+  searchNavigationRequestId?: number
   initialScrollTop?: number
   onChange: (value: string) => void
   onCursorChange: (position: CursorPosition) => void
@@ -209,7 +211,9 @@ export const SourceMarkdownEditor = forwardRef<
     fontSize,
     lineHeight,
     searchQuery = '',
+    searchCaseSensitive = false,
     activeSearchMatchIndex = 0,
+    searchNavigationRequestId = 0,
     initialScrollTop = 0,
     onChange,
     onCursorChange,
@@ -229,6 +233,7 @@ export const SourceMarkdownEditor = forwardRef<
   const valueRef = useRef(value)
   const initialScrollTopRef = useRef(initialScrollTop)
   const searchQueryRef = useRef(searchQuery)
+  const searchCaseSensitiveRef = useRef(searchCaseSensitive)
   const activeSearchMatchIndexRef = useRef(activeSearchMatchIndex)
   const initialOptionsRef = useRef({ fontSize, lineHeight, showLineNumbers, wordWrap })
   const lineNumbersCompartmentRef = useRef(new Compartment())
@@ -327,7 +332,11 @@ export const SourceMarkdownEditor = forwardRef<
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdownKeymap,
         searchCompartmentRef.current.of(
-          createSearchHighlightExtension(searchQueryRef.current, activeSearchMatchIndexRef.current)
+          createSearchHighlightExtension(
+            searchQueryRef.current,
+            activeSearchMatchIndexRef.current,
+            searchCaseSensitiveRef.current
+          )
         ),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -335,7 +344,9 @@ export const SourceMarkdownEditor = forwardRef<
             valueRef.current = nextValue
             onChangeRef.current(nextValue)
             onSearchMatchCountChangeRef.current?.(
-              findTextSearchMatches(nextValue, searchQueryRef.current).length
+              findTextSearchMatches(nextValue, searchQueryRef.current, {
+                caseSensitive: searchCaseSensitiveRef.current
+              }).length
             )
           }
 
@@ -382,11 +393,13 @@ export const SourceMarkdownEditor = forwardRef<
   useEffect(() => {
     const view = viewRef.current
     searchQueryRef.current = searchQuery
+    searchCaseSensitiveRef.current = searchCaseSensitive
     activeSearchMatchIndexRef.current = activeSearchMatchIndex
 
     const matches = findTextSearchMatches(
       view?.state.doc.toString() ?? valueRef.current,
-      searchQuery
+      searchQuery,
+      { caseSensitive: searchCaseSensitive }
     )
     onSearchMatchCountChangeRef.current?.(matches.length)
 
@@ -396,11 +409,11 @@ export const SourceMarkdownEditor = forwardRef<
 
     view.dispatch({
       effects: searchCompartmentRef.current.reconfigure(
-        createSearchHighlightExtension(searchQuery, activeSearchMatchIndex)
+        createSearchHighlightExtension(searchQuery, activeSearchMatchIndex, searchCaseSensitive)
       )
     })
     scrollToSourceSearchMatch(view, matches, activeSearchMatchIndex)
-  }, [activeSearchMatchIndex, searchQuery])
+  }, [activeSearchMatchIndex, searchCaseSensitive, searchNavigationRequestId, searchQuery])
 
   useEffect(() => {
     const view = viewRef.current
@@ -417,6 +430,12 @@ export const SourceMarkdownEditor = forwardRef<
         insert: value
       }
     })
+
+    const matches = findTextSearchMatches(value, searchQueryRef.current, {
+      caseSensitive: searchCaseSensitiveRef.current
+    })
+    onSearchMatchCountChangeRef.current?.(matches.length)
+    scrollToSourceSearchMatch(view, matches, activeSearchMatchIndexRef.current)
   }, [value])
 
   useEffect(() => {
@@ -442,18 +461,22 @@ function createLineNumberExtensions(showLineNumbers: boolean): Extension {
   return showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []
 }
 
-function createSearchHighlightExtension(query: string, activeIndex: number): Extension {
+function createSearchHighlightExtension(
+  query: string,
+  activeIndex: number,
+  caseSensitive: boolean
+): Extension {
   if (!query.trim()) {
     return []
   }
 
   return StateField.define<DecorationSet>({
     create(state) {
-      return createSearchDecorations(state.doc, query, activeIndex)
+      return createSearchDecorations(state.doc, query, activeIndex, caseSensitive)
     },
     update(decorations, transaction) {
       if (transaction.docChanged) {
-        return createSearchDecorations(transaction.state.doc, query, activeIndex)
+        return createSearchDecorations(transaction.state.doc, query, activeIndex, caseSensitive)
       }
 
       return decorations.map(transaction.changes)
@@ -462,8 +485,13 @@ function createSearchHighlightExtension(query: string, activeIndex: number): Ext
   })
 }
 
-function createSearchDecorations(doc: Text, query: string, activeIndex: number): DecorationSet {
-  const matches = findTextSearchMatches(doc.toString(), query)
+function createSearchDecorations(
+  doc: Text,
+  query: string,
+  activeIndex: number,
+  caseSensitive: boolean
+): DecorationSet {
+  const matches = findTextSearchMatches(doc.toString(), query, { caseSensitive })
   const safeActiveIndex = matches.length > 0 ? Math.min(activeIndex, matches.length - 1) : -1
 
   return Decoration.set(

@@ -1,9 +1,20 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
+import { IconFolderStroked } from '@douyinfe/semi-icons'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
-import type { HistoryDocumentActivity, UpdaterStatus } from '../../../shared/types'
+import type {
+  HistoryDocumentActivity,
+  UpdaterStatus,
+  WorkspaceEntry,
+  WorkspaceSearchResult
+} from '../../../shared/types'
 import { normalizeEditorMode } from '../../../shared/preferences'
 import type { CursorPosition, EditorMode } from '../modules/editor/model/types'
+import {
+  findTextSearchMatches,
+  normalizeSearchQuery,
+  replaceTextSearchMatches
+} from '../modules/editor/services/documentSearch'
 import '../modules/editor/styles/editor.css'
 import { createWelcomeDocument, useTabs } from '../features/tabs/useTabs'
 import { TabBar } from '../features/tabs/TabBar'
@@ -15,13 +26,14 @@ import {
   subscribeToSystemAppearance,
   type ResolvedAppearanceMode
 } from '../features/theme/theme'
-import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
-import { SettingsPage } from './SettingsPanel'
-import { TitleBar } from './TitleBar'
+import { SettingsPage, type PreferenceSection } from './SettingsPanel'
+import { TitleBar, type TitleBarSearchResult, type TitleBarSearchScope } from './TitleBar'
+import { WorkspaceTree } from './WorkspaceTree'
 
 type AppView = 'editor' | 'recent' | 'settings'
 type UpdaterDialogKind = 'available' | 'downloaded' | null
+const MAX_TITLEBAR_SEARCH_RESULTS = 80
 
 const MarkdownEditor = lazy(() =>
   import('../modules/editor/MarkdownEditor').then((module) => ({
@@ -34,11 +46,6 @@ const MarkdownPreview = lazy(() =>
     default: module.MarkdownPreview
   }))
 )
-
-const defaultSidebarPaneWidth = 280
-const minSidebarPaneWidth = 220
-const maxSidebarPaneWidth = 480
-const sidebarPaneWidthStorageKey = 'velox:sidebar-pane-width'
 
 function computeWordCount(content: string): number {
   const text = content.trim()
@@ -54,13 +61,115 @@ function hasExternalFiles(dataTransfer: DataTransfer): boolean {
   return Array.from(dataTransfer.types).includes('Files')
 }
 
-function clampSidebarPaneWidth(width: number): number {
-  return Math.min(maxSidebarPaneWidth, Math.max(minSidebarPaneWidth, Math.round(width)))
+function basename(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
 }
 
-function getInitialSidebarPaneWidth(): number {
-  const storedWidth = Number(window.localStorage.getItem(sidebarPaneWidthStorageKey))
-  return Number.isFinite(storedWidth) ? clampSidebarPaneWidth(storedWidth) : defaultSidebarPaneWidth
+function compactSearchSnippetPart(value: string): string {
+  return value.replace(/\s+/g, ' ')
+}
+
+function buildSearchResultSnippet(
+  content: string,
+  from: number,
+  to: number
+): Pick<TitleBarSearchResult, 'before' | 'match' | 'after'> {
+  const lineStart = content.lastIndexOf('\n', Math.max(0, from - 1)) + 1
+  const nextLineBreak = content.indexOf('\n', to)
+  const lineEnd = nextLineBreak === -1 ? content.length : nextLineBreak
+  const beforeStart = Math.max(lineStart, from - 42)
+  const afterEnd = Math.min(lineEnd, to + 58)
+
+  return {
+    before: `${beforeStart > lineStart ? '...' : ''}${compactSearchSnippetPart(
+      content.slice(beforeStart, from)
+    )}`,
+    match: compactSearchSnippetPart(content.slice(from, to)),
+    after: `${compactSearchSnippetPart(content.slice(to, afterEnd))}${
+      afterEnd < lineEnd ? '...' : ''
+    }`
+  }
+}
+
+function buildTitlebarSearchResults(
+  content: string,
+  query: string,
+  caseSensitive: boolean
+): { totalCount: number; items: TitleBarSearchResult[] } {
+  const normalizedQuery = normalizeSearchQuery(query)
+  if (!normalizedQuery) {
+    return { totalCount: 0, items: [] }
+  }
+
+  const matches = findTextSearchMatches(content, normalizedQuery, { caseSensitive })
+  let currentLine = 1
+  let scannedOffset = 0
+
+  const items = matches.slice(0, MAX_TITLEBAR_SEARCH_RESULTS).map((match, index) => {
+    let newlineOffset = content.indexOf('\n', scannedOffset)
+    while (newlineOffset !== -1 && newlineOffset < match.from) {
+      currentLine += 1
+      scannedOffset = newlineOffset + 1
+      newlineOffset = content.indexOf('\n', scannedOffset)
+    }
+
+    const lineStart = content.lastIndexOf('\n', Math.max(0, match.from - 1)) + 1
+
+    return {
+      id: `document-${index}-${currentLine}-${match.from}`,
+      scope: 'document' as const,
+      index,
+      matchIndex: index,
+      line: currentLine,
+      column: match.from - lineStart + 1,
+      ...buildSearchResultSnippet(content, match.from, match.to)
+    }
+  })
+
+  return { totalCount: matches.length, items }
+}
+
+function flattenWorkspaceSearchResults(
+  result: WorkspaceSearchResult | null
+): TitleBarSearchResult[] {
+  if (!result) {
+    return []
+  }
+
+  let globalIndex = 0
+  const items: TitleBarSearchResult[] = []
+
+  for (const file of result.files) {
+    for (const match of file.matches) {
+      items.push({
+        id: `workspace-${globalIndex}-${file.path}-${match.index}`,
+        scope: 'workspace',
+        index: globalIndex,
+        matchIndex: match.index,
+        path: file.path,
+        relativePath: file.relativePath,
+        fileName: file.name,
+        line: match.line,
+        column: match.column,
+        before: match.before,
+        match: match.match,
+        after: match.after
+      })
+      globalIndex += 1
+    }
+  }
+
+  return items
+}
+
+function isPathInsideWorkspace(filePath: string, workspacePath: string): boolean {
+  const normalizedFilePath = filePath.replace(/\\/g, '/')
+  const normalizedWorkspacePath = workspacePath.replace(/\\/g, '/').replace(/\/$/, '')
+
+  return (
+    normalizedFilePath === normalizedWorkspacePath ||
+    normalizedFilePath.startsWith(`${normalizedWorkspacePath}/`)
+  )
 }
 
 function EditorLoadingFallback(): React.JSX.Element {
@@ -115,12 +224,94 @@ function getUpdateNotes(status: UpdaterStatus): string {
   return status.releaseNotes?.trim() || '此版本没有提供更新日志。'
 }
 
+function ResourceExplorer({
+  workspaceRoot,
+  workspaceTree,
+  selectedPath,
+  expandedPaths,
+  onOpenWorkspace,
+  onOpenFile,
+  onExpandedPathsChange,
+  onCreateWorkspaceEntry,
+  onRenameWorkspaceEntry,
+  onDeleteWorkspaceEntry
+}: {
+  workspaceRoot: string | null
+  workspaceTree: WorkspaceEntry[]
+  selectedPath?: string
+  expandedPaths: string[]
+  onOpenWorkspace: () => void
+  onOpenFile: (path: string) => void
+  onExpandedPathsChange: (paths: string[]) => void
+  onCreateWorkspaceEntry: (
+    parentPath: string,
+    name: string,
+    type: 'file' | 'directory'
+  ) => Promise<string | null>
+  onRenameWorkspaceEntry: (path: string, newName: string) => Promise<string | null>
+  onDeleteWorkspaceEntry: (path: string) => Promise<boolean>
+}): React.JSX.Element {
+  const singleFileEntry: WorkspaceEntry | null =
+    !workspaceRoot && selectedPath
+      ? {
+          path: selectedPath,
+          name: basename(selectedPath),
+          type: 'file'
+        }
+      : null
+
+  return (
+    <aside className="resource-explorer" aria-label="资源管理器">
+      <header className="resource-explorer-header">
+        <div className="resource-explorer-title">资源管理器</div>
+      </header>
+      {workspaceRoot ? (
+        <WorkspaceTree
+          entries={workspaceTree}
+          selectedPath={selectedPath}
+          expandedPaths={expandedPaths}
+          workspaceRoot={workspaceRoot}
+          onOpenFile={onOpenFile}
+          onExpandedPathsChange={onExpandedPathsChange}
+          onCreateWorkspaceEntry={onCreateWorkspaceEntry}
+          onRenameWorkspaceEntry={onRenameWorkspaceEntry}
+          onDeleteWorkspaceEntry={onDeleteWorkspaceEntry}
+        />
+      ) : singleFileEntry ? (
+        <WorkspaceTree
+          entries={[singleFileEntry]}
+          selectedPath={selectedPath}
+          workspaceRoot={singleFileEntry.path}
+          workspaceRootType="file"
+          onOpenFile={onOpenFile}
+        />
+      ) : (
+        <div className="resource-explorer-empty">
+          <IconFolderStroked />
+          <Typography.Text strong>未打开文件夹</Typography.Text>
+          <Typography.Text type="tertiary">
+            打开一个本地文件夹后可浏览 Markdown 文件。
+          </Typography.Text>
+          <button
+            className="resource-explorer-empty-action"
+            type="button"
+            onClick={onOpenWorkspace}
+          >
+            打开文件夹
+          </button>
+        </div>
+      )}
+    </aside>
+  )
+}
+
 function RecentWorkbench({
   activity,
   recentFiles,
   selectedPath,
   onSelectFile,
   onOpenInEditor,
+  onBack,
   customCss
 }: {
   activity: HistoryDocumentActivity | null
@@ -128,6 +319,7 @@ function RecentWorkbench({
   selectedPath?: string
   onSelectFile: (path: string) => void
   onOpenInEditor: (path: string) => void
+  onBack: () => void
   customCss?: string
 }): React.JSX.Element {
   const selectedFile = recentFiles.find((file) => file.path === selectedPath)
@@ -141,15 +333,20 @@ function RecentWorkbench({
             查看打开记录、分支推进和当前文档相对最近快照的变化。
           </Typography.Text>
         </div>
-        {activity ? (
-          <button
-            className="recent-workbench-open"
-            type="button"
-            onClick={() => onOpenInEditor(activity.path)}
-          >
-            打开编辑
+        <div className="recent-workbench-actions">
+          <button className="recent-workbench-open" type="button" onClick={onBack}>
+            返回编辑
           </button>
-        ) : null}
+          {activity ? (
+            <button
+              className="recent-workbench-open recent-workbench-open-primary"
+              type="button"
+              onClick={() => onOpenInEditor(activity.path)}
+            >
+              打开编辑
+            </button>
+          ) : null}
+        </div>
       </header>
       <div className="recent-workbench-body">
         <aside className="recent-workbench-list" aria-label="最近文档">
@@ -254,35 +451,40 @@ export function MainLayout(): React.JSX.Element {
   const [platform, setPlatform] = useState<string>('')
   const [resolvedAppearanceMode, setResolvedAppearanceMode] =
     useState<ResolvedAppearanceMode>('light')
-  const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
-  const [sidebarPaneWidth, setSidebarPaneWidth] = useState(getInitialSidebarPaneWidth)
-  const [workspaceTree, setWorkspaceTree] = useState<
-    import('../../../shared/types').WorkspaceEntry[]
-  >([])
+  const [workspaceTree, setWorkspaceTree] = useState<WorkspaceEntry[]>([])
+  const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
+  const [explorerVisible, setExplorerVisible] = useState(true)
   const [recentFiles, setRecentFiles] = useState<
     import('../../../shared/types').RecentFileRecord[]
   >([])
-  const [historyTimeline, setHistoryTimeline] = useState<
-    import('../../../shared/types').HistoryTimelineEntry[]
-  >([])
-  const [historyBranches, setHistoryBranches] = useState<
-    import('../../../shared/types').HistoryBranchRecord[]
-  >([])
   const [selectedRecentPath, setSelectedRecentPath] = useState<string | undefined>(undefined)
   const [recentActivity, setRecentActivity] = useState<HistoryDocumentActivity | null>(null)
+  const [settingsInitialSection, setSettingsInitialSection] = useState<PreferenceSection>('general')
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [updaterDialog, setUpdaterDialog] = useState<UpdaterDialogKind>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
-  const [searchRequestId, setSearchRequestId] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchScope, setSearchScope] = useState<TitleBarSearchScope>('document')
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState(false)
+  const [replaceValue, setReplaceValue] = useState('')
+  const [replaceVisible, setReplaceVisible] = useState(false)
+  const [, setSearchMatchCount] = useState(0)
+  const [activeSearchResultIndex, setActiveSearchResultIndex] = useState(0)
+  const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
+  const [searchFocusRequestId, setSearchFocusRequestId] = useState(0)
+  const [searchNavigationRequestId, setSearchNavigationRequestId] = useState(0)
+  const [workspaceSearchResult, setWorkspaceSearchResult] = useState<WorkspaceSearchResult | null>(
+    null
+  )
+  const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false)
+  const [workspaceSearchError, setWorkspaceSearchError] = useState<string | undefined>(undefined)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
   const editorHostRef = useRef<HTMLElement | null>(null)
-  const revealWorkspacePaneRef = useRef<string | null>(null)
   const updaterManualCheckRef = useRef(false)
   const updaterAvailablePromptRef = useRef<string | undefined>(undefined)
   const updaterInstallPromptRef = useRef<string | undefined>(undefined)
@@ -317,18 +519,11 @@ export function MainLayout(): React.JSX.Element {
   const openPathRef = useRef<
     ((path: string, options?: { mode?: EditorMode }) => Promise<boolean>) | undefined
   >(undefined)
-  const loadWorkspaceRef = useRef<
-    ((path: string, options?: { revealPane?: boolean }) => Promise<void>) | undefined
-  >(undefined)
+  const loadWorkspaceRef = useRef<((path: string) => Promise<void>) | undefined>(undefined)
   const refreshRecentRef = useRef<
     (() => Promise<import('../../../shared/types').RecentFileRecord[]>) | undefined
   >(undefined)
   const hasInitializedRef = useRef(false)
-  const sidebarResizeRef = useRef<{
-    pointerId: number
-    startX: number
-    startWidth: number
-  } | null>(null)
 
   const document = useMemo(
     () =>
@@ -349,21 +544,36 @@ export function MainLayout(): React.JSX.Element {
     [activeTab?.cursorLine, activeTab?.cursorColumn]
   )
   const wordCount = useMemo(() => computeWordCount(document.content), [document.content])
+  const searchResultSummary = useMemo(
+    () => buildTitlebarSearchResults(document.content, searchQuery, searchCaseSensitive),
+    [document.content, searchCaseSensitive, searchQuery]
+  )
+  const workspaceSearchResults = useMemo(
+    () => flattenWorkspaceSearchResults(workspaceSearchResult),
+    [workspaceSearchResult]
+  )
+  const titlebarSearchResults =
+    searchScope === 'workspace' ? workspaceSearchResults : searchResultSummary.items
+  const effectiveSearchMatchCount =
+    searchScope === 'workspace'
+      ? (workspaceSearchResult?.totalCount ?? 0)
+      : searchResultSummary.totalCount
+  const titlebarSearchTruncated =
+    searchScope === 'workspace'
+      ? Boolean(workspaceSearchResult?.truncated)
+      : searchResultSummary.totalCount > searchResultSummary.items.length
+  const activeSearchOrdinal =
+    searchQuery && effectiveSearchMatchCount > 0
+      ? Math.min(activeSearchResultIndex, effectiveSearchMatchCount - 1) + 1
+      : 0
+  const searchResultsForNavigation = titlebarSearchResults
+  const workspaceSearchDisabledError =
+    searchScope === 'workspace' && !workspaceRoot ? '先打开一个工作区' : undefined
 
   const refreshRecent = useCallback(async () => {
-    const [filesResult, timelineResult, branchesResult] = await Promise.all([
-      window.api.recent.listFiles(),
-      window.api.history.listTimeline(),
-      window.api.history.listBranches()
-    ])
+    const filesResult = await window.api.recent.listFiles()
     if (filesResult.ok) {
       setRecentFiles(filesResult.data)
-    }
-    if (timelineResult.ok) {
-      setHistoryTimeline(timelineResult.data)
-    }
-    if (branchesResult.ok) {
-      setHistoryBranches(branchesResult.data)
     }
     return filesResult.ok ? filesResult.data : []
   }, [])
@@ -496,11 +706,11 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [findTabByPath, setActiveTabId, addTab, refreshRecent])
 
-  const loadWorkspace = useCallback(async (path: string, options?: { revealPane?: boolean }) => {
+  const loadWorkspace = useCallback(async (path: string) => {
+    setWorkspaceSearchLoading(false)
+    setWorkspaceSearchError(undefined)
+    setWorkspaceSearchResult(null)
     setWorkspaceRoot(path)
-    if (options?.revealPane) {
-      revealWorkspacePaneRef.current = path
-    }
     const treeResult = await window.api.workspace.getTree(path)
     if (treeResult.ok) {
       setWorkspaceTree(treeResult.data)
@@ -529,9 +739,18 @@ export function MainLayout(): React.JSX.Element {
       return
     }
     if (!result.data) return
-    await loadWorkspace(result.data, { revealPane: true })
+    await loadWorkspace(result.data)
     void refreshRecent()
   }, [loadWorkspace, refreshRecent])
+
+  const refreshWorkspaceTree = useCallback(async (): Promise<void> => {
+    if (!workspaceRoot) return
+
+    const result = await window.api.workspace.getTree(workspaceRoot)
+    if (result.ok) {
+      setWorkspaceTree(result.data)
+    }
+  }, [workspaceRoot])
 
   const confirmDiscardChanges = useCallback(async (): Promise<boolean> => {
     if (!document.dirty) return true
@@ -693,9 +912,7 @@ export function MainLayout(): React.JSX.Element {
       if (cancelled) return
       if (result.ok && result.data) {
         setExpandedWorkspacePaths(result.data.expandedPaths)
-        if (revealWorkspacePaneRef.current === workspaceRoot) {
-          revealWorkspacePaneRef.current = null
-        }
+        setExplorerVisible(result.data.sidebarVisible)
       }
     })
 
@@ -723,19 +940,6 @@ export function MainLayout(): React.JSX.Element {
   }, [document.path, setEditorMode, setCursorPosition])
 
   useEffect(() => {
-    if (!workspaceRoot) return
-
-    window.clearTimeout(workspacePersistTimerRef.current)
-    workspacePersistTimerRef.current = window.setTimeout(() => {
-      void window.api.workspace.updateState({
-        workspacePath: workspaceRoot,
-        expandedPaths: expandedWorkspacePaths,
-        sidebarVisible: true
-      })
-    }, 250)
-  }, [expandedWorkspacePaths, workspaceRoot])
-
-  useEffect(() => {
     if (!document.path) return
 
     window.clearTimeout(sessionPersistTimerRef.current)
@@ -748,6 +952,19 @@ export function MainLayout(): React.JSX.Element {
       })
     }, 250)
   }, [cursorPosition.column, cursorPosition.line, document.path, editorMode])
+
+  useEffect(() => {
+    if (!workspaceRoot) return
+
+    window.clearTimeout(workspacePersistTimerRef.current)
+    workspacePersistTimerRef.current = window.setTimeout(() => {
+      void window.api.workspace.updateState({
+        workspacePath: workspaceRoot,
+        expandedPaths: expandedWorkspacePaths,
+        sidebarVisible: explorerVisible
+      })
+    }, 250)
+  }, [expandedWorkspacePaths, explorerVisible, workspaceRoot])
 
   useEffect(() => {
     if (!pendingAnchor) return
@@ -765,83 +982,353 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [])
 
-  useEffect(() => {
-    window.localStorage.setItem(sidebarPaneWidthStorageKey, String(sidebarPaneWidth))
-  }, [sidebarPaneWidth])
-
   const openEditorView = useCallback((): void => {
     setActiveView('editor')
   }, [])
 
-  const openSettingsView = useCallback((): void => {
+  const openSettingsView = useCallback((section: PreferenceSection = 'general'): void => {
+    setSettingsInitialSection(section)
     setActiveView('settings')
   }, [])
 
   const triggerDocumentSearch = useCallback((): void => {
     openEditorView()
-    setSearchRequestId((current) => current + 1)
+    setSearchFocusRequestId((current) => current + 1)
   }, [openEditorView])
 
-  const handleSidebarResizeStart = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>): void => {
-      if (event.button !== 0) {
-        return
-      }
+  const updateSearchQuery = useCallback((value: string): void => {
+    setSearchQuery(value)
+    setSearchMatchCount(0)
+    setActiveSearchResultIndex(0)
+    setActiveSearchMatchIndex(0)
+    setWorkspaceSearchResult(null)
+    setWorkspaceSearchError(undefined)
+    setWorkspaceSearchLoading(false)
+  }, [])
 
-      event.preventDefault()
-      event.currentTarget.setPointerCapture(event.pointerId)
-      sidebarResizeRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startWidth: sidebarPaneWidth
-      }
-      setIsResizingSidebar(true)
-    },
-    [sidebarPaneWidth]
-  )
+  const updateSearchScope = useCallback((scope: TitleBarSearchScope): void => {
+    setSearchScope(scope)
+    setSearchMatchCount(0)
+    setActiveSearchResultIndex(0)
+    setActiveSearchMatchIndex(0)
+    setWorkspaceSearchResult(null)
+    setWorkspaceSearchError(undefined)
+    setWorkspaceSearchLoading(false)
+  }, [])
 
-  const resizeSidebarByKeyboard = useCallback((delta: number): void => {
-    setSidebarPaneWidth((current) => clampSidebarPaneWidth(current + delta))
+  const updateSearchCaseSensitive = useCallback((caseSensitive: boolean): void => {
+    setSearchCaseSensitive(caseSensitive)
+    setSearchMatchCount(0)
+    setActiveSearchResultIndex(0)
+    setActiveSearchMatchIndex(0)
+    setWorkspaceSearchResult(null)
+    setWorkspaceSearchError(undefined)
+    setWorkspaceSearchLoading(false)
+  }, [])
+
+  const updateSearchMatchCount = useCallback((count: number): void => {
+    setSearchMatchCount(count)
+    setActiveSearchMatchIndex((current) => (count === 0 ? 0 : Math.min(current, count - 1)))
   }, [])
 
   useEffect(() => {
-    if (!isResizingSidebar) {
+    const normalizedQuery = normalizeSearchQuery(searchQuery)
+
+    if (searchScope !== 'workspace' || !normalizedQuery || !workspaceRoot) return
+
+    let cancelled = false
+
+    const timer = window.setTimeout(() => {
+      if (cancelled) {
+        return
+      }
+
+      setWorkspaceSearchLoading(true)
+      setWorkspaceSearchError(undefined)
+      setWorkspaceSearchResult(null)
+
+      window.api.workspace
+        .search({
+          rootPath: workspaceRoot,
+          query: normalizedQuery,
+          caseSensitive: searchCaseSensitive
+        })
+        .then((result) => {
+          if (cancelled) {
+            return
+          }
+
+          if (result.ok) {
+            setWorkspaceSearchResult(result.data)
+            setActiveSearchResultIndex((current) =>
+              result.data.totalCount === 0 ? 0 : Math.min(current, result.data.totalCount - 1)
+            )
+          } else {
+            setWorkspaceSearchResult(null)
+            setWorkspaceSearchError(result.error.message)
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setWorkspaceSearchLoading(false)
+          }
+        })
+    }, 180)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [searchCaseSensitive, searchQuery, searchScope, workspaceRoot])
+
+  const navigateToSearchResult = useCallback(
+    async (result: TitleBarSearchResult): Promise<void> => {
+      openEditorView()
+
+      if (result.scope === 'workspace' && result.path) {
+        const opened = await openPath(result.path, { mode: 'source' })
+        if (!opened) {
+          return
+        }
+      } else {
+        setEditorMode('source')
+      }
+
+      setActiveSearchResultIndex(result.index)
+      setActiveSearchMatchIndex(result.matchIndex)
+      setSearchNavigationRequestId((current) => current + 1)
+    },
+    [openEditorView, openPath, setEditorMode]
+  )
+
+  const stepSearchMatch = useCallback(
+    (direction: 1 | -1): void => {
+      if (searchScope === 'workspace') {
+        const visibleResultCount = searchResultsForNavigation.length
+
+        if (visibleResultCount === 0) {
+          setSearchFocusRequestId((current) => current + 1)
+          return
+        }
+
+        const nextIndex =
+          (activeSearchResultIndex + direction + visibleResultCount) % visibleResultCount
+        const nextResult = searchResultsForNavigation[nextIndex]
+
+        if (nextResult) {
+          void navigateToSearchResult(nextResult)
+        }
+        return
+      }
+
+      const matchCount = searchResultSummary.totalCount
+
+      if (matchCount === 0) {
+        setSearchFocusRequestId((current) => current + 1)
+        return
+      }
+
+      const nextIndex = (activeSearchResultIndex + direction + matchCount) % matchCount
+      openEditorView()
+      setEditorMode('source')
+      setActiveSearchResultIndex(nextIndex)
+      setActiveSearchMatchIndex(nextIndex)
+      setSearchNavigationRequestId((current) => current + 1)
+    },
+    [
+      activeSearchResultIndex,
+      navigateToSearchResult,
+      openEditorView,
+      searchResultSummary.totalCount,
+      searchResultsForNavigation,
+      searchScope,
+      setEditorMode
+    ]
+  )
+
+  const selectSearchMatch = useCallback(
+    (result: TitleBarSearchResult): void => {
+      void navigateToSearchResult(result)
+    },
+    [navigateToSearchResult]
+  )
+
+  const replaceCurrentSearchMatch = useCallback((): void => {
+    const normalizedQuery = normalizeSearchQuery(searchQuery)
+
+    if (!normalizedQuery) {
+      setSearchFocusRequestId((current) => current + 1)
       return
     }
 
-    const handlePointerMove = (event: PointerEvent): void => {
-      const resizeState = sidebarResizeRef.current
+    if (searchScope === 'workspace') {
+      Toast.warning('工作区范围请使用全部替换')
+      return
+    }
 
-      if (!resizeState || event.pointerId !== resizeState.pointerId) {
+    const matches = findTextSearchMatches(document.content, normalizedQuery, {
+      caseSensitive: searchCaseSensitive
+    })
+
+    if (matches.length === 0) {
+      setSearchFocusRequestId((current) => current + 1)
+      return
+    }
+
+    const matchIndex = Math.min(activeSearchMatchIndex, matches.length - 1)
+    const match = matches[matchIndex]
+    const nextContent = replaceTextSearchMatches(document.content, [match], replaceValue)
+    const nextMatches = findTextSearchMatches(nextContent, normalizedQuery, {
+      caseSensitive: searchCaseSensitive
+    })
+    const nextIndex = nextMatches.length === 0 ? 0 : Math.min(matchIndex, nextMatches.length - 1)
+
+    openEditorView()
+    setEditorMode('source')
+    setContent(nextContent)
+    setActiveSearchResultIndex(nextIndex)
+    setActiveSearchMatchIndex(nextIndex)
+    setSearchNavigationRequestId((current) => current + 1)
+    Toast.success('已替换 1 处')
+  }, [
+    activeSearchMatchIndex,
+    document.content,
+    openEditorView,
+    replaceValue,
+    searchCaseSensitive,
+    searchQuery,
+    searchScope,
+    setContent,
+    setEditorMode
+  ])
+
+  const replaceAllSearchMatches = useCallback(async (): Promise<void> => {
+    const normalizedQuery = normalizeSearchQuery(searchQuery)
+
+    if (!normalizedQuery) {
+      setSearchFocusRequestId((current) => current + 1)
+      return
+    }
+
+    if (searchScope !== 'workspace') {
+      const matches = findTextSearchMatches(document.content, normalizedQuery, {
+        caseSensitive: searchCaseSensitive
+      })
+
+      if (matches.length === 0) {
+        setSearchFocusRequestId((current) => current + 1)
         return
       }
 
-      setSidebarPaneWidth(
-        clampSidebarPaneWidth(resizeState.startWidth + event.clientX - resizeState.startX)
-      )
+      openEditorView()
+      setEditorMode('source')
+      setContent(replaceTextSearchMatches(document.content, matches, replaceValue))
+      setActiveSearchResultIndex(0)
+      setActiveSearchMatchIndex(0)
+      setSearchNavigationRequestId((current) => current + 1)
+      Toast.success(`已替换 ${matches.length} 处`)
+      return
     }
 
-    const handlePointerUp = (event: PointerEvent): void => {
-      const resizeState = sidebarResizeRef.current
+    if (!workspaceRoot) {
+      Toast.error('先打开一个工作区')
+      return
+    }
 
-      if (resizeState && event.pointerId !== resizeState.pointerId) {
-        return
+    const dirtyWorkspaceTabs = tabs.filter(
+      (tab) =>
+        tab.document.dirty &&
+        tab.document.path &&
+        isPathInsideWorkspace(tab.document.path, workspaceRoot)
+    )
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: '替换整个工作区匹配项？',
+        content:
+          dirtyWorkspaceTabs.length > 0
+            ? `将按磁盘文件替换 ${effectiveSearchMatchCount} 处匹配，并刷新已打开的命中文件。${dirtyWorkspaceTabs.length} 个未保存标签可能被磁盘内容覆盖。`
+            : `将按磁盘文件替换 ${effectiveSearchMatchCount} 处匹配。`,
+        okText: '全部替换',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false)
+      })
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    const result = await window.api.workspace.replaceAll({
+      rootPath: workspaceRoot,
+      query: normalizedQuery,
+      replacement: replaceValue,
+      caseSensitive: searchCaseSensitive
+    })
+
+    if (!result.ok) {
+      Toast.error(result.error.message)
+      return
+    }
+
+    for (const file of result.data.files) {
+      const openTab = findTabByPath(file.path)
+
+      if (!openTab) {
+        continue
       }
 
-      sidebarResizeRef.current = null
-      setIsResizingSidebar(false)
+      const documentResult = await window.api.document.openPath(file.path)
+      if (documentResult.ok) {
+        updateTabDocument(openTab.id, {
+          path: documentResult.data.path,
+          title: documentResult.data.title,
+          content: documentResult.data.content,
+          dirty: false,
+          updatedAt: documentResult.data.updatedAt
+        })
+      }
     }
 
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    window.addEventListener('pointercancel', handlePointerUp)
+    const searchResult = await window.api.workspace.search({
+      rootPath: workspaceRoot,
+      query: normalizedQuery,
+      caseSensitive: searchCaseSensitive
+    })
 
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', handlePointerUp)
+    if (searchResult.ok) {
+      setWorkspaceSearchResult(searchResult.data)
     }
-  }, [isResizingSidebar])
+
+    setActiveSearchResultIndex(0)
+    setActiveSearchMatchIndex(0)
+    void refreshWorkspaceTree()
+    Toast.success(`已替换 ${result.data.replacements} 处，涉及 ${result.data.changedFiles} 个文件`)
+  }, [
+    document.content,
+    effectiveSearchMatchCount,
+    findTabByPath,
+    openEditorView,
+    refreshWorkspaceTree,
+    replaceValue,
+    searchCaseSensitive,
+    searchQuery,
+    searchScope,
+    setContent,
+    setEditorMode,
+    tabs,
+    updateTabDocument,
+    workspaceRoot
+  ])
+
+  const openRecentView = useCallback((): void => {
+    setActiveView('recent')
+    const targetPath = selectedRecentPath ?? document.path ?? recentFiles[0]?.path
+
+    if (targetPath) {
+      void loadRecentActivity(targetPath)
+    }
+  }, [document.path, loadRecentActivity, recentFiles, selectedRecentPath])
 
   const handleExport = useCallback(
     async (format: ExportFormat): Promise<void> => {
@@ -1216,15 +1703,9 @@ export function MainLayout(): React.JSX.Element {
 
   useEffect(() => {
     return window.api.workspace.onDidChange(() => {
-      if (workspaceRoot) {
-        window.api.workspace.getTree(workspaceRoot).then((result) => {
-          if (result.ok) {
-            setWorkspaceTree(result.data)
-          }
-        })
-      }
+      void refreshWorkspaceTree()
     })
-  }, [workspaceRoot])
+  }, [refreshWorkspaceTree])
 
   const dragOverFrameRef = useRef<number | undefined>(undefined)
 
@@ -1282,7 +1763,7 @@ export function MainLayout(): React.JSX.Element {
       if (files.length === 1 && firstFilePath) {
         const statResult = await window.api.workspace.getTree(firstFilePath)
         if (statResult.ok) {
-          await loadWorkspaceRef.current?.(firstFilePath, { revealPane: true })
+          await loadWorkspaceRef.current?.(firstFilePath)
           void refreshRecentRef.current?.()
           return
         }
@@ -1313,11 +1794,14 @@ export function MainLayout(): React.JSX.Element {
       type: 'file' | 'directory'
     ): Promise<string | null> => {
       const result = await window.api.workspace.createEntry({ parentPath, name, type })
-      if (result.ok) return result.data
+      if (result.ok) {
+        void refreshWorkspaceTree()
+        return result.data
+      }
       Toast.error(result.error.message)
       return null
     },
-    []
+    [refreshWorkspaceTree]
   )
 
   const renameWorkspaceEntry = useCallback(
@@ -1325,26 +1809,29 @@ export function MainLayout(): React.JSX.Element {
       const result = await window.api.workspace.renameEntry({ path, newName })
       if (result.ok) {
         if (activeTab?.document.path === path) {
-          updateTabDocument(activeTab.id, { path: result.data })
+          updateTabDocument(activeTab.id, { path: result.data, title: basename(result.data) })
         }
+        void refreshWorkspaceTree()
         return result.data
       }
       Toast.error(result.error.message)
       return null
     },
-    [activeTab, updateTabDocument]
+    [activeTab, refreshWorkspaceTree, updateTabDocument]
   )
 
-  const deleteWorkspaceEntry = useCallback(async (path: string): Promise<boolean> => {
-    const result = await window.api.workspace.deleteEntry({ path })
-    if (result.ok) {
-      return true
-    }
-    Toast.error(result.error.message)
-    return false
-  }, [])
-
-  const isSidebarVisible = true
+  const deleteWorkspaceEntry = useCallback(
+    async (path: string): Promise<boolean> => {
+      const result = await window.api.workspace.deleteEntry({ path })
+      if (result.ok) {
+        void refreshWorkspaceTree()
+        return true
+      }
+      Toast.error(result.error.message)
+      return false
+    },
+    [refreshWorkspaceTree]
+  )
 
   return (
     <div
@@ -1352,104 +1839,125 @@ export function MainLayout(): React.JSX.Element {
       data-color-mode={resolvedAppearanceMode}
       data-appearance-mode={editorSettings.appearanceMode}
       data-platform={platform}
-      data-sidebar-visible={isSidebarVisible}
       data-view={activeView}
       data-dragging={isDragging}
-      data-resizing-sidebar={isResizingSidebar}
-      style={{ '--sidebar-pane-width': `${sidebarPaneWidth}px` } as React.CSSProperties}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Sidebar
-        activeView={activeView}
-        visible={isSidebarVisible}
-        paneWidth={sidebarPaneWidth}
-        workspaceRoot={workspaceRoot}
-        workspaceTree={workspaceTree}
-        recentFiles={recentFiles}
-        historyTimeline={historyTimeline}
-        historyBranches={historyBranches}
-        selectedPath={activeView === 'recent' ? selectedRecentPath : document.path}
-        expandedPaths={expandedWorkspacePaths}
-        onOpenEditor={openEditorView}
-        onOpenSettings={openSettingsView}
-        onOpenWorkspace={() => void openWorkspace()}
-        onResizeStart={handleSidebarResizeStart}
-        onResizeByKeyboard={resizeSidebarByKeyboard}
-        onOpenFile={(path) => {
-          openEditorView()
-          void openPath(path)
-        }}
-        onSelectRecentFile={(path) => {
-          setActiveView('recent')
-          void loadRecentActivity(path)
-        }}
-        onExpandedPathsChange={setExpandedWorkspacePaths}
-        onCreateWorkspaceEntry={createWorkspaceEntry}
-        onRenameWorkspaceEntry={renameWorkspaceEntry}
-        onDeleteWorkspaceEntry={deleteWorkspaceEntry}
-      />
       <main className="main-panel">
+        <TitleBar
+          mode={editorMode}
+          platform={platform}
+          searchValue={searchQuery}
+          searchScope={searchScope}
+          searchCaseSensitive={searchCaseSensitive}
+          replaceValue={replaceValue}
+          replaceVisible={replaceVisible}
+          searchMatchCount={effectiveSearchMatchCount}
+          activeSearchOrdinal={activeSearchOrdinal}
+          searchResults={titlebarSearchResults}
+          searchLoading={workspaceSearchLoading}
+          searchError={workspaceSearchDisabledError ?? workspaceSearchError}
+          workspaceAvailable={Boolean(workspaceRoot)}
+          searchTruncated={titlebarSearchTruncated}
+          searchFocusRequestId={searchFocusRequestId}
+          explorerVisible={explorerVisible}
+          onModeChange={setEditorMode}
+          onSearchChange={updateSearchQuery}
+          onSearchScopeChange={updateSearchScope}
+          onSearchCaseSensitiveChange={updateSearchCaseSensitive}
+          onReplaceChange={setReplaceValue}
+          onReplaceVisibleChange={setReplaceVisible}
+          onSearchStep={stepSearchMatch}
+          onSearchSelect={selectSearchMatch}
+          onReplaceCurrent={replaceCurrentSearchMatch}
+          onReplaceAll={() => void replaceAllSearchMatches()}
+          onNew={handleNewTab}
+          onOpen={() => void openDocument()}
+          onOpenWorkspace={() => void openWorkspace()}
+          onOpenRecent={openRecentView}
+          onSave={() => void saveDocument()}
+          onOpenSettings={() => openSettingsView('general')}
+          onOpenAbout={() => openSettingsView('about')}
+          onToggleExplorer={() => setExplorerVisible((current) => !current)}
+          onCheckForUpdates={() => void checkForUpdates()}
+          onExport={(format) => void handleExport(format)}
+        />
         {activeView === 'editor' ? (
           <>
-            <TitleBar
-              mode={editorMode}
-              platform={platform}
-              onModeChange={setEditorMode}
-              onNew={handleNewTab}
-              onOpen={() => void openDocument()}
-              onOpenWorkspace={() => void openWorkspace()}
-              onSave={() => void saveDocument()}
-              onSearch={triggerDocumentSearch}
-              onOpenSettings={openSettingsView}
-              onExport={(format) => void handleExport(format)}
-            />
-            <TabBar
-              tabs={tabs}
-              activeTabId={activeTabId}
-              onSelect={setActiveTabId}
-              onClose={(tabId) => void handleCloseTab(tabId)}
-              onCloseOthers={(tabId) => void handleCloseOthers(tabId)}
-              onCloseAll={() => void handleCloseAll()}
-              onCloseSaved={closeSavedTabs}
-              onPin={pinTab}
-              onUnpin={unpinTab}
-              onReorder={reorderTabs}
-              onNewTab={handleNewTab}
-            />
-            <section ref={editorHostRef} className="editor-host" data-editor-mode={editorMode}>
-              {activeTab ? (
-                <Suspense fallback={<EditorLoadingFallback />}>
-                  <MarkdownEditor
-                    key={activeTab.id}
-                    mode={editorMode}
-                    dirty={document.dirty}
-                    content={document.content}
-                    settings={editorSettings}
-                    currentPath={document.path}
-                    workspaceRoot={workspaceRoot}
-                    anchorTarget={pendingAnchor}
-                    searchRequestId={searchRequestId}
-                    initialScrollTop={activeTab.scrollTop}
-                    onChange={setContent}
-                    onCursorChange={(position) => setCursorPosition(position.line, position.column)}
-                    onScrollTopChange={(scrollTop) => setTabScrollTop(activeTab.id, scrollTop)}
-                    onOpenDocumentLink={openPathFromLink}
-                    onLinkError={(message) => Toast.error(message)}
-                  />
-                </Suspense>
-              ) : (
-                <div className="empty-editor" />
-              )}
-            </section>
-            <StatusBar
-              mode={editorMode}
-              wordCount={wordCount}
-              dirty={document.dirty}
-              cursorPosition={cursorPosition}
-              showLineNumbers={editorSettings.showLineNumbers}
-            />
+            <div className="editor-workspace" data-explorer-visible={explorerVisible}>
+              {explorerVisible ? (
+                <ResourceExplorer
+                  workspaceRoot={workspaceRoot}
+                  workspaceTree={workspaceTree}
+                  selectedPath={document.path}
+                  expandedPaths={expandedWorkspacePaths}
+                  onOpenWorkspace={() => void openWorkspace()}
+                  onOpenFile={(path) => {
+                    openEditorView()
+                    void openPath(path)
+                  }}
+                  onExpandedPathsChange={setExpandedWorkspacePaths}
+                  onCreateWorkspaceEntry={createWorkspaceEntry}
+                  onRenameWorkspaceEntry={renameWorkspaceEntry}
+                  onDeleteWorkspaceEntry={deleteWorkspaceEntry}
+                />
+              ) : null}
+              <div className="editor-main">
+                <TabBar
+                  tabs={tabs}
+                  activeTabId={activeTabId}
+                  onSelect={setActiveTabId}
+                  onClose={(tabId) => void handleCloseTab(tabId)}
+                  onCloseOthers={(tabId) => void handleCloseOthers(tabId)}
+                  onCloseAll={() => void handleCloseAll()}
+                  onCloseSaved={closeSavedTabs}
+                  onPin={pinTab}
+                  onUnpin={unpinTab}
+                  onReorder={reorderTabs}
+                  onNewTab={handleNewTab}
+                />
+                <section ref={editorHostRef} className="editor-host" data-editor-mode={editorMode}>
+                  {activeTab ? (
+                    <Suspense fallback={<EditorLoadingFallback />}>
+                      <MarkdownEditor
+                        key={activeTab.id}
+                        mode={editorMode}
+                        dirty={document.dirty}
+                        content={document.content}
+                        settings={editorSettings}
+                        currentPath={document.path}
+                        workspaceRoot={workspaceRoot}
+                        anchorTarget={pendingAnchor}
+                        searchQuery={searchQuery}
+                        searchCaseSensitive={searchCaseSensitive}
+                        activeSearchMatchIndex={activeSearchMatchIndex}
+                        searchNavigationRequestId={searchNavigationRequestId}
+                        initialScrollTop={activeTab.scrollTop}
+                        onSearchMatchCountChange={updateSearchMatchCount}
+                        onChange={setContent}
+                        onCursorChange={(position) =>
+                          setCursorPosition(position.line, position.column)
+                        }
+                        onScrollTopChange={(scrollTop) => setTabScrollTop(activeTab.id, scrollTop)}
+                        onOpenDocumentLink={openPathFromLink}
+                        onLinkError={(message) => Toast.error(message)}
+                      />
+                    </Suspense>
+                  ) : (
+                    <div className="empty-editor" />
+                  )}
+                </section>
+                <StatusBar
+                  mode={editorMode}
+                  wordCount={wordCount}
+                  dirty={document.dirty}
+                  cursorPosition={cursorPosition}
+                  showLineNumbers={editorSettings.showLineNumbers}
+                />
+              </div>
+            </div>
           </>
         ) : activeView === 'recent' ? (
           <RecentWorkbench
@@ -1458,6 +1966,7 @@ export function MainLayout(): React.JSX.Element {
             selectedPath={selectedRecentPath}
             customCss={editorSettings.customPreviewCss}
             onSelectFile={(path) => void loadRecentActivity(path)}
+            onBack={openEditorView}
             onOpenInEditor={(path) => {
               openEditorView()
               void openPath(path, { mode: 'preview-edit' })
@@ -1465,8 +1974,10 @@ export function MainLayout(): React.JSX.Element {
           />
         ) : (
           <SettingsPage
+            key={settingsInitialSection}
             settings={editorSettings}
             updaterStatus={updaterStatus}
+            initialSection={settingsInitialSection}
             onBack={openEditorView}
             onChange={(nextSettings) => {
               updateSettings(nextSettings)
