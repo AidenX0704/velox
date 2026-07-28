@@ -26,7 +26,8 @@ export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element
 function HighlightedCodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
   const languageMeta = useMemo(() => getCodeLanguageMeta(language), [language])
-  const lineNumbers = useMemo(() => renderCodeLineNumbers(getCodeLineCount(code)), [code])
+  const lineCount = useMemo(() => getCodeLineCount(code), [code])
+  const lineNumbers = useMemo(() => renderCodeLineNumbers(lineCount), [lineCount])
 
   useEffect(() => {
     let cancelled = false
@@ -47,6 +48,7 @@ function HighlightedCodeBlock({ code, language }: CodeBlockProps): React.JSX.Ele
       className="markdown-code-block"
       data-language={languageMeta.displayName}
       data-language-kind={languageMeta.kind}
+      data-line-count={lineCount}
       data-wrap="false"
     >
       <figcaption className="markdown-code-toolbar" contentEditable={false}>
@@ -60,17 +62,12 @@ function HighlightedCodeBlock({ code, language }: CodeBlockProps): React.JSX.Ele
             data-code-action="fold"
             onClick={(event) => handleCodeBlockAction(event.currentTarget)}
           />
-          <span className="markdown-code-title-text">代码块</span>
+          <span className="markdown-code-title-mark" aria-hidden="true" />
+          <span className="markdown-code-language markdown-code-language-static">
+            {languageMeta.displayName}
+          </span>
         </span>
         <span className="markdown-code-actions">
-          <button
-            className="markdown-code-language markdown-code-language-trigger"
-            type="button"
-            disabled
-            aria-label={`代码语言：${languageMeta.displayName}`}
-          >
-            <span>{languageMeta.displayName}</span>
-          </button>
           <button
             className="markdown-code-action markdown-code-action-wrap"
             type="button"

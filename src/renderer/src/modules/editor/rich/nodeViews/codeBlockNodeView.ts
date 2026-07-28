@@ -90,10 +90,12 @@ export function createCodeBlockNodeView(
     const code = contentDOM.textContent ?? ''
     const language = getCodeBlockLanguage(currentNode)
     const languageMeta = getCodeLanguageMeta(language)
+    const lineCount = getCodeLineCount(code)
 
     contentDOM.dataset.rawCode = encodeURIComponent(code)
     contentDOM.style.setProperty('--code-language', languageMeta.displayName)
-    shell.lineNumbers.textContent = renderCodeLineNumbers(getCodeLineCount(code))
+    shell.dom.dataset.lineCount = String(lineCount)
+    shell.lineNumbers.textContent = renderCodeLineNumbers(lineCount)
 
     if (
       code !== lastRenderedCode ||
@@ -224,15 +226,10 @@ export function createCodeBlockNodeView(
   function scheduleDiagramRender(code: string, language: string, delay = 260): void {
     const isDiagram = isMermaidLanguage(language)
     const wasDiagram = shell.dom.dataset.diagram === 'true'
-    const title = shell.toolbarTitle.querySelector<HTMLElement>('.markdown-code-title-text')
 
     shell.dom.dataset.diagram = String(isDiagram)
     diagramPanel.hidden = !isDiagram
     diagramToggleButton.hidden = !isDiagram
-
-    if (title) {
-      title.textContent = isDiagram ? 'Mermaid 图表' : '代码块'
-    }
 
     if (isDiagram) {
       setDiagramView(wasDiagram ? getDiagramView(shell.dom) : 'preview')
@@ -301,6 +298,7 @@ function updateCodeBlockDom(
   // Update UI metadata
   dom.dataset.language = languageMeta.displayName
   dom.dataset.languageKind = languageMeta.kind
+  dom.dataset.lineCount = String(getCodeLineCount(node.textContent))
 
   // Sync language picker
   languagePicker.setValue(getSelectLanguageValue(language), languageMeta)

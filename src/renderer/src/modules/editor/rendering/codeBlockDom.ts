@@ -23,7 +23,7 @@ export function createCodeBlockShell(options: CreateCodeBlockShellOptions = {}):
   const dom = document.createElement('figure')
   const toolbar = document.createElement('figcaption')
   const toolbarTitle = document.createElement('span')
-  const toolbarTitleText = document.createElement('span')
+  const toolbarTitleMark = document.createElement('span')
   const languageLabel = document.createElement('span')
   const actions = document.createElement('span')
   const toggleWrapButton = document.createElement('button')
@@ -37,8 +37,8 @@ export function createCodeBlockShell(options: CreateCodeBlockShellOptions = {}):
   toolbar.className = 'markdown-code-toolbar'
   toolbar.contentEditable = 'false'
   toolbarTitle.className = 'markdown-code-title'
-  toolbarTitleText.className = 'markdown-code-title-text'
-  toolbarTitleText.textContent = '代码块'
+  toolbarTitleMark.className = 'markdown-code-title-mark'
+  toolbarTitleMark.setAttribute('aria-hidden', 'true')
   languageLabel.className = 'markdown-code-language'
   actions.className = 'markdown-code-actions'
   toggleWrapButton.className = 'markdown-code-action markdown-code-action-wrap'
@@ -69,8 +69,8 @@ export function createCodeBlockShell(options: CreateCodeBlockShellOptions = {}):
   lineNumbers.setAttribute('aria-hidden', 'true')
   content.className = 'markdown-code-content'
 
-  toolbarTitle.append(foldButton, toolbarTitleText)
-  actions.append(languageLabel, toggleWrapButton, copyButton)
+  toolbarTitle.append(foldButton, toolbarTitleMark, languageLabel)
+  actions.append(toggleWrapButton, copyButton)
 
   if (options.foldable === false) {
     foldButton.hidden = true

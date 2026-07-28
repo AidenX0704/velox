@@ -33,26 +33,34 @@ export const commonCodeLanguages = [
 
 const languageAliases: Record<string, string> = {
   text: 'plaintext',
+  txt: 'plaintext',
   cjs: 'javascript',
   js: 'javascript',
-  jsx: 'javascript',
+  jsx: 'jsx',
   mjs: 'javascript',
   ts: 'typescript',
-  tsx: 'typescript',
+  tsx: 'tsx',
   py: 'python',
   rb: 'ruby',
   rs: 'rust',
+  kt: 'kotlin',
+  cs: 'csharp',
+  'c#': 'csharp',
+  'c++': 'cpp',
+  objc: 'objectivec',
   sh: 'bash',
   shell: 'bash',
   zsh: 'bash',
+  console: 'bash',
+  terminal: 'bash',
   ps: 'powershell',
   ps1: 'powershell',
   yml: 'yaml',
   md: 'markdown',
-  htm: 'xml',
-  html: 'xml',
+  htm: 'html',
+  html: 'html',
   svg: 'xml',
-  vue: 'xml',
+  docker: 'dockerfile',
   patch: 'diff',
   mmd: 'mermaid'
 }
@@ -97,7 +105,11 @@ function getLanguageKind(language: string): string {
     return 'diagram'
   }
 
-  if (['javascript', 'typescript', 'python', 'ruby', 'php', 'lua', 'perl'].includes(language)) {
+  if (
+    ['javascript', 'typescript', 'jsx', 'tsx', 'python', 'ruby', 'php', 'lua', 'perl'].includes(
+      language
+    )
+  ) {
     return 'script'
   }
 

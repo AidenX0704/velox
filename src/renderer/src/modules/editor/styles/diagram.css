@@ -248,7 +248,7 @@
 }
 
 .preview-edit-code-block[data-diagram='true'] .markdown-code-pre {
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 6px 6px;
   background: color-mix(in srgb, var(--code-bg), var(--surface-muted) 28%);
 }
 
