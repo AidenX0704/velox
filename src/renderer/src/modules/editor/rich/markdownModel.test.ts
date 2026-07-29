@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import type { InputRule } from 'prosemirror-inputrules'
-import type { Transaction } from 'prosemirror-state'
-import { EditorState } from 'prosemirror-state'
+import type { Command, Transaction } from 'prosemirror-state'
+import { EditorState, NodeSelection, TextSelection } from 'prosemirror-state'
 import { CellSelection, mergeCells } from 'prosemirror-tables'
+import { createImageDeletionGuardPlugin, guardImageDeletion } from './imageDeletionGuard'
 import {
   createMarkdownInputRules,
   normalizeRichMarkdown,
@@ -57,6 +58,11 @@ const fixtures: MarkdownFixture[] = [
     name: 'code block',
     input: ['```ts', 'const message = "hello"', '```'].join('\n'),
     includes: ['```ts', 'const message = "hello"', '```']
+  },
+  {
+    name: 'relative image with unicode path',
+    input: '![alt text](assest/CRUDETL工程师的末日从NL2SQL到ChatBI/1.png)',
+    includes: [`![alt text](${encodeURI('assest/CRUDETL工程师的末日从NL2SQL到ChatBI/1.png')})`]
   },
   {
     name: 'table with marked text',
@@ -144,7 +150,92 @@ assertInputRule({
   expectedMarkdown: '- [x] '
 })
 
+assertImageDeletionGuard()
+
 console.log(`rich markdown fixtures passed: ${fixtures.length}`)
+
+function assertImageDeletionGuard(): void {
+  let adjacentState = createImageDeletionState('cursor')
+
+  adjacentState = applyCommand(adjacentState, guardImageDeletion(-1))
+  assert.ok(
+    adjacentState.selection instanceof NodeSelection,
+    'first backspace should select the adjacent image'
+  )
+  assert.equal(countImages(adjacentState), 1, 'first backspace must preserve the image')
+
+  adjacentState = applyCommand(adjacentState, guardImageDeletion(-1))
+  assert.equal(countImages(adjacentState), 0, 'second backspace should delete the selected image')
+
+  let selectedState = createImageDeletionState('node')
+
+  selectedState = applyCommand(selectedState, guardImageDeletion(1))
+  assert.equal(countImages(selectedState), 1, 'first delete on a selected image must only arm it')
+
+  selectedState = applyCommand(selectedState, guardImageDeletion(1))
+  assert.equal(countImages(selectedState), 0, 'second delete should remove the armed image')
+
+  let repeatedState = createImageDeletionState('node')
+
+  repeatedState = applyCommand(repeatedState, guardImageDeletion(1))
+  repeatedState = applyCommand(repeatedState, guardImageDeletion(1, false))
+  assert.equal(
+    countImages(repeatedState),
+    1,
+    'key repeat must not bypass image delete confirmation'
+  )
+
+  repeatedState = applyCommand(repeatedState, guardImageDeletion(1))
+  assert.equal(countImages(repeatedState), 0, 'a second physical key press should delete the image')
+}
+
+function createImageDeletionState(selection: 'cursor' | 'node'): EditorState {
+  const doc = parseRichMarkdown('![alt](image.png)')
+  let imagePosition = -1
+
+  doc.descendants((node, position) => {
+    if (node.type === richMarkdownSchema.nodes.image) {
+      imagePosition = position
+      return false
+    }
+
+    return true
+  })
+
+  assert.notEqual(imagePosition, -1, 'expected image fixture to contain an image node')
+
+  return EditorState.create({
+    doc,
+    schema: richMarkdownSchema,
+    selection:
+      selection === 'node'
+        ? NodeSelection.create(doc, imagePosition)
+        : TextSelection.create(doc, imagePosition + 1),
+    plugins: [createImageDeletionGuardPlugin()]
+  })
+}
+
+function applyCommand(state: EditorState, command: Command): EditorState {
+  let nextState = state
+  const handled = command(state, (transaction) => {
+    nextState = state.apply(transaction)
+  })
+
+  assert.equal(handled, true, 'expected image deletion guard to handle the command')
+  return nextState
+}
+
+function countImages(state: EditorState): number {
+  let count = 0
+
+  state.doc.descendants((node) => {
+    if (node.type === richMarkdownSchema.nodes.image) {
+      count += 1
+    }
+  })
+
+  return count
+}
 
 function assertMergedCellSerialization({
   name,

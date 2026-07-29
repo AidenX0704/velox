@@ -1,7 +1,7 @@
 import { dialog, shell, BrowserWindow } from 'electron'
 import fg from 'fast-glob'
-import { basename, dirname, extname, join } from 'node:path'
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, isAbsolute, join, relative } from 'node:path'
+import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import chokidar, { type FSWatcher } from 'chokidar'
 import type {
   WorkspaceEntry,
@@ -17,6 +17,7 @@ import { ipcChannels } from '../../shared/channels'
 import { logger } from './log-service'
 
 const workspaceIgnore = ['**/.git/**', '**/node_modules/**', '**/dist/**', '**/out/**']
+const workspaceIgnoredEntryNames = new Set(['node_modules', 'dist', 'out'])
 const workspaceSearchMaxResults = 500
 const workspaceSearchMaxFileSizeBytes = 2 * 1024 * 1024
 const searchableTextExtensions = new Set([
@@ -54,6 +55,7 @@ interface TextSearchMatch {
 export class WorkspaceService {
   private watcher: FSWatcher | null = null
   private currentWorkspacePath: string | null = null
+  private workspaceChangeTimer: NodeJS.Timeout | undefined
 
   constructor(
     private readonly settingsService: SettingsService,
@@ -79,29 +81,22 @@ export class WorkspaceService {
     return folderPath
   }
 
-  async getTree(rootPath: string): Promise<WorkspaceEntry[]> {
+  async getTree(rootPath: string, expandedPaths: string[] = []): Promise<WorkspaceEntry[]> {
+    const rootStat = await stat(rootPath)
+    if (!rootStat.isDirectory()) {
+      throw new Error(`Workspace path is not a directory: ${rootPath}`)
+    }
+
     // If getting tree for a new path, start watching it
     if (this.currentWorkspacePath !== rootPath) {
       await this.watchWorkspace(rootPath)
     }
 
-    const relativePaths = await fg('**/*', {
-      cwd: rootPath,
-      deep: 5,
-      dot: false,
-      ignore: workspaceIgnore,
-      markDirectories: true,
-      onlyFiles: false,
-      unique: true
-    })
+    const expandedPathSet = new Set(
+      expandedPaths.filter((path) => isWorkspaceDescendantPath(rootPath, path))
+    )
 
-    const roots: WorkspaceEntry[] = []
-
-    for (const relativePath of relativePaths) {
-      this.insertEntry(roots, rootPath, relativePath)
-    }
-
-    return this.sortEntries(roots)
+    return this.readDirectory(rootPath, expandedPathSet, true)
   }
 
   async createEntry(parentPath: string, name: string, type: 'file' | 'directory'): Promise<string> {
@@ -233,10 +228,6 @@ export class WorkspaceService {
       })
     }
 
-    if (files.length > 0) {
-      this.notifyWorkspaceChange()
-    }
-
     return {
       changedFiles: files.length,
       replacements,
@@ -255,13 +246,10 @@ export class WorkspaceService {
       depth: 5
     })
 
-    const notifyChange = (): void => {
-      this.notifyWorkspaceChange()
-    }
+    const notifyChange = (): void => this.scheduleWorkspaceChange()
 
     this.watcher
       .on('add', notifyChange)
-      .on('change', notifyChange)
       .on('unlink', notifyChange)
       .on('addDir', notifyChange)
       .on('unlinkDir', notifyChange)
@@ -269,6 +257,9 @@ export class WorkspaceService {
   }
 
   private async unwatchWorkspace(): Promise<void> {
+    clearTimeout(this.workspaceChangeTimer)
+    this.workspaceChangeTimer = undefined
+
     if (this.watcher) {
       await this.watcher.close()
       this.watcher = null
@@ -297,46 +288,73 @@ export class WorkspaceService {
     })
   }
 
-  private insertEntry(roots: WorkspaceEntry[], rootPath: string, relativePath: string): void {
-    const isDirectory = relativePath.endsWith('/')
-    const parts = relativePath.replace(/\/$/, '').split('/')
-    let entries = roots
+  private scheduleWorkspaceChange(): void {
+    clearTimeout(this.workspaceChangeTimer)
+    this.workspaceChangeTimer = setTimeout(() => {
+      this.workspaceChangeTimer = undefined
+      this.notifyWorkspaceChange()
+    }, 120)
+  }
 
-    parts.forEach((part, index) => {
-      const isLeaf = index === parts.length - 1
-      const type = isLeaf && !isDirectory ? 'file' : 'directory'
-      let entry = entries.find((item) => item.name === part)
+  private async readDirectory(
+    directoryPath: string,
+    expandedPaths: Set<string>,
+    isRoot = false
+  ): Promise<WorkspaceEntry[]> {
+    let directoryEntries
 
-      if (!entry) {
-        entry = {
-          path: join(rootPath, ...parts.slice(0, index + 1)),
-          name: part,
-          type,
-          ...(type === 'directory' ? { children: [] } : {})
-        }
-        entries.push(entry)
+    try {
+      directoryEntries = await readdir(directoryPath, { withFileTypes: true })
+    } catch (error) {
+      if (isRoot) {
+        throw error
       }
 
-      if (entry.type === 'directory') {
-        entries = entry.children ?? []
+      logger.warn(`Unable to read workspace directory: ${directoryPath}`, error)
+      return []
+    }
+
+    const entries = await Promise.all(
+      directoryEntries
+        .filter(
+          (entry) =>
+            !entry.name.startsWith('.') && !workspaceIgnoredEntryNames.has(entry.name.toLowerCase())
+        )
+        .map(async (entry): Promise<WorkspaceEntry> => {
+          const entryPath = join(directoryPath, entry.name)
+
+          if (!entry.isDirectory()) {
+            return {
+              path: entryPath,
+              name: entry.name,
+              type: 'file'
+            }
+          }
+
+          return {
+            path: entryPath,
+            name: entry.name,
+            type: 'directory',
+            ...(expandedPaths.has(entryPath)
+              ? { children: await this.readDirectory(entryPath, expandedPaths) }
+              : {})
+          }
+        })
+    )
+
+    return entries.sort((left, right) => {
+      if (left.type !== right.type) {
+        return left.type === 'directory' ? -1 : 1
       }
+
+      return left.name.localeCompare(right.name)
     })
   }
+}
 
-  private sortEntries(entries: WorkspaceEntry[]): WorkspaceEntry[] {
-    return entries
-      .map((entry) => ({
-        ...entry,
-        children: entry.children ? this.sortEntries(entry.children) : undefined
-      }))
-      .sort((left, right) => {
-        if (left.type !== right.type) {
-          return left.type === 'directory' ? -1 : 1
-        }
-
-        return left.name.localeCompare(right.name)
-      })
-  }
+function isWorkspaceDescendantPath(rootPath: string, candidatePath: string): boolean {
+  const relativePath = relative(rootPath, candidatePath)
+  return relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath)
 }
 
 async function readWorkspaceTextFile(filePath: string): Promise<string | null> {

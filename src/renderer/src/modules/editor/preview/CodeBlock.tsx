@@ -9,21 +9,30 @@ import { MermaidDiagram } from './MermaidDiagram'
 interface CodeBlockProps {
   code: string
   language?: string
+  showLineNumbers?: boolean
 }
 
 /**
  * Static CodeBlock component used in Markdown Preview.
  * In this mode, the language is read-only as it's driven by the source markdown.
  */
-export function CodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
+export function CodeBlock({
+  code,
+  language,
+  showLineNumbers = false
+}: CodeBlockProps): React.JSX.Element {
   if (isMermaidLanguage(language)) {
     return <MermaidDiagram definition={code} />
   }
 
-  return <HighlightedCodeBlock code={code} language={language} />
+  return <HighlightedCodeBlock code={code} language={language} showLineNumbers={showLineNumbers} />
 }
 
-function HighlightedCodeBlock({ code, language }: CodeBlockProps): React.JSX.Element {
+function HighlightedCodeBlock({
+  code,
+  language,
+  showLineNumbers = false
+}: CodeBlockProps): React.JSX.Element {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
   const languageMeta = useMemo(() => getCodeLanguageMeta(language), [language])
   const lineCount = useMemo(() => getCodeLineCount(code), [code])
@@ -49,36 +58,15 @@ function HighlightedCodeBlock({ code, language }: CodeBlockProps): React.JSX.Ele
       data-language={languageMeta.displayName}
       data-language-kind={languageMeta.kind}
       data-line-count={lineCount}
-      data-wrap="false"
+      data-line-numbers={showLineNumbers}
     >
       <figcaption className="markdown-code-toolbar" contentEditable={false}>
         <span className="markdown-code-title">
-          <button
-            className="markdown-code-title-fold"
-            type="button"
-            title="折叠代码块"
-            aria-label="折叠代码块"
-            aria-pressed="false"
-            data-code-action="fold"
-            onClick={(event) => handleCodeBlockAction(event.currentTarget)}
-          />
-          <span className="markdown-code-title-mark" aria-hidden="true" />
           <span className="markdown-code-language markdown-code-language-static">
             {languageMeta.displayName}
           </span>
         </span>
         <span className="markdown-code-actions">
-          <button
-            className="markdown-code-action markdown-code-action-wrap"
-            type="button"
-            title="自动换行"
-            aria-label="自动换行"
-            aria-pressed="false"
-            data-code-action="wrap"
-            onClick={(event) => handleCodeBlockAction(event.currentTarget)}
-          >
-            <span>自动换行</span>
-          </button>
           <button
             className="markdown-code-action markdown-code-action-copy"
             type="button"

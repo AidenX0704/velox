@@ -11,6 +11,9 @@ import type { DocumentLinkPreview } from '../../../../../shared/types'
 
 interface MarkdownPreviewProps {
   content: string
+  currentPath?: string
+  workspaceRoot?: string | null
+  showCodeBlockLineNumbers?: boolean
   anchorTarget?: string | null
   linkNavigation?: EditorLinkNavigationOptions
   customCss?: string
@@ -26,13 +29,24 @@ interface LinkPreviewCardState {
 
 export function MarkdownPreview({
   content,
+  currentPath,
+  workspaceRoot,
+  showCodeBlockLineNumbers = false,
   anchorTarget,
   linkNavigation,
   customCss
 }: MarkdownPreviewProps): React.JSX.Element {
   const rootRef = useRef<HTMLElement | null>(null)
   const previewRequestRef = useRef(0)
-  const renderedContent = useMemo(() => renderMarkdownReact(content), [content])
+  const renderedContent = useMemo(
+    () =>
+      renderMarkdownReact(content, {
+        currentPath,
+        workspaceRoot,
+        showCodeBlockLineNumbers
+      }),
+    [content, currentPath, showCodeBlockLineNumbers, workspaceRoot]
+  )
   const [linkPreview, setLinkPreview] = useState<LinkPreviewCardState | null>(null)
 
   useEffect(() => {

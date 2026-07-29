@@ -22,6 +22,11 @@ import {
 import { slugifyHeading } from '../rendering/headingAnchors'
 import { markdownSanitizeSchema } from './sanitizeSchema'
 import { renderMultimdTableBlocks } from './multimdTable'
+import type { DocumentImageContext } from '../services/documentImage'
+
+interface MarkdownRenderOptions extends DocumentImageContext {
+  showCodeBlockLineNumbers?: boolean
+}
 
 const headingSlugCounts = new Map<string, number>()
 const Heading = {
@@ -35,9 +40,14 @@ const Heading = {
 
 type HeadingTagName = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
-export function renderMarkdownReact(content: string): ReactNode {
+export function renderMarkdownReact(
+  content: string,
+  options: MarkdownRenderOptions = {}
+): ReactNode {
   resetHeadingRenderState()
   const { body, frontmatter } = splitFrontmatter(content)
+  const Image = createMarkdownImageRenderer(options)
+  const Pre = createCodeBlockRenderer(options.showCodeBlockLineNumbers ?? false)
 
   const file = unified()
     .use(remarkParse)
@@ -60,9 +70,9 @@ export function renderMarkdownReact(content: string): ReactNode {
         h4: Heading.h4,
         h5: Heading.h5,
         h6: Heading.h6,
-        pre: CodeBlockPre,
+        pre: Pre,
         table: MarkdownTable,
-        img: MarkdownImage,
+        img: Image,
         a: SafeLink,
         blockquote: MarkdownBlockquote
       }
@@ -79,6 +89,18 @@ export function renderMarkdownReact(content: string): ReactNode {
   }
 
   return file.result
+}
+
+function createCodeBlockRenderer(showLineNumbers: boolean) {
+  return function RenderedCodeBlock(props: React.ComponentProps<'pre'>): ReactElement {
+    return <CodeBlockPre {...props} showLineNumbers={showLineNumbers} />
+  }
+}
+
+function createMarkdownImageRenderer(imageContext: DocumentImageContext) {
+  return function ResolvedMarkdownImage(props: React.ComponentProps<'img'>): ReactElement {
+    return <MarkdownImage {...props} {...imageContext} />
+  }
 }
 
 function splitFrontmatter(content: string): {

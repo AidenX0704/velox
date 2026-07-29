@@ -41,6 +41,7 @@ export interface ShortcutOverride {
 export interface EditorPreferences {
   showSidebar: boolean
   showLineNumbers: boolean
+  showCodeBlockLineNumbers: boolean
   wordWrap: boolean
   editorFontSize: number
   editorLineHeight: number
@@ -66,11 +67,12 @@ export type EditorPreferencesPatch = Partial<Omit<EditorPreferences, 'export'>> 
 export const defaultEditorPreferences: EditorPreferences = {
   showSidebar: true,
   showLineNumbers: true,
+  showCodeBlockLineNumbers: false,
   wordWrap: true,
   editorFontSize: 15,
   editorLineHeight: 1.72,
   previewFontSize: 16,
-  previewLineHeight: 1.82,
+  previewLineHeight: 1.72,
   previewMaxWidth: 920,
   previewCentered: false,
   previewEditWidthMode: 'standard',

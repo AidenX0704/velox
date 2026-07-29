@@ -98,7 +98,7 @@ export function TabBar({
   )
 
   return (
-    <div className="tabbar" ref={tabBarRef} role="tablist" aria-label="打开的文档">
+    <div className="tabbar" ref={tabBarRef} role="tablist" aria-label="打开的资源">
       <div className="tabbar-tabs">
         {tabs.map((tab, index) => (
           <Dropdown

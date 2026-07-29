@@ -1,15 +1,56 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
-import { Button, Typography, Dropdown, Input } from '@douyinfe/semi-ui'
+import { useEffect, useState, useRef } from 'react'
+import { Typography, Dropdown, Input } from '@douyinfe/semi-ui'
 import {
+  IconBriefStroked,
   IconChevronRight,
+  IconDeleteStroked,
+  IconEditStroked,
+  IconExternalOpenStroked,
   IconFile,
+  IconFolder,
+  IconFolderOpen,
   IconFolderOpenStroked,
-  IconFolderStroked
+  IconFolderStroked,
+  IconImageStroked,
+  IconTreeTriangleRight
 } from '@douyinfe/semi-icons'
 import type { WorkspaceEntry } from '../../../shared/types'
+import { getWorkspaceResourceKind } from './workspaceResource'
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
+}
+
+function WorkspaceEntryIcon({
+  type,
+  name,
+  expanded = false
+}: {
+  type: WorkspaceEntry['type']
+  name?: string
+  expanded?: boolean
+}): React.JSX.Element {
+  const resourceKind = type === 'directory' ? 'directory' : getWorkspaceResourceKind(name ?? '')
+
+  return (
+    <span
+      className="workspace-tree-icon"
+      data-entry-kind={resourceKind}
+      data-expanded={type === 'directory' ? expanded : undefined}
+    >
+      {type === 'directory' ? (
+        expanded ? (
+          <IconFolderOpen />
+        ) : (
+          <IconFolder />
+        )
+      ) : resourceKind === 'image' ? (
+        <IconImageStroked />
+      ) : (
+        <IconBriefStroked />
+      )}
+    </span>
+  )
 }
 
 type WorkspaceRootType = 'directory' | 'file'
@@ -43,11 +84,9 @@ export function WorkspaceTree({
   onRenameWorkspaceEntry,
   onDeleteWorkspaceEntry
 }: WorkspaceTreeProps): React.JSX.Element {
-  const treeKey = entries.map((entry) => entry.path).join('|')
-
   return (
     <WorkspaceTreeContent
-      key={treeKey}
+      key={`${workspaceRootType}:${workspaceRoot}`}
       entries={entries}
       selectedPath={selectedPath}
       expandedPaths={expandedPaths}
@@ -82,42 +121,46 @@ function WorkspaceTreeContent({
   onRenameWorkspaceEntry,
   onDeleteWorkspaceEntry
 }: WorkspaceTreeProps): React.JSX.Element {
-  const defaultExpandedPaths = useMemo(
-    () => collectDefaultExpandedPaths(entries, selectedPath),
-    [entries, selectedPath]
-  )
   const [localExpandedPaths, setLocalExpandedPaths] = useState<Set<string>>(
-    () => new Set(expandedPaths?.length ? expandedPaths : [...defaultExpandedPaths])
+    () => new Set(expandedPaths ?? [])
   )
-  const effectiveExpandedPaths = useMemo(
-    () => new Set([...localExpandedPaths, ...defaultExpandedPaths]),
-    [defaultExpandedPaths, localExpandedPaths]
-  )
+  const localExpandedPathsRef = useRef(localExpandedPaths)
 
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
 
   useEffect(() => {
-    if (!selectedPath) {
-      return
-    }
+    if (expandedPaths !== undefined) {
+      const next = new Set(expandedPaths)
 
-    onExpandedPathsChange?.([...effectiveExpandedPaths])
-  }, [effectiveExpandedPaths, onExpandedPathsChange, selectedPath])
-
-  const toggleDirectory = (path: string): void => {
-    setLocalExpandedPaths((current) => {
-      const next = new Set(current)
-
-      if (next.has(path)) {
-        next.delete(path)
-      } else {
-        next.add(path)
+      if (arePathSetsEqual(localExpandedPathsRef.current, next)) {
+        return
       }
 
-      onExpandedPathsChange?.([...new Set([...next, ...defaultExpandedPaths])])
+      localExpandedPathsRef.current = next
+      setLocalExpandedPaths(next)
+    }
+  }, [expandedPaths])
 
-      return next
-    })
+  const commitExpandedPaths = (next: Set<string>): void => {
+    localExpandedPathsRef.current = next
+    setLocalExpandedPaths(next)
+    onExpandedPathsChange?.([...next])
+  }
+
+  const toggleDirectory = (path: string): void => {
+    const next = new Set(localExpandedPathsRef.current)
+
+    if (next.has(path)) {
+      next.delete(path)
+    } else {
+      next.add(path)
+    }
+
+    commitExpandedPaths(next)
+  }
+
+  const collapseAllDirectories = (): void => {
+    commitExpandedPaths(new Set())
   }
 
   const handleCreateRequest = (parentPath: string, type: 'file' | 'directory'): void => {
@@ -126,12 +169,11 @@ function WorkspaceTreeContent({
     }
 
     // Ensure parent is expanded
-    setLocalExpandedPaths((current) => {
-      const next = new Set(current)
+    if (parentPath !== workspaceRoot) {
+      const next = new Set(localExpandedPathsRef.current)
       next.add(parentPath)
-      onExpandedPathsChange?.([...new Set([...next, ...defaultExpandedPaths])])
-      return next
-    })
+      commitExpandedPaths(next)
+    }
 
     setInlineInput({
       type: 'create',
@@ -200,9 +242,7 @@ function WorkspaceTreeContent({
           data-selected={selectedPath === workspaceRoot || undefined}
           onClick={() => onOpenFile(workspaceRoot)}
         >
-          <span className="workspace-tree-icon">
-            <IconFile />
-          </span>
+          <WorkspaceEntryIcon type="file" name={basename(workspaceRoot)} />
           <span className="workspace-tree-label">{basename(workspaceRoot)}</span>
         </button>
       </div>
@@ -211,40 +251,56 @@ function WorkspaceTreeContent({
 
   return (
     <div className="workspace-tree" role="tree">
-      <div className="explorer-root-header">
-        <IconFolderOpenStroked />
-        <div className="explorer-root-copy">
-          <Typography.Text className="explorer-root-name" ellipsis={{ showTooltip: true }}>
-            {workspaceRoot ? basename(workspaceRoot) : '未打开工作区'}
-          </Typography.Text>
-        </div>
-        {onCreateWorkspaceEntry ? (
-          <div className="explorer-root-actions">
-            <button
-              className="explorer-action-button"
-              type="button"
-              title="新建文件"
-              onClick={() => handleCreateRequest(workspaceRoot, 'file')}
+      <Dropdown
+        trigger="contextMenu"
+        render={
+          <Dropdown.Menu>
+            {onCreateWorkspaceEntry ? (
+              <>
+                <Dropdown.Item
+                  icon={<IconFile />}
+                  onClick={() => handleCreateRequest(workspaceRoot, 'file')}
+                >
+                  新建文件
+                </Dropdown.Item>
+                <Dropdown.Item
+                  icon={<IconFolderStroked />}
+                  onClick={() => handleCreateRequest(workspaceRoot, 'directory')}
+                >
+                  新建文件夹
+                </Dropdown.Item>
+              </>
+            ) : null}
+            {localExpandedPaths.size > 0 ? (
+              <Dropdown.Item icon={<IconTreeTriangleRight />} onClick={collapseAllDirectories}>
+                全部折叠
+              </Dropdown.Item>
+            ) : null}
+            {onCreateWorkspaceEntry || localExpandedPaths.size > 0 ? <Dropdown.Divider /> : null}
+            <Dropdown.Item
+              icon={<IconExternalOpenStroked />}
+              onClick={() => void window.api.shell.showItemInFolder(workspaceRoot)}
             >
-              <IconFile />
-            </button>
-            <button
-              className="explorer-action-button"
-              type="button"
-              title="新建文件夹"
-              onClick={() => handleCreateRequest(workspaceRoot, 'directory')}
-            >
-              <IconFolderStroked />
-            </button>
+              在访达中显示
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        }
+      >
+        <div className="explorer-root-header">
+          <IconFolderOpen className="explorer-root-folder-icon" />
+          <div className="explorer-root-copy">
+            <Typography.Text className="explorer-root-name" ellipsis={{ showTooltip: true }}>
+              {workspaceRoot ? basename(workspaceRoot) : '未打开工作区'}
+            </Typography.Text>
           </div>
-        ) : null}
-      </div>
+        </div>
+      </Dropdown>
 
       {inlineInput?.type === 'create' && inlineInput.parentPath === workspaceRoot && (
         <InlineInputNode
           initialValue={inlineInput.initialValue}
           level={0}
-          icon={inlineInput.entryType === 'directory' ? <IconFolderStroked /> : <IconFile />}
+          entryType={inlineInput.entryType ?? 'file'}
           onComplete={handleInlineInputComplete}
           onCancel={() => setInlineInput(null)}
         />
@@ -260,7 +316,7 @@ function WorkspaceTreeContent({
             key={entry.path}
             entry={entry}
             selectedPath={selectedPath}
-            expandedPaths={effectiveExpandedPaths}
+            expandedPaths={localExpandedPaths}
             level={0}
             inlineInput={inlineInput}
             onOpenFile={onOpenFile}
@@ -278,6 +334,20 @@ function WorkspaceTreeContent({
       )}
     </div>
   )
+}
+
+function arePathSetsEqual(left: Set<string>, right: Set<string>): boolean {
+  if (left.size !== right.size) {
+    return false
+  }
+
+  for (const path of left) {
+    if (!right.has(path)) {
+      return false
+    }
+  }
+
+  return true
 }
 
 interface WorkspaceTreeNodeProps {
@@ -317,18 +387,32 @@ function WorkspaceTreeNode({
 }: WorkspaceTreeNodeProps): React.JSX.Element {
   const isDirectory = entry.type === 'directory'
   const isExpanded = isDirectory && expandedPaths.has(entry.path)
-  const isMarkdown = /\.(md|markdown|mdown|mkd|txt)$/i.test(entry.name)
-  const canOpen = entry.type === 'file' && isMarkdown
+  const resourceKind = isDirectory ? null : getWorkspaceResourceKind(entry.name)
+  const canOpen = entry.type === 'file' && resourceKind !== 'unsupported'
   const isSelected = canOpen && entry.path === selectedPath
+  const isDisabled = entry.type === 'file' && !canOpen
 
   const isRenaming = inlineInput?.type === 'rename' && inlineInput.targetPath === entry.path
+
+  const activateNode = (): void => {
+    if (isDisabled) {
+      return
+    }
+
+    if (isDirectory) {
+      onToggleDirectory(entry.path)
+      return
+    }
+
+    onOpenFile(entry.path)
+  }
 
   if (isRenaming) {
     return (
       <InlineInputNode
         initialValue={inlineInput.initialValue}
         level={level}
-        icon={isDirectory ? <IconFolderStroked /> : <IconFile />}
+        entryType={entry.type}
         onComplete={onInlineInputComplete}
         onCancel={onInlineInputCancel}
       />
@@ -345,10 +429,16 @@ function WorkspaceTreeNode({
               <>
                 {canCreate ? (
                   <>
-                    <Dropdown.Item onClick={() => onCreateRequest(entry.path, 'file')}>
+                    <Dropdown.Item
+                      icon={<IconFile />}
+                      onClick={() => onCreateRequest(entry.path, 'file')}
+                    >
                       新建文件
                     </Dropdown.Item>
-                    <Dropdown.Item onClick={() => onCreateRequest(entry.path, 'directory')}>
+                    <Dropdown.Item
+                      icon={<IconFolderStroked />}
+                      onClick={() => onCreateRequest(entry.path, 'directory')}
+                    >
                       新建文件夹
                     </Dropdown.Item>
                     <Dropdown.Divider />
@@ -357,40 +447,62 @@ function WorkspaceTreeNode({
               </>
             )}
             {canRename ? (
-              <Dropdown.Item onClick={() => onRenameRequest(entry.path, entry.name)}>
+              <Dropdown.Item
+                icon={<IconEditStroked />}
+                onClick={() => onRenameRequest(entry.path, entry.name)}
+              >
                 重命名
               </Dropdown.Item>
             ) : null}
             {canDelete ? (
-              <Dropdown.Item type="danger" onClick={() => void onDeleteRequest(entry.path)}>
+              <Dropdown.Item
+                icon={<IconDeleteStroked />}
+                type="danger"
+                onClick={() => void onDeleteRequest(entry.path)}
+              >
                 删除
               </Dropdown.Item>
             ) : null}
             {canRename || canDelete ? <Dropdown.Divider /> : null}
-            <Dropdown.Item onClick={() => void window.api.shell.showItemInFolder(entry.path)}>
+            <Dropdown.Item
+              icon={<IconFolderOpenStroked />}
+              onClick={() => void window.api.shell.showItemInFolder(entry.path)}
+            >
               在访达中显示
             </Dropdown.Item>
           </Dropdown.Menu>
         }
       >
-        <Button
+        <div
           className="workspace-tree-node"
-          theme="borderless"
-          type="tertiary"
-          disabled={entry.type === 'file' && !canOpen}
           style={{ '--tree-level': level } as React.CSSProperties}
           role="treeitem"
+          tabIndex={isDisabled ? -1 : 0}
           aria-expanded={isDirectory ? isExpanded : undefined}
           aria-selected={isSelected || undefined}
+          aria-disabled={isDisabled || undefined}
           data-selected={isSelected || undefined}
-          onClick={() => {
-            if (isDirectory) {
+          onClick={activateNode}
+          onKeyDown={(event) => {
+            if (event.target !== event.currentTarget || isDisabled) {
+              return
+            }
+
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              activateNode()
+              return
+            }
+
+            if (event.key === 'ArrowRight' && isDirectory && !isExpanded) {
+              event.preventDefault()
               onToggleDirectory(entry.path)
               return
             }
 
-            if (canOpen) {
-              onOpenFile(entry.path)
+            if (event.key === 'ArrowLeft' && isDirectory && isExpanded) {
+              event.preventDefault()
+              onToggleDirectory(entry.path)
             }
           }}
         >
@@ -398,55 +510,25 @@ function WorkspaceTreeNode({
             <span className="workspace-tree-chevron" data-expanded={isExpanded}>
               {isDirectory ? <IconChevronRight /> : null}
             </span>
-            <span className="workspace-tree-icon">
-              {isDirectory ? (
-                isExpanded ? (
-                  <IconFolderOpenStroked />
-                ) : (
-                  <IconFolderStroked />
-                )
-              ) : (
-                <IconFile />
-              )}
-            </span>
+            <WorkspaceEntryIcon type={entry.type} name={entry.name} expanded={isExpanded} />
             <span className="workspace-tree-label" title={entry.path}>
               {entry.name}
             </span>
-            {isDirectory && canCreate && (
-              <span className="workspace-tree-actions" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="workspace-tree-action-btn"
-                  title="新建文件"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onCreateRequest(entry.path, 'file')
-                  }}
-                >
-                  <IconFile />
-                </button>
-                <button
-                  className="workspace-tree-action-btn"
-                  title="新建文件夹"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onCreateRequest(entry.path, 'directory')
-                  }}
-                >
-                  <IconFolderStroked />
-                </button>
-              </span>
-            )}
           </span>
-        </Button>
+        </div>
       </Dropdown>
 
       {isExpanded && (
-        <div className="workspace-tree-children" role="group">
+        <div
+          className="workspace-tree-children"
+          role="group"
+          style={{ '--tree-parent-level': level } as React.CSSProperties}
+        >
           {inlineInput?.type === 'create' && inlineInput.parentPath === entry.path && (
             <InlineInputNode
               initialValue={inlineInput.initialValue}
               level={level + 1}
-              icon={inlineInput.entryType === 'directory' ? <IconFolderStroked /> : <IconFile />}
+              entryType={inlineInput.entryType ?? 'file'}
               onComplete={onInlineInputComplete}
               onCancel={onInlineInputCancel}
             />
@@ -480,13 +562,13 @@ function WorkspaceTreeNode({
 function InlineInputNode({
   initialValue,
   level,
-  icon,
+  entryType,
   onComplete,
   onCancel
 }: {
   initialValue: string
   level: number
-  icon: React.ReactNode
+  entryType: WorkspaceEntry['type']
   onComplete: (value: string) => void
   onCancel: () => void
 }): React.JSX.Element {
@@ -514,7 +596,7 @@ function InlineInputNode({
       >
         <span className="workspace-tree-row">
           <span className="workspace-tree-chevron" />
-          <span className="workspace-tree-icon">{icon}</span>
+          <WorkspaceEntryIcon type={entryType} name={initialValue} />
           <Input
             ref={inputRef}
             value={value}
@@ -535,31 +617,4 @@ function InlineInputNode({
       </div>
     </div>
   )
-}
-
-function collectDefaultExpandedPaths(
-  entries: WorkspaceEntry[],
-  selectedPath?: string
-): Set<string> {
-  const expandedPaths = new Set<string>()
-
-  for (const entry of entries) {
-    if (entry.type === 'directory') {
-      expandedPaths.add(entry.path)
-
-      if (selectedPath && isDescendantPath(selectedPath, entry.path)) {
-        expandedPaths.add(entry.path)
-      }
-
-      for (const childPath of collectDefaultExpandedPaths(entry.children ?? [], selectedPath)) {
-        expandedPaths.add(childPath)
-      }
-    }
-  }
-
-  return expandedPaths
-}
-
-function isDescendantPath(path: string, parentPath: string): boolean {
-  return path.startsWith(`${parentPath}/`) || path.startsWith(`${parentPath}\\`)
 }

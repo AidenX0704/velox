@@ -29,9 +29,12 @@ import { getCodeBlockActionButton, handleCodeBlockAction } from '../rendering/bl
 import { collectHeadingAnchors, type HeadingAnchor } from '../rendering/headingAnchors'
 import { DocumentOutline } from '../outline/DocumentOutline'
 import { createCodeBlockNodeView } from './nodeViews/codeBlockNodeView'
+import { createImageNodeView, type ResolvableImageNodeView } from './nodeViews/imageNodeView'
 import { createTaskListItemNodeView } from './nodeViews/taskListItemNodeView'
+import type { DocumentImageContext } from '../services/documentImage'
 import { FormatToolbar } from './FormatToolbar'
 import { RICH_EDITOR_STATE_EVENT } from './editorEvents'
+import { createImageDeletionGuardPlugin } from './imageDeletionGuard'
 import type { CursorPosition, MarkdownEditorPreferences } from '../model/types'
 import {
   createMarkdownInputRules,
@@ -94,6 +97,8 @@ export function RichMarkdownEditor({
   const searchCaseSensitiveRef = useRef(searchCaseSensitive)
   const activeSearchMatchIndexRef = useRef(activeSearchMatchIndex)
   const linkNavigationRef = useRef<EditorLinkNavigationOptions>({})
+  const imageContextRef = useRef<DocumentImageContext>({ currentPath, workspaceRoot })
+  const imageNodeViewsRef = useRef(new Set<ResolvableImageNodeView>())
   const headingAnchors = useMemo(() => collectHeadingAnchors(content), [content])
   const [fontSize, setFontSize] = useState(settings.previewFontSize)
   const [editorView, setEditorView] = useState<EditorView | null>(null)
@@ -125,11 +130,17 @@ export function RichMarkdownEditor({
   }, [currentPath, onLinkError, onOpenDocumentLink, workspaceRoot])
 
   useEffect(() => {
+    imageContextRef.current = { currentPath, workspaceRoot }
+    imageNodeViewsRef.current.forEach((nodeView) => nodeView.refreshSource())
+  }, [currentPath, workspaceRoot])
+
+  useEffect(() => {
     if (!hostRef.current) {
       return
     }
 
     const hostElement = hostRef.current
+    const imageNodeViews = imageNodeViewsRef.current
     const view = new EditorView(hostElement, {
       state: createEditorState(
         initialContentRef.current,
@@ -147,6 +158,15 @@ export function RichMarkdownEditor({
       nodeViews: {
         code_block: (node, view, getPos) =>
           createCodeBlockNodeView(node, view, getPos as () => number | undefined),
+        image: (node) => {
+          const nodeView = createImageNodeView(
+            node,
+            () => imageContextRef.current,
+            (destroyedNodeView) => imageNodeViews.delete(destroyedNodeView)
+          )
+          imageNodeViews.add(nodeView)
+          return nodeView
+        },
         list_item: (node, view, getPos) =>
           createTaskListItemNodeView(node, view, getPos as () => number | undefined)
       },
@@ -207,6 +227,7 @@ export function RichMarkdownEditor({
       scrollContainer?.removeEventListener('scroll', handleScroll)
       view.destroy()
       viewRef.current = null
+      imageNodeViews.clear()
       setEditorView(null)
     }
   }, [])
@@ -330,6 +351,7 @@ export function RichMarkdownEditor({
       }
       data-preview-centered={settings.previewCentered}
       data-width-mode={settings.previewEditWidthMode}
+      data-code-line-numbers={settings.showCodeBlockLineNumbers}
     >
       {settings.customPreviewCss ? <style>{settings.customPreviewCss}</style> : null}
       {searchPanel}
@@ -516,6 +538,7 @@ function createEditorState(
       createRichSearchPlugin(searchQuery, activeSearchMatchIndex, searchCaseSensitive),
       inputRules({ rules: createMarkdownInputRules() }),
       history(),
+      createImageDeletionGuardPlugin(),
       columnResizing(),
       tableEditing(),
       keymap({

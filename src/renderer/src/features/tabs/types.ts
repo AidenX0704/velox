@@ -6,6 +6,8 @@ export interface TabDocument {
   content: string
   dirty: boolean
   updatedAt?: string
+  kind?: 'markdown' | 'image'
+  imageSource?: string
 }
 
 export interface TabState {

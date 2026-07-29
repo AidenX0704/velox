@@ -1,127 +1,27 @@
-.markdown-diagram {
-  margin: 1.7em 0;
-  overflow: hidden;
-  border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  background: var(--surface-raised);
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
-}
-
-[data-color-mode='dark'] .markdown-diagram {
-  box-shadow: none;
-}
-
-.markdown-diagram-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 42px;
-  gap: 12px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--line-soft);
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--surface-muted), var(--surface-raised) 42%);
-  font-size: 12px;
-}
-
-.markdown-diagram-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: var(--text-primary);
-  font-weight: 650;
-}
-
-.markdown-diagram-mark {
-  width: 16px;
-  height: 16px;
-  color: var(--brand-active);
-  background: currentColor;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='6' height='5' rx='1'/%3E%3Crect x='15' y='16' width='6' height='5' rx='1'/%3E%3Cpath d='M9 5.5h3a3 3 0 0 1 3 3v7.5M12 16h3'/%3E%3Cpath d='m12 13 3 3 3-3'/%3E%3C/svg%3E");
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: contain;
-}
-
-.markdown-diagram-type {
-  overflow: hidden;
-  color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.markdown-diagram-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.markdown-diagram-copy,
-.markdown-diagram-switch {
-  height: 28px;
-  padding: 0 10px;
+.markdown-diagram,
+.markdown-preview .markdown-diagram {
+  position: relative;
+  margin: 1.35em 0;
+  overflow: visible;
   border: 0;
-  border-radius: 6px;
-  color: var(--text-secondary);
+  border-radius: 0;
   background: transparent;
-  font: inherit;
-  cursor: pointer;
-  transition:
-    color 120ms ease,
-    background 120ms ease;
-}
-
-.markdown-diagram-copy:hover,
-.markdown-diagram-copy:focus-visible,
-.markdown-diagram-switch:hover,
-.markdown-diagram-switch:focus-visible {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-  outline: none;
-}
-
-.markdown-diagram-copy[data-copy-state='copied'] {
-  color: #059669;
-}
-
-.markdown-diagram-source {
-  box-sizing: border-box;
-  min-width: 100%;
-  min-height: 220px;
-  margin: 0 !important;
-  padding: 22px 24px !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  color: var(--text-primary);
-  background: var(--surface-muted) !important;
-  font-family: var(--code-font-family);
-  font-size: 13px;
-  line-height: 1.65;
-  white-space: pre;
+  box-shadow: none;
 }
 
 .markdown-diagram-viewport,
 .markdown-diagram-panel {
   position: relative;
-  min-height: 220px;
+  min-height: 160px;
   overflow: auto;
-  background:
-    radial-gradient(
-      circle at 50% 0,
-      rgba(var(--theme-accent-rgb, 22, 119, 255), 0.055),
-      transparent 48%
-    ),
-    var(--surface-raised);
+  background: transparent;
 }
 
 .markdown-diagram-canvas {
   display: grid;
   min-width: min-content;
-  min-height: 220px;
-  padding: 28px;
+  min-height: 160px;
+  padding: 12px 0;
   place-items: center;
 }
 
@@ -130,7 +30,7 @@
   width: auto;
   max-width: 100%;
   height: auto;
-  min-height: 80px;
+  min-height: 72px;
   margin: auto;
 }
 
@@ -151,15 +51,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 220px;
-  gap: 9px;
+  min-height: 160px;
+  gap: 8px;
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .markdown-diagram-loading > span {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid var(--line-soft);
   border-top-color: var(--brand-active);
   border-radius: 50%;
@@ -169,49 +69,20 @@
 .markdown-diagram-error {
   display: flex;
   flex-direction: column;
-  min-height: 220px;
-  padding: 24px;
+  justify-content: center;
+  min-height: 160px;
+  padding: 16px 0;
   color: var(--text-secondary);
 }
 
 .markdown-diagram-error strong {
   margin-bottom: 4px;
   color: #c2413b;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .markdown-diagram-error > span {
   font-size: 12px;
-}
-
-.markdown-diagram-error button {
-  align-self: flex-start;
-  height: 30px;
-  margin-top: 16px;
-  padding: 0 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  background: var(--surface-raised);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.markdown-diagram-error button:hover,
-.markdown-diagram-error button:focus-visible {
-  color: var(--brand-active);
-  border-color: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.32);
-  outline: none;
-}
-
-.preview-edit-prosemirror .ProseMirror .markdown-diagram-panel {
-  min-height: 220px;
-  border-bottom: 1px solid var(--code-border);
-}
-
-.preview-edit-prosemirror .ProseMirror .markdown-diagram-panel[hidden] {
-  display: none;
 }
 
 .markdown-diagram-panel-status {
@@ -219,20 +90,20 @@
   inset: 0;
   z-index: 2;
   flex-direction: column;
-  padding: 24px;
-  background: color-mix(in srgb, var(--surface-raised), transparent 8%);
+  padding: 16px;
+  background: var(--surface-base);
   text-align: center;
 }
 
 .markdown-diagram-panel-status strong {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .markdown-diagram-panel-status span {
   max-width: 620px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .markdown-diagram-panel[data-diagram-state='ready'] .markdown-diagram-panel-status {
@@ -240,51 +111,21 @@
 }
 
 .markdown-diagram-panel[data-diagram-state='updating'] .markdown-diagram-canvas {
-  opacity: 0.42;
+  opacity: 0.5;
 }
 
 .markdown-diagram-panel[data-diagram-state='error'] .markdown-diagram-panel-status strong {
   color: #c2413b;
 }
 
-.preview-edit-code-block[data-diagram='true'] .markdown-code-pre {
-  border-radius: 0 0 6px 6px;
-  background: color-mix(in srgb, var(--code-bg), var(--surface-muted) 28%);
+.preview-edit-prosemirror .ProseMirror .markdown-diagram-embedded {
+  margin: 1.35em 0;
+  min-height: 160px;
+  user-select: none;
 }
 
-.preview-edit-code-block[data-diagram='true'][data-diagram-view='preview'] .markdown-code-pre {
-  display: none;
-}
-
-.preview-edit-code-block[data-diagram='true'][data-diagram-view='source'] .markdown-diagram-panel {
-  display: none;
-}
-
-.markdown-code-action-diagram::before {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h10'/%3E%3Cpath d='m11 4 3 3-3 3'/%3E%3Cpath d='M20 17H10'/%3E%3Cpath d='m13 14-3 3 3 3'/%3E%3C/svg%3E");
-}
-
-.markdown-code-action-diagram {
-  width: auto;
-  padding: 0 8px;
-  gap: 5px;
-}
-
-.markdown-code-action-diagram span {
-  position: static;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip: auto;
-  white-space: nowrap;
-}
-
-.preview-edit-code-block[data-diagram='true'][data-collapsed='true'] .markdown-diagram-panel {
-  display: none;
-}
-
-.preview-edit-code-block[data-diagram='true'][data-collapsed='true']::after {
-  content: '图表已折叠';
+.preview-edit-prosemirror .ProseMirror .markdown-diagram-embedded.ProseMirror-selectednode {
+  outline: none;
 }
 
 @keyframes markdown-diagram-spin {

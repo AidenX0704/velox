@@ -40,6 +40,7 @@ export interface TitleBarSearchResult {
 
 interface TitleBarProps {
   mode: EditorMode
+  documentActionsEnabled: boolean
   platform: string
   searchValue: string
   searchScope: TitleBarSearchScope
@@ -100,6 +101,7 @@ function WindowsCaptionIcon({
 
 export function TitleBar({
   mode,
+  documentActionsEnabled,
   platform,
   searchValue,
   searchScope,
@@ -240,23 +242,47 @@ export function TitleBar({
                 最近活动
               </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item icon={<IconSaveStroked />} onClick={onSave}>
+              <Dropdown.Item
+                disabled={!documentActionsEnabled}
+                icon={<IconSaveStroked />}
+                onClick={onSave}
+              >
                 保存
               </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item icon={<IconPdf />} onClick={() => onExport('pdf')}>
+              <Dropdown.Item
+                disabled={!documentActionsEnabled}
+                icon={<IconPdf />}
+                onClick={() => onExport('pdf')}
+              >
                 导出 PDF
               </Dropdown.Item>
-              <Dropdown.Item icon={<IconImageStroked />} onClick={() => onExport('png')}>
+              <Dropdown.Item
+                disabled={!documentActionsEnabled}
+                icon={<IconImageStroked />}
+                onClick={() => onExport('png')}
+              >
                 导出 PNG
               </Dropdown.Item>
-              <Dropdown.Item icon={<IconImage />} onClick={() => onExport('jpeg')}>
+              <Dropdown.Item
+                disabled={!documentActionsEnabled}
+                icon={<IconImage />}
+                onClick={() => onExport('jpeg')}
+              >
                 导出 JPEG
               </Dropdown.Item>
-              <Dropdown.Item icon={<IconExport />} onClick={() => onExport('docx')}>
+              <Dropdown.Item
+                disabled={!documentActionsEnabled}
+                icon={<IconExport />}
+                onClick={() => onExport('docx')}
+              >
                 导出 Word
               </Dropdown.Item>
-              <Dropdown.Item icon={<IconExport />} onClick={() => onExport('html')}>
+              <Dropdown.Item
+                disabled={!documentActionsEnabled}
+                icon={<IconExport />}
+                onClick={() => onExport('html')}
+              >
                 导出 HTML
               </Dropdown.Item>
             </Dropdown.Menu>
@@ -535,14 +561,16 @@ export function TitleBar({
       </div>
 
       <div className="titlebar-right">
-        <Segment
-          className="mode-segment"
-          value={mode}
-          options={modeOptions}
-          ariaLabel="编辑模式切换"
-          size="small"
-          onChange={onModeChange}
-        />
+        {documentActionsEnabled ? (
+          <Segment
+            className="mode-segment"
+            value={mode}
+            options={modeOptions}
+            ariaLabel="编辑模式切换"
+            size="small"
+            onChange={onModeChange}
+          />
+        ) : null}
         <div className="window-controls" aria-label="窗口控制">
           <button
             type="button"

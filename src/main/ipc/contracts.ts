@@ -32,6 +32,7 @@ export const schemas = {
   editorPreferencesPatch: z.object({
     showSidebar: z.boolean().optional(),
     showLineNumbers: z.boolean().optional(),
+    showCodeBlockLineNumbers: z.boolean().optional(),
     wordWrap: z.boolean().optional(),
     editorFontSize: z.number().int().min(12).max(24).optional(),
     editorLineHeight: z.number().min(1.3).max(2.2).optional(),
@@ -79,6 +80,12 @@ export const schemas = {
       expandedPaths: z.array(nonEmptyString).optional(),
       selectedPath: nonEmptyString.optional(),
       sidebarVisible: z.boolean().optional()
+    })
+    .strict(),
+  workspaceTree: z
+    .object({
+      rootPath: nonEmptyString,
+      expandedPaths: z.array(nonEmptyString).max(512).optional()
     })
     .strict(),
   createWorkspaceEntry: z
@@ -144,6 +151,13 @@ export const schemas = {
       workspaceRoot: nonEmptyString.optional()
     })
     .strict(),
+  resolveDocumentImage: z
+    .object({
+      src: nonEmptyString.max(8192),
+      currentPath: nonEmptyString.optional(),
+      workspaceRoot: nonEmptyString.optional()
+    })
+    .strict(),
   url: z.url()
 }
 
@@ -151,6 +165,7 @@ export type SettingsPatchInput = z.infer<typeof schemas.settingsPatch>
 export type SaveDocumentInput = z.infer<typeof schemas.saveDocument>
 export type SaveDocumentAsInput = z.infer<typeof schemas.saveDocumentAs>
 export type ResolveDocumentLinkInput = z.infer<typeof schemas.resolveDocumentLink>
+export type ResolveDocumentImageInput = z.infer<typeof schemas.resolveDocumentImage>
 export type EditorPreferencesPatchInput = z.infer<typeof schemas.editorPreferencesPatch>
 export type WorkspaceStateInput = z.infer<typeof schemas.workspaceState>
 export type WorkspaceSearchInput = z.infer<typeof schemas.workspaceSearch>

@@ -8,6 +8,23 @@ import type { ExportPreferences } from '../../shared/export'
 import { PreferencesRepository } from '../database/repositories/preferences-repository'
 
 const editorPreferencesKey = 'editorPreferences'
+const excludedEditorPreferenceKeys = new Set<keyof EditorPreferences>(['export'])
+
+function pickKnownProperties<T extends object>(
+  source: Partial<T> | undefined,
+  defaults: T,
+  excludedKeys: ReadonlySet<keyof T> = new Set()
+): Partial<T> {
+  if (!source) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    (Object.keys(defaults) as Array<keyof T>)
+      .filter((key) => !excludedKeys.has(key) && key in source)
+      .map((key) => [key, source[key]])
+  ) as Partial<T>
+}
 
 export class PreferencesService {
   constructor(private readonly preferencesRepository: PreferencesRepository) {}
@@ -17,24 +34,17 @@ export class PreferencesService {
     const hasExistingPreferences = stored !== undefined
 
     // Filter out unknown keys from stored preferences to avoid carrying over legacy settings
-    const cleanStored: Partial<EditorPreferences> = {}
-    if (stored) {
-      for (const key of Object.keys(defaultEditorPreferences)) {
-        if (key !== 'export' && key in stored) {
-          ;(cleanStored as any)[key] = (stored as any)[key]
-        }
-      }
-    }
+    const cleanStored = pickKnownProperties(
+      stored,
+      defaultEditorPreferences,
+      excludedEditorPreferenceKeys
+    )
 
     // Filter out unknown keys from stored export preferences
-    const cleanExport: Partial<ExportPreferences> = {}
-    if (stored?.export) {
-      for (const key of Object.keys(defaultEditorPreferences.export)) {
-        if (key in stored.export) {
-          cleanExport[key] = (stored.export as any)[key]
-        }
-      }
-    }
+    const cleanExport: Partial<ExportPreferences> = pickKnownProperties(
+      stored?.export,
+      defaultEditorPreferences.export
+    )
 
     const preferences = {
       ...defaultEditorPreferences,

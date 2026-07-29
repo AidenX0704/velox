@@ -35,7 +35,7 @@
 .preview-edit-prosemirror .ProseMirror ol,
 .preview-edit-prosemirror .ProseMirror blockquote,
 .preview-edit-prosemirror .ProseMirror pre {
-  margin: 0.75em 0;
+  margin: 0.85em 0;
 }
 
 .preview-edit-prosemirror .ProseMirror ul,
@@ -92,14 +92,8 @@
   color: #0550ae;
   background: rgba(175, 184, 193, 0.18);
   box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.12);
-  font-family:
-    ui-monospace,
-    SFMono-Regular,
-    SF Mono,
-    Menlo,
-    Consolas,
-    monospace;
-  font-size: 0.88em;
+  font-family: var(--code-font-family);
+  font-size: 0.9em;
 }
 
 [data-color-mode='dark'] .preview-edit-prosemirror .ProseMirror code {
@@ -128,6 +122,50 @@
 .preview-edit-prosemirror .ProseMirror-selectednode {
   outline: 2px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.28);
   outline-offset: 2px;
+}
+
+.preview-edit-prosemirror .ProseMirror img {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: auto;
+  margin: 1.45em auto;
+  border-radius: 8px;
+}
+
+.preview-edit-prosemirror .ProseMirror p.markdown-image-paragraph {
+  line-height: 0;
+}
+
+.preview-edit-prosemirror
+  .ProseMirror
+  p.markdown-image-paragraph
+  > img:not(.ProseMirror-separator) {
+  margin: 0 auto;
+}
+
+.preview-edit-prosemirror .ProseMirror img.image-delete-armed {
+  outline: 2px solid rgba(220, 38, 38, 0.68);
+  outline-offset: 3px;
+}
+
+.preview-edit-prosemirror .ProseMirror img[data-image-state='loading'],
+.markdown-preview img[data-image-state='loading'] {
+  width: 100%;
+  min-height: 64px;
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.preview-edit-prosemirror .ProseMirror img[data-image-state='error'],
+.markdown-preview img[data-image-state='error'] {
+  min-width: min(100%, 220px);
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-soft);
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+  box-shadow: none;
 }
 
 .katex,

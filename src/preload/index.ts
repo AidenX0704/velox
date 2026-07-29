@@ -12,6 +12,7 @@ import type {
   MenuCommand,
   RecentFileRecord,
   RecentWorkspaceRecord,
+  ResolveDocumentImageInput,
   ResolveDocumentLinkInput,
   ResolvedDocumentLink,
   Result,
@@ -99,6 +100,8 @@ const api: VeloxAPI = {
       invoke<ResolvedDocumentLink | null>(ipcChannels.document.resolveLink, input),
     previewLink: (input: ResolveDocumentLinkInput) =>
       invoke<DocumentLinkPreview | null>(ipcChannels.document.previewLink, input),
+    resolveImage: (input: ResolveDocumentImageInput) =>
+      invoke<string | null>(ipcChannels.document.resolveImage, input),
     save: (input: SaveDocumentInput) => invoke<DocumentData>(ipcChannels.document.save, input),
     saveAs: (input: SaveDocumentAsInput) =>
       invoke<DocumentData | null>(ipcChannels.document.saveAs, input),
@@ -118,8 +121,7 @@ const api: VeloxAPI = {
   },
   workspace: {
     openFolder: () => invoke<string | null>(ipcChannels.workspace.openFolder),
-    getTree: (rootPath: string) =>
-      invoke<WorkspaceEntry[]>(ipcChannels.workspace.getTree, rootPath),
+    getTree: (input) => invoke<WorkspaceEntry[]>(ipcChannels.workspace.getTree, input),
     getState: (rootPath: string) =>
       invoke<WorkspaceStateRecord | null>(ipcChannels.workspace.getState, rootPath),
     updateState: (input: UpdateWorkspaceStateInput) =>

@@ -131,7 +131,7 @@ export function useDocument(): {
   const loadWorkspace = useCallback(async (path: string) => {
     setWorkspaceRoot(path)
 
-    const treeResult = await window.api.workspace.getTree(path)
+    const treeResult = await window.api.workspace.getTree({ rootPath: path })
 
     if (treeResult.ok) {
       setWorkspaceTree(treeResult.data)
@@ -142,7 +142,7 @@ export function useDocument(): {
 
   const refreshWorkspace = useCallback(async () => {
     if (workspaceRoot) {
-      const treeResult = await window.api.workspace.getTree(workspaceRoot)
+      const treeResult = await window.api.workspace.getTree({ rootPath: workspaceRoot })
       if (treeResult.ok) {
         setWorkspaceTree(treeResult.data)
       }

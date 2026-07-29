@@ -4,6 +4,15 @@
   background: var(--surface-base);
 }
 
+.markdown-preview,
+.preview-edit-shell {
+  --markdown-font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --code-font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
 .markdown-preview {
   --color-text: var(--text-primary);
   --color-text-light: var(--text-secondary);
@@ -26,9 +35,6 @@
   --markdown-color-reference: var(--color-reference);
   --markdown-color-reference-text: var(--color-reference-text);
   --markdown-color-reference-background: var(--color-reference-background);
-  --code-font-family:
-    ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-
   box-sizing: border-box;
   width: 100%;
   max-width: none;
@@ -36,8 +42,9 @@
   margin: 0;
   padding: 24px clamp(20px, 4vw, 32px) 96px;
   color: var(--markdown-color-text);
+  font-family: var(--markdown-font-family);
   font-size: var(--preview-font-size, 16px);
-  line-height: var(--preview-line-height, 1.6);
+  line-height: var(--preview-line-height, 1.72);
   overflow-wrap: anywhere;
   word-break: break-word;
   user-select: text;
@@ -79,7 +86,7 @@
   overflow: visible;
   background: var(--surface-base);
   font-size: var(--preview-font-size, 16px);
-  line-height: var(--preview-line-height, 1.82);
+  line-height: var(--preview-line-height, 1.72);
 }
 
 .preview-edit-prosemirror {
@@ -115,15 +122,7 @@
   margin: 0 auto;
   padding: 24px 32px 96px;
   color: var(--text-primary);
-  font-family:
-    JetBrains Mono,
-    ui-monospace,
-    SFMono-Regular,
-    SF Mono,
-    Menlo,
-    Consolas,
-    Liberation Mono,
-    monospace;
+  font-family: var(--markdown-font-family);
   outline: none;
   -webkit-text-decoration-skip: none;
   white-space: pre-wrap;
@@ -199,7 +198,7 @@
 
 .preview-edit-shell-readonly .markdown-preview {
   font-size: var(--preview-font-size, 16px);
-  line-height: var(--preview-line-height, 1.82);
+  line-height: var(--preview-line-height, 1.72);
 }
 
 .preview-readonly-pane {

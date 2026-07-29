@@ -9,7 +9,7 @@ export const codeBlockSelectors = {
   rawCode: '[data-raw-code]'
 } as const
 
-export type CodeBlockAction = 'copy' | 'fold' | 'wrap'
+export type CodeBlockAction = 'copy'
 
 export function applyCodeBlockMeta(
   codeBlock: HTMLElement,
@@ -54,34 +54,6 @@ export async function copyCodeBlock(codeBlock: HTMLElement): Promise<void> {
     Toast.success('代码已复制')
   } catch {
     Toast.error('复制失败')
-  }
-}
-
-export function toggleCodeBlockFold(
-  codeBlock: HTMLElement,
-  actionButton?: HTMLButtonElement
-): void {
-  const collapsed = codeBlock.dataset.collapsed === 'true'
-  const nextCollapsed = !collapsed
-  codeBlock.dataset.collapsed = String(nextCollapsed)
-
-  if (actionButton) {
-    actionButton.title = nextCollapsed ? '展开代码块' : '折叠代码块'
-    actionButton.setAttribute('aria-label', nextCollapsed ? '展开代码块' : '折叠代码块')
-    actionButton.setAttribute('aria-pressed', String(nextCollapsed))
-  }
-}
-
-export function toggleCodeBlockWrap(
-  codeBlock: HTMLElement,
-  actionButton?: HTMLButtonElement
-): void {
-  const wrapped = codeBlock.dataset.wrap === 'true'
-  const nextWrapped = !wrapped
-  codeBlock.dataset.wrap = String(nextWrapped)
-
-  if (actionButton) {
-    actionButton.setAttribute('aria-pressed', String(nextWrapped))
   }
 }
 

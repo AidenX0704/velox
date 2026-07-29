@@ -76,6 +76,12 @@ export interface ResolveDocumentLinkInput {
   workspaceRoot?: string
 }
 
+export interface ResolveDocumentImageInput {
+  src: string
+  currentPath?: string
+  workspaceRoot?: string
+}
+
 export interface ResolvedDocumentLink {
   path: string
   anchor?: string
@@ -95,6 +101,11 @@ export interface WorkspaceEntry {
   name: string
   type: 'file' | 'directory'
   children?: WorkspaceEntry[]
+}
+
+export interface WorkspaceTreeInput {
+  rootPath: string
+  expandedPaths?: string[]
 }
 
 export interface WorkspaceSearchInput {
@@ -327,6 +338,7 @@ export interface VeloxAPI {
     openPath: (path: string) => Promise<Result<DocumentData>>
     resolveLink: (input: ResolveDocumentLinkInput) => Promise<Result<ResolvedDocumentLink | null>>
     previewLink: (input: ResolveDocumentLinkInput) => Promise<Result<DocumentLinkPreview | null>>
+    resolveImage: (input: ResolveDocumentImageInput) => Promise<Result<string | null>>
     save: (input: SaveDocumentInput) => Promise<Result<DocumentData>>
     saveAs: (input: SaveDocumentAsInput) => Promise<Result<DocumentData | null>>
     export: (
@@ -338,7 +350,7 @@ export interface VeloxAPI {
   }
   workspace: {
     openFolder: () => Promise<Result<string | null>>
-    getTree: (rootPath: string) => Promise<Result<WorkspaceEntry[]>>
+    getTree: (input: WorkspaceTreeInput) => Promise<Result<WorkspaceEntry[]>>
     getState: (rootPath: string) => Promise<Result<WorkspaceStateRecord | null>>
     updateState: (input: UpdateWorkspaceStateInput) => Promise<Result<WorkspaceStateRecord>>
     createEntry: (input: {

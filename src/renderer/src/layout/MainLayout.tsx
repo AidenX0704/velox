@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
 import { IconFolderStroked } from '@douyinfe/semi-icons'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
@@ -29,11 +29,15 @@ import {
 import { StatusBar } from './StatusBar'
 import { SettingsPage, type PreferenceSection } from './SettingsPanel'
 import { TitleBar, type TitleBarSearchResult, type TitleBarSearchScope } from './TitleBar'
+import { WorkspaceImagePreview } from './WorkspaceImagePreview'
 import { WorkspaceTree } from './WorkspaceTree'
+import { isWorkspaceImageResource } from './workspaceResource'
 
 type AppView = 'editor' | 'recent' | 'settings'
 type UpdaterDialogKind = 'available' | 'downloaded' | null
 const MAX_TITLEBAR_SEARCH_RESULTS = 80
+const MAX_RESTORED_EXPLORER_PATHS = 128
+const WORKSPACE_EXPLORER_STATE_VERSION = '2'
 
 const MarkdownEditor = lazy(() =>
   import('../modules/editor/MarkdownEditor').then((module) => ({
@@ -172,6 +176,27 @@ function isPathInsideWorkspace(filePath: string, workspacePath: string): boolean
   )
 }
 
+function restoreWorkspaceExpandedPaths(workspacePath: string, paths: string[]): string[] {
+  const migrationKey = `velox:workspace-explorer-state:${workspacePath}`
+
+  try {
+    if (window.localStorage.getItem(migrationKey) !== WORKSPACE_EXPLORER_STATE_VERSION) {
+      window.localStorage.setItem(migrationKey, WORKSPACE_EXPLORER_STATE_VERSION)
+      return []
+    }
+  } catch {
+    return []
+  }
+
+  if (paths.length > MAX_RESTORED_EXPLORER_PATHS) {
+    return []
+  }
+
+  return [...new Set(paths)].filter(
+    (path) => path !== workspacePath && isPathInsideWorkspace(path, workspacePath)
+  )
+}
+
 function EditorLoadingFallback(): React.JSX.Element {
   return (
     <div className="editor-loading" aria-label="正在加载编辑器">
@@ -224,7 +249,7 @@ function getUpdateNotes(status: UpdaterStatus): string {
   return status.releaseNotes?.trim() || '此版本没有提供更新日志。'
 }
 
-function ResourceExplorer({
+const ResourceExplorer = memo(function ResourceExplorer({
   workspaceRoot,
   workspaceTree,
   selectedPath,
@@ -262,9 +287,6 @@ function ResourceExplorer({
 
   return (
     <aside className="resource-explorer" aria-label="资源管理器">
-      <header className="resource-explorer-header">
-        <div className="resource-explorer-title">资源管理器</div>
-      </header>
       {workspaceRoot ? (
         <WorkspaceTree
           entries={workspaceTree}
@@ -290,7 +312,7 @@ function ResourceExplorer({
           <IconFolderStroked />
           <Typography.Text strong>未打开文件夹</Typography.Text>
           <Typography.Text type="tertiary">
-            打开一个本地文件夹后可浏览 Markdown 文件。
+            打开一个本地文件夹后可浏览 Markdown 文档和图片资源。
           </Typography.Text>
           <button
             className="resource-explorer-empty-action"
@@ -303,7 +325,7 @@ function ResourceExplorer({
       )}
     </aside>
   )
-}
+})
 
 function RecentWorkbench({
   activity,
@@ -312,7 +334,8 @@ function RecentWorkbench({
   onSelectFile,
   onOpenInEditor,
   onBack,
-  customCss
+  customCss,
+  showCodeBlockLineNumbers
 }: {
   activity: HistoryDocumentActivity | null
   recentFiles: import('../../../shared/types').RecentFileRecord[]
@@ -321,6 +344,7 @@ function RecentWorkbench({
   onOpenInEditor: (path: string) => void
   onBack: () => void
   customCss?: string
+  showCodeBlockLineNumbers: boolean
 }): React.JSX.Element {
   const selectedFile = recentFiles.find((file) => file.path === selectedPath)
 
@@ -430,7 +454,12 @@ function RecentWorkbench({
             </section>
             <section className="recent-rendered-preview" aria-label="渲染预览">
               <Suspense fallback={<div className="recent-preview-loading" />}>
-                <MarkdownPreview content={activity.currentContent} customCss={customCss} />
+                <MarkdownPreview
+                  content={activity.currentContent}
+                  currentPath={activity.path}
+                  customCss={customCss}
+                  showCodeBlockLineNumbers={showCodeBlockLineNumbers}
+                />
               </Suspense>
             </section>
           </>
@@ -454,6 +483,7 @@ export function MainLayout(): React.JSX.Element {
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
   const [workspaceTree, setWorkspaceTree] = useState<WorkspaceEntry[]>([])
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
+  const [workspaceStateReady, setWorkspaceStateReady] = useState(false)
   const [explorerVisible, setExplorerVisible] = useState(true)
   const [recentFiles, setRecentFiles] = useState<
     import('../../../shared/types').RecentFileRecord[]
@@ -482,6 +512,7 @@ export function MainLayout(): React.JSX.Element {
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false)
   const [workspaceSearchError, setWorkspaceSearchError] = useState<string | undefined>(undefined)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
+  const workspaceTreeRequestRef = useRef(0)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
   const editorHostRef = useRef<HTMLElement | null>(null)
@@ -535,6 +566,8 @@ export function MainLayout(): React.JSX.Element {
       },
     [activeTab?.document]
   )
+  const activeResourceKind = activeTab?.document.kind ?? 'markdown'
+  const isImagePreview = activeResourceKind === 'image'
   const editorMode = activeTab?.editorMode ?? 'preview-edit'
   const cursorPosition = useMemo<CursorPosition>(
     () => ({
@@ -589,7 +622,7 @@ export function MainLayout(): React.JSX.Element {
   }, [])
 
   const saveDocument = useCallback(async (): Promise<void> => {
-    if (!activeTab) return
+    if (!activeTab || activeTab.document.kind === 'image') return
     const result = activeTab.document.path
       ? await window.api.document.save({
           path: activeTab.document.path,
@@ -615,6 +648,7 @@ export function MainLayout(): React.JSX.Element {
   const openPath = useCallback(
     async (path: string, options?: { mode?: EditorMode }): Promise<boolean> => {
       const targetMode = options?.mode ?? activeTab?.editorMode ?? editorMode
+      const imageResource = isWorkspaceImageResource(path)
       const existing = findTabByPath(path)
       if (existing) {
         setActiveTabId(existing.id)
@@ -622,12 +656,41 @@ export function MainLayout(): React.JSX.Element {
           // setActiveTabId updates the hook ref synchronously; setEditorMode now targets that ref.
           setEditorMode(targetMode)
         }
-        const touchResult = await window.api.document.openPath(path)
-        if (!touchResult.ok) {
-          Toast.error(touchResult.error.message)
+
+        if (!imageResource) {
+          const touchResult = await window.api.document.openPath(path)
+          if (!touchResult.ok) {
+            Toast.error(touchResult.error.message)
+          }
+          void refreshRecent()
         }
-        void refreshRecent()
         return true
+      }
+
+      if (imageResource) {
+        const imageResult = await window.api.document.resolveImage({
+          src: path,
+          workspaceRoot:
+            workspaceRoot && isPathInsideWorkspace(path, workspaceRoot) ? workspaceRoot : undefined
+        })
+
+        if (imageResult.ok && imageResult.data) {
+          addTab(
+            {
+              path,
+              title: basename(path),
+              content: '',
+              dirty: false,
+              kind: 'image',
+              imageSource: imageResult.data
+            },
+            targetMode
+          )
+          return true
+        }
+
+        Toast.error(imageResult.ok ? '无法加载图片资源' : imageResult.error.message)
+        return false
       }
 
       const result = await window.api.document.openPath(path)
@@ -656,7 +719,8 @@ export function MainLayout(): React.JSX.Element {
       setActiveTabId,
       setEditorMode,
       addTab,
-      refreshRecent
+      refreshRecent,
+      workspaceRoot
     ]
   )
 
@@ -707,15 +771,62 @@ export function MainLayout(): React.JSX.Element {
   }, [findTabByPath, setActiveTabId, addTab, refreshRecent])
 
   const loadWorkspace = useCallback(async (path: string) => {
+    const requestId = ++workspaceTreeRequestRef.current
+
+    window.clearTimeout(workspacePersistTimerRef.current)
     setWorkspaceSearchLoading(false)
     setWorkspaceSearchError(undefined)
     setWorkspaceSearchResult(null)
     setWorkspaceRoot(path)
-    const treeResult = await window.api.workspace.getTree(path)
-    if (treeResult.ok) {
-      setWorkspaceTree(treeResult.data)
-    } else {
+    setWorkspaceTree([])
+    setExpandedWorkspacePaths([])
+    setWorkspaceStateReady(false)
+
+    const [treeResult, stateResult] = await Promise.all([
+      window.api.workspace.getTree({ rootPath: path }),
+      window.api.workspace.getState(path)
+    ])
+
+    if (requestId !== workspaceTreeRequestRef.current) {
+      return
+    }
+
+    if (!treeResult.ok) {
+      setWorkspaceStateReady(true)
       Toast.error(treeResult.error.message)
+      return
+    }
+
+    const restoredExpandedPaths = restoreWorkspaceExpandedPaths(
+      path,
+      stateResult.ok && stateResult.data ? stateResult.data.expandedPaths : []
+    )
+
+    if (stateResult.ok && stateResult.data) {
+      setExplorerVisible(stateResult.data.sidebarVisible)
+    }
+
+    setExpandedWorkspacePaths(restoredExpandedPaths)
+    setWorkspaceTree(treeResult.data)
+    setWorkspaceStateReady(true)
+
+    if (restoredExpandedPaths.length === 0) {
+      return
+    }
+
+    const expandedTreeResult = await window.api.workspace.getTree({
+      rootPath: path,
+      expandedPaths: restoredExpandedPaths
+    })
+
+    if (requestId !== workspaceTreeRequestRef.current) {
+      return
+    }
+
+    setWorkspaceTree(expandedTreeResult.ok ? expandedTreeResult.data : treeResult.data)
+
+    if (!expandedTreeResult.ok) {
+      Toast.error(expandedTreeResult.error.message)
     }
   }, [])
 
@@ -743,14 +854,30 @@ export function MainLayout(): React.JSX.Element {
     void refreshRecent()
   }, [loadWorkspace, refreshRecent])
 
-  const refreshWorkspaceTree = useCallback(async (): Promise<void> => {
-    if (!workspaceRoot) return
+  const refreshWorkspaceTree = useCallback(
+    async (expandedPaths?: string[]): Promise<void> => {
+      if (!workspaceRoot || !workspaceStateReady) return
 
-    const result = await window.api.workspace.getTree(workspaceRoot)
-    if (result.ok) {
-      setWorkspaceTree(result.data)
-    }
-  }, [workspaceRoot])
+      const requestId = ++workspaceTreeRequestRef.current
+      const result = await window.api.workspace.getTree({
+        rootPath: workspaceRoot,
+        expandedPaths: expandedPaths ?? expandedWorkspacePaths
+      })
+
+      if (requestId === workspaceTreeRequestRef.current && result.ok) {
+        setWorkspaceTree(result.data)
+      }
+    },
+    [expandedWorkspacePaths, workspaceRoot, workspaceStateReady]
+  )
+
+  const updateExpandedWorkspacePaths = useCallback(
+    (paths: string[]): void => {
+      setExpandedWorkspacePaths(paths)
+      void refreshWorkspaceTree(paths)
+    },
+    [refreshWorkspaceTree]
+  )
 
   const confirmDiscardChanges = useCallback(async (): Promise<boolean> => {
     if (!document.dirty) return true
@@ -904,25 +1031,7 @@ export function MainLayout(): React.JSX.Element {
   }, [editorSettings, resolvedAppearanceMode])
 
   useEffect(() => {
-    if (!workspaceRoot) return
-
-    let cancelled = false
-
-    window.api.workspace.getState(workspaceRoot).then((result) => {
-      if (cancelled) return
-      if (result.ok && result.data) {
-        setExpandedWorkspacePaths(result.data.expandedPaths)
-        setExplorerVisible(result.data.sidebarVisible)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [workspaceRoot])
-
-  useEffect(() => {
-    if (!document.path) return
+    if (activeResourceKind !== 'markdown' || !document.path) return
 
     let cancelled = false
 
@@ -937,10 +1046,10 @@ export function MainLayout(): React.JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [document.path, setEditorMode, setCursorPosition])
+  }, [activeResourceKind, document.path, setEditorMode, setCursorPosition])
 
   useEffect(() => {
-    if (!document.path) return
+    if (activeResourceKind !== 'markdown' || !document.path) return
 
     window.clearTimeout(sessionPersistTimerRef.current)
     sessionPersistTimerRef.current = window.setTimeout(() => {
@@ -951,10 +1060,10 @@ export function MainLayout(): React.JSX.Element {
         cursorColumn: cursorPosition.column
       })
     }, 250)
-  }, [cursorPosition.column, cursorPosition.line, document.path, editorMode])
+  }, [activeResourceKind, cursorPosition.column, cursorPosition.line, document.path, editorMode])
 
   useEffect(() => {
-    if (!workspaceRoot) return
+    if (!workspaceRoot || !workspaceStateReady) return
 
     window.clearTimeout(workspacePersistTimerRef.current)
     workspacePersistTimerRef.current = window.setTimeout(() => {
@@ -964,7 +1073,7 @@ export function MainLayout(): React.JSX.Element {
         sidebarVisible: explorerVisible
       })
     }, 250)
-  }, [expandedWorkspacePaths, explorerVisible, workspaceRoot])
+  }, [expandedWorkspacePaths, explorerVisible, workspaceRoot, workspaceStateReady])
 
   useEffect(() => {
     if (!pendingAnchor) return
@@ -1302,14 +1411,12 @@ export function MainLayout(): React.JSX.Element {
 
     setActiveSearchResultIndex(0)
     setActiveSearchMatchIndex(0)
-    void refreshWorkspaceTree()
     Toast.success(`已替换 ${result.data.replacements} 处，涉及 ${result.data.changedFiles} 个文件`)
   }, [
     document.content,
     effectiveSearchMatchCount,
     findTabByPath,
     openEditorView,
-    refreshWorkspaceTree,
     replaceValue,
     searchCaseSensitive,
     searchQuery,
@@ -1323,15 +1430,20 @@ export function MainLayout(): React.JSX.Element {
 
   const openRecentView = useCallback((): void => {
     setActiveView('recent')
-    const targetPath = selectedRecentPath ?? document.path ?? recentFiles[0]?.path
+    const targetPath =
+      selectedRecentPath ?? (isImagePreview ? undefined : document.path) ?? recentFiles[0]?.path
 
     if (targetPath) {
       void loadRecentActivity(targetPath)
     }
-  }, [document.path, loadRecentActivity, recentFiles, selectedRecentPath])
+  }, [document.path, isImagePreview, loadRecentActivity, recentFiles, selectedRecentPath])
 
   const handleExport = useCallback(
     async (format: ExportFormat): Promise<void> => {
+      if (isImagePreview) {
+        return
+      }
+
       window.clearTimeout(exportProgressCloseTimerRef.current)
       setExportProgress({
         stage: 'resolving',
@@ -1378,7 +1490,8 @@ export function MainLayout(): React.JSX.Element {
       editorSettings.export.imageFormat,
       editorSettings.export.imageScale,
       editorSettings.export.includeCustomCss,
-      editorSettings.export.pdfPageSize
+      editorSettings.export.pdfPageSize,
+      isImagePreview
     ]
   )
 
@@ -1535,12 +1648,16 @@ export function MainLayout(): React.JSX.Element {
       }
       if (e.key === '1' && e.shiftKey) {
         e.preventDefault()
-        setEditorMode('source')
+        if (!isImagePreview) {
+          setEditorMode('source')
+        }
         return
       }
       if (e.key === '2' && e.shiftKey) {
         e.preventDefault()
-        setEditorMode('preview-edit')
+        if (!isImagePreview) {
+          setEditorMode('preview-edit')
+        }
         return
       }
     }
@@ -1558,7 +1675,8 @@ export function MainLayout(): React.JSX.Element {
     switchToPreviousTab,
     switchToTabByIndex,
     openEditorView,
-    triggerDocumentSearch
+    triggerDocumentSearch,
+    isImagePreview
   ])
 
   useEffect(() => {
@@ -1761,7 +1879,7 @@ export function MainLayout(): React.JSX.Element {
 
       const firstFilePath = getDroppedFilePath(files[0])
       if (files.length === 1 && firstFilePath) {
-        const statResult = await window.api.workspace.getTree(firstFilePath)
+        const statResult = await window.api.workspace.getTree({ rootPath: firstFilePath })
         if (statResult.ok) {
           await loadWorkspaceRef.current?.(firstFilePath)
           void refreshRecentRef.current?.()
@@ -1787,6 +1905,9 @@ export function MainLayout(): React.JSX.Element {
     [loadRecentActivity, openEditorView]
   )
 
+  const activeWorkspaceTabId = activeTab?.id
+  const activeWorkspaceDocumentPath = activeTab?.document.path
+
   const createWorkspaceEntry = useCallback(
     async (
       parentPath: string,
@@ -1808,8 +1929,11 @@ export function MainLayout(): React.JSX.Element {
     async (path: string, newName: string): Promise<string | null> => {
       const result = await window.api.workspace.renameEntry({ path, newName })
       if (result.ok) {
-        if (activeTab?.document.path === path) {
-          updateTabDocument(activeTab.id, { path: result.data, title: basename(result.data) })
+        if (activeWorkspaceDocumentPath === path && activeWorkspaceTabId) {
+          updateTabDocument(activeWorkspaceTabId, {
+            path: result.data,
+            title: basename(result.data)
+          })
         }
         void refreshWorkspaceTree()
         return result.data
@@ -1817,7 +1941,7 @@ export function MainLayout(): React.JSX.Element {
       Toast.error(result.error.message)
       return null
     },
-    [activeTab, refreshWorkspaceTree, updateTabDocument]
+    [activeWorkspaceDocumentPath, activeWorkspaceTabId, refreshWorkspaceTree, updateTabDocument]
   )
 
   const deleteWorkspaceEntry = useCallback(
@@ -1831,6 +1955,18 @@ export function MainLayout(): React.JSX.Element {
       return false
     },
     [refreshWorkspaceTree]
+  )
+
+  const openWorkspaceFromExplorer = useCallback((): void => {
+    void openWorkspace()
+  }, [openWorkspace])
+
+  const openWorkspaceFile = useCallback(
+    (path: string): void => {
+      openEditorView()
+      void openPathRef.current?.(path)
+    },
+    [openEditorView]
   )
 
   return (
@@ -1848,6 +1984,7 @@ export function MainLayout(): React.JSX.Element {
       <main className="main-panel">
         <TitleBar
           mode={editorMode}
+          documentActionsEnabled={!isImagePreview}
           platform={platform}
           searchValue={searchQuery}
           searchScope={searchScope}
@@ -1893,12 +2030,9 @@ export function MainLayout(): React.JSX.Element {
                   workspaceTree={workspaceTree}
                   selectedPath={document.path}
                   expandedPaths={expandedWorkspacePaths}
-                  onOpenWorkspace={() => void openWorkspace()}
-                  onOpenFile={(path) => {
-                    openEditorView()
-                    void openPath(path)
-                  }}
-                  onExpandedPathsChange={setExpandedWorkspacePaths}
+                  onOpenWorkspace={openWorkspaceFromExplorer}
+                  onOpenFile={openWorkspaceFile}
+                  onExpandedPathsChange={updateExpandedWorkspacePaths}
                   onCreateWorkspaceEntry={createWorkspaceEntry}
                   onRenameWorkspaceEntry={renameWorkspaceEntry}
                   onDeleteWorkspaceEntry={deleteWorkspaceEntry}
@@ -1918,44 +2052,74 @@ export function MainLayout(): React.JSX.Element {
                   onReorder={reorderTabs}
                   onNewTab={handleNewTab}
                 />
-                <section ref={editorHostRef} className="editor-host" data-editor-mode={editorMode}>
+                <section
+                  ref={editorHostRef}
+                  className="editor-host"
+                  data-editor-mode={editorMode}
+                  data-resource-kind={activeResourceKind}
+                >
                   {activeTab ? (
-                    <Suspense fallback={<EditorLoadingFallback />}>
-                      <MarkdownEditor
-                        key={activeTab.id}
-                        mode={editorMode}
-                        dirty={document.dirty}
-                        content={document.content}
-                        settings={editorSettings}
-                        currentPath={document.path}
-                        workspaceRoot={workspaceRoot}
-                        anchorTarget={pendingAnchor}
-                        searchQuery={searchQuery}
-                        searchCaseSensitive={searchCaseSensitive}
-                        activeSearchMatchIndex={activeSearchMatchIndex}
-                        searchNavigationRequestId={searchNavigationRequestId}
-                        initialScrollTop={activeTab.scrollTop}
-                        onSearchMatchCountChange={updateSearchMatchCount}
-                        onChange={setContent}
-                        onCursorChange={(position) =>
-                          setCursorPosition(position.line, position.column)
-                        }
-                        onScrollTopChange={(scrollTop) => setTabScrollTop(activeTab.id, scrollTop)}
-                        onOpenDocumentLink={openPathFromLink}
-                        onLinkError={(message) => Toast.error(message)}
-                      />
-                    </Suspense>
+                    isImagePreview ? (
+                      document.imageSource ? (
+                        <WorkspaceImagePreview
+                          key={activeTab.id}
+                          source={document.imageSource}
+                          title={document.title}
+                        />
+                      ) : (
+                        <div className="workspace-image-preview-error">无法加载图片资源</div>
+                      )
+                    ) : (
+                      <Suspense fallback={<EditorLoadingFallback />}>
+                        <MarkdownEditor
+                          key={activeTab.id}
+                          mode={editorMode}
+                          dirty={document.dirty}
+                          content={document.content}
+                          settings={editorSettings}
+                          currentPath={document.path}
+                          workspaceRoot={workspaceRoot}
+                          anchorTarget={pendingAnchor}
+                          searchQuery={searchQuery}
+                          searchCaseSensitive={searchCaseSensitive}
+                          activeSearchMatchIndex={activeSearchMatchIndex}
+                          searchNavigationRequestId={searchNavigationRequestId}
+                          initialScrollTop={activeTab.scrollTop}
+                          onSearchMatchCountChange={updateSearchMatchCount}
+                          onChange={setContent}
+                          onCursorChange={(position) =>
+                            setCursorPosition(position.line, position.column)
+                          }
+                          onScrollTopChange={(scrollTop) =>
+                            setTabScrollTop(activeTab.id, scrollTop)
+                          }
+                          onOpenDocumentLink={openPathFromLink}
+                          onLinkError={(message) => Toast.error(message)}
+                        />
+                      </Suspense>
+                    )
                   ) : (
                     <div className="empty-editor" />
                   )}
                 </section>
-                <StatusBar
-                  mode={editorMode}
-                  wordCount={wordCount}
-                  dirty={document.dirty}
-                  cursorPosition={cursorPosition}
-                  showLineNumbers={editorSettings.showLineNumbers}
-                />
+                {isImagePreview ? (
+                  <footer className="statusbar">
+                    <div className="statusbar-left">
+                      <Typography.Text type="tertiary">图片预览</Typography.Text>
+                    </div>
+                    <div className="statusbar-right">
+                      <Typography.Text type="tertiary">只读</Typography.Text>
+                    </div>
+                  </footer>
+                ) : (
+                  <StatusBar
+                    mode={editorMode}
+                    wordCount={wordCount}
+                    dirty={document.dirty}
+                    cursorPosition={cursorPosition}
+                    showLineNumbers={editorSettings.showLineNumbers}
+                  />
+                )}
               </div>
             </div>
           </>
@@ -1965,6 +2129,7 @@ export function MainLayout(): React.JSX.Element {
             recentFiles={recentFiles}
             selectedPath={selectedRecentPath}
             customCss={editorSettings.customPreviewCss}
+            showCodeBlockLineNumbers={editorSettings.showCodeBlockLineNumbers}
             onSelectFile={(path) => void loadRecentActivity(path)}
             onBack={openEditorView}
             onOpenInEditor={(path) => {

@@ -36,6 +36,7 @@ export const ipcChannels = {
     openPath: 'document:open-path',
     resolveLink: 'document:resolve-link',
     previewLink: 'document:preview-link',
+    resolveImage: 'document:resolve-image',
     save: 'document:save',
     saveAs: 'document:save-as',
     export: 'document:export',

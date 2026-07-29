@@ -332,6 +332,13 @@ export function SettingsPage({
                   onChange={(previewCentered) => updateSettings({ previewCentered })}
                 />
                 <CheckSetting
+                  title="代码块显示行号"
+                  checked={settings.showCodeBlockLineNumbers}
+                  onChange={(showCodeBlockLineNumbers) =>
+                    updateSettings({ showCodeBlockLineNumbers })
+                  }
+                />
+                <CheckSetting
                   title="导出时包含自定义 CSS"
                   checked={settings.export.includeCustomCss}
                   onChange={(includeCustomCss) =>

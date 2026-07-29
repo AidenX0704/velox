@@ -1,6 +1,11 @@
-import { cloneElement, createElement, isValidElement } from 'react'
+import { cloneElement, createElement, isValidElement, useEffect, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { CodeBlock } from '../preview/CodeBlock'
+import {
+  isLocalDocumentImageSource,
+  resolveDocumentImageSource,
+  type DocumentImageContext
+} from '../services/documentImage'
 
 export interface MarkdownFrontmatterEntry {
   key: string
@@ -17,18 +22,24 @@ const githubAlertLabels: Record<string, string> = {
 
 const githubAlertPattern = /\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i
 
-export function CodeBlockPre(props: { children?: ReactNode }): React.JSX.Element {
-  const codeElement = Array.isArray(props.children) ? props.children[0] : props.children
+type CodeBlockPreProps = React.ComponentProps<'pre'> & { showLineNumbers?: boolean }
+
+export function CodeBlockPre({
+  children,
+  showLineNumbers = false,
+  ...props
+}: CodeBlockPreProps): React.JSX.Element {
+  const codeElement = Array.isArray(children) ? children[0] : children
 
   if (!isValidElement(codeElement) || codeElement.type !== 'code') {
-    return createElement('pre', props)
+    return createElement('pre', props, children)
   }
 
   const codeProps = codeElement.props as { className?: string; children?: ReactNode }
   const language = /language-([\w-]+)/.exec(codeProps.className ?? '')?.[1]
   const code = extractText(codeProps.children).replace(/\n$/, '')
 
-  return <CodeBlock code={code} language={language} />
+  return <CodeBlock code={code} language={language} showLineNumbers={showLineNumbers} />
 }
 
 export function SafeLink(props: React.ComponentProps<'a'>): ReactElement {
@@ -53,8 +64,60 @@ export function MarkdownTable(props: React.ComponentProps<'table'>): ReactElemen
   )
 }
 
-export function MarkdownImage(props: React.ComponentProps<'img'>): ReactElement {
-  return <img loading="lazy" decoding="async" {...props} />
+type MarkdownImageProps = React.ComponentProps<'img'> & DocumentImageContext
+
+interface ImageResolution {
+  key: string
+  status: 'loading' | 'loaded' | 'error'
+  src?: string
+}
+
+export function MarkdownImage({
+  src,
+  currentPath,
+  workspaceRoot,
+  ...props
+}: MarkdownImageProps): ReactElement {
+  const localSource = isLocalDocumentImageSource(src)
+  const resolutionKey = [src ?? '', currentPath ?? '', workspaceRoot ?? ''].join('\0')
+  const [resolution, setResolution] = useState<ImageResolution | null>(null)
+  const activeResolution = resolution?.key === resolutionKey ? resolution : null
+  const renderedSrc = localSource ? activeResolution?.src : src || undefined
+  const imageState = localSource ? (activeResolution?.status ?? 'loading') : undefined
+
+  useEffect(() => {
+    if (!src || !localSource) {
+      return
+    }
+
+    let active = true
+
+    void resolveDocumentImageSource(src, { currentPath, workspaceRoot }).then((resolvedSrc) => {
+      if (!active) {
+        return
+      }
+
+      setResolution(
+        resolvedSrc
+          ? { key: resolutionKey, status: 'loaded', src: resolvedSrc }
+          : { key: resolutionKey, status: 'error' }
+      )
+    })
+
+    return () => {
+      active = false
+    }
+  }, [currentPath, localSource, resolutionKey, src, workspaceRoot])
+
+  return (
+    <img
+      loading="lazy"
+      decoding="async"
+      {...props}
+      src={renderedSrc}
+      data-image-state={imageState}
+    />
+  )
 }
 
 export function MarkdownBlockquote(props: React.ComponentProps<'blockquote'>): ReactElement {

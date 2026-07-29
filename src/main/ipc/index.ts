@@ -3,6 +3,7 @@ import { schemas } from './contracts'
 import { registerIpcHandler } from './router'
 import { BrowserWindow } from 'electron'
 import { AppService } from '../services/app-service'
+import { resolveDocumentImage } from '../services/document-image'
 import { DocumentService } from '../services/document-service'
 import { DocumentSessionService } from '../services/document-session-service'
 import { ExportService } from '../services/export-service'
@@ -110,6 +111,9 @@ export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.document.previewLink, schemas.resolveDocumentLink, (input) =>
     services.documentService.previewLink(input)
   )
+  registerIpcHandler(ipcChannels.document.resolveImage, schemas.resolveDocumentImage, (input) =>
+    resolveDocumentImage(input)
+  )
   registerIpcHandler(ipcChannels.document.save, schemas.saveDocument, (input) =>
     services.documentService.save(input)
   )
@@ -125,8 +129,8 @@ export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.workspace.openFolder, schemas.empty, () =>
     services.workspaceService.openFolder()
   )
-  registerIpcHandler(ipcChannels.workspace.getTree, schemas.path, (path) =>
-    services.workspaceService.getTree(path)
+  registerIpcHandler(ipcChannels.workspace.getTree, schemas.workspaceTree, (input) =>
+    services.workspaceService.getTree(input.rootPath, input.expandedPaths)
   )
   registerIpcHandler(ipcChannels.workspace.createEntry, schemas.createWorkspaceEntry, (input) =>
     services.workspaceService.createEntry(input.parentPath, input.name, input.type)

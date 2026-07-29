@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 
-const temporaryDirectory = await mkdtemp(join(tmpdir(), 'velox-rich-markdown-'))
-const outfile = join(temporaryDirectory, 'rich-markdown-check.mjs')
+const temporaryDirectory = await mkdtemp(join(tmpdir(), 'velox-document-image-check-'))
+const outfile = join(temporaryDirectory, 'document-image-check.mjs')
 
 try {
   await build({
-    entryPoints: ['src/renderer/src/modules/editor/rich/markdownModel.test.ts'],
+    entryPoints: ['src/main/services/document-image.test.ts'],
     outfile,
     bundle: true,
     platform: 'node',
