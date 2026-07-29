@@ -101,7 +101,46 @@ jobs:
           if-no-files-found: error
 
       - name: Publish artifacts to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os != 'macOS'
         run: npm exec -- electron-builder ${{ matrix.platform.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package macOS release artifacts
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'macOS'
+        run: npm exec -- electron-builder ${{ matrix.platform.target }} --publish never
+
+      - name: Publish macOS artifacts to GitHub Release
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'macOS'
+        shell: bash
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          shopt -s nullglob
+          DMGS=(dist/*.dmg)
+          ZIPS=(dist/*.zip)
+          METADATA=(dist/latest-mac.yml)
+          BLOCKMAPS=(dist/*.blockmap)
+
+          if (( ${#DMGS[@]} == 0 || ${#ZIPS[@]} == 0 || ${#METADATA[@]} != 1 )); then
+            echo "Expected macOS DMG, ZIP, and latest-mac.yml artifacts"
+            ls -la dist
+            exit 1
+          fi
+
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "${TAG#v}" \
+              --generate-notes
+          fi
+
+          gh release upload "$TAG" \
+            "${DMGS[@]}" \
+            "${ZIPS[@]}" \
+            "${METADATA[@]}" \
+            "${BLOCKMAPS[@]}" \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

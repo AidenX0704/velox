@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7 - 2026-07-29
+
+### Fixed
+
+- Fixed macOS release publishing by validating and explicitly uploading Intel and Apple Silicon DMG, ZIP, and auto-update metadata assets after packaging.
+
 ## 1.0.6 - 2026-07-29
 
 ### Added
