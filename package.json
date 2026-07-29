@@ -1,6 +1,6 @@
 {
   "name": "velox",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A Typora-inspired desktop Markdown editor built with Electron, React and TypeScript",
   "main": "./out/main/index.js",
   "author": "Velox",
@@ -10,6 +10,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "format": "prettier --write .",
     "lint": "eslint --cache .",
+    "test:document-images": "node scripts/check-document-images.mjs",
     "test:rich-markdown": "node scripts/check-rich-markdown.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",

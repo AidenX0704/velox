@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.6 - 2026-07-29
+
+### Added
+
+- Added in-document and workspace-wide search and replace with case-sensitive matching, result navigation, and replacement summaries.
+- Added Mermaid diagram rendering, richer Markdown table editing, and per-tab reading position restoration.
+- Added local Markdown image resolution for relative paths, absolute paths, and file URLs with workspace boundary and file-size safeguards.
+- Added image resource tabs with zoom, original-size, and fit-to-window controls in the workspace explorer.
+- Added operating-system file associations for Markdown and text documents.
+
+### Changed
+
+- Redesigned the workspace shell, title bar, resource explorer, settings surfaces, and editor styling for a denser document workflow.
+- Switched the workspace tree to lazy directory loading with persisted expansion state and debounced filesystem refreshes for large workspaces.
+- Refined code block and diagram presentation, simplified code block actions, and made code block line numbers an independent preference.
+- Updated Windows packaging to use per-machine installation and reduced package compression time for release builds.
+
+### Fixed
+
+- Fixed local images not rendering consistently across preview, rich editing, and file URL sources.
+- Protected rich-editor image nodes from accidental deletion by requiring a confirmed second delete action.
+- Fixed workspace image resources being treated as unsupported documents and improved tab behavior for read-only previews.
+
 ## 1.0.5 - 2026-06-08
 
 ### Added
