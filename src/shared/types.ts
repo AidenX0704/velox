@@ -268,6 +268,29 @@ export interface UpdateWorkspaceStateInput {
   sidebarVisible?: boolean
 }
 
+export type BackupFileState = 'pending' | 'syncing' | 'synced' | 'skipped' | 'conflict' | 'failed'
+
+export interface BackupFileStatus {
+  targetId: string
+  relativePath: string
+  state: BackupFileState
+  bytes?: number
+  message?: string
+  updatedAt: string
+}
+
+export interface BackupRunResult {
+  id: string
+  state: 'running' | 'completed' | 'partial' | 'failed'
+  startedAt: string
+  completedAt?: string
+  totalFiles: number
+  syncedFiles: number
+  skippedFiles: number
+  failedFiles: number
+  files: BackupFileStatus[]
+}
+
 export interface DocumentSessionRecord {
   path: string
   mode: import('./preferences').EditorMode
@@ -321,6 +344,11 @@ export interface VeloxAPI {
       patch: import('./preferences').EditorPreferencesPatch
     ) => Promise<Result<import('./preferences').EditorPreferences>>
     resetEditor: () => Promise<Result<import('./preferences').EditorPreferences>>
+  }
+  backup: {
+    run: (sourcePath: string) => Promise<Result<BackupRunResult>>
+    getLastRun: () => Promise<Result<BackupRunResult | null>>
+    onProgress: (callback: (status: BackupFileStatus) => void) => () => void
   }
   recent: {
     listFiles: () => Promise<Result<RecentFileRecord[]>>

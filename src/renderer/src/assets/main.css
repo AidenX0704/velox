@@ -2165,6 +2165,88 @@ textarea,
   line-height: 1.5;
 }
 
+.backup-run-panel {
+  overflow: hidden;
+}
+
+.backup-run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px var(--ui-settings-box-padding-x);
+}
+
+.backup-run-header > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backup-file-status-list {
+  max-height: 320px;
+  overflow: auto;
+  border-top: 1px solid var(--line-soft);
+}
+
+.backup-file-status-row {
+  display: grid;
+  grid-template-columns: 10px minmax(160px, 1fr) minmax(0, auto) auto 70px;
+  align-items: center;
+  min-height: 36px;
+  gap: 10px;
+  padding: 6px var(--ui-settings-box-padding-x);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+
+.backup-file-status-row:last-child {
+  border-bottom: 0;
+}
+
+.backup-file-state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+}
+
+.backup-file-status-row[data-state='syncing'] .backup-file-state-dot {
+  background: var(--brand-active);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.backup-file-status-row[data-state='synced'] .backup-file-state-dot {
+  background: var(--success);
+}
+
+.backup-file-status-row[data-state='failed'] .backup-file-state-dot,
+.backup-file-status-row[data-state='conflict'] .backup-file-state-dot {
+  background: var(--danger);
+}
+
+.backup-file-path,
+.backup-file-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backup-file-path {
+  color: var(--text-primary);
+}
+
+.backup-file-message,
+.backup-file-size {
+  color: var(--text-tertiary);
+}
+
+.backup-file-state {
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-align: right;
+}
+
 .settings-about-card {
   display: flex;
   gap: 14px;

@@ -2230,6 +2230,7 @@ export function MainLayout(): React.JSX.Element {
             key={settingsInitialSection}
             settings={editorSettings}
             updaterStatus={updaterStatus}
+            workspaceRoot={workspaceRoot}
             initialSection={settingsInitialSection}
             onBack={openEditorView}
             onChange={(nextSettings) => {

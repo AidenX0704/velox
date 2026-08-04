@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'ele
 import { ipcChannels } from '../shared/channels'
 import type {
   AppInfo,
+  BackupFileStatus,
+  BackupRunResult,
   AppSettings,
   DocumentLinkPreview,
   DocumentSessionRecord,
@@ -78,6 +80,16 @@ const api: VeloxAPI = {
     getEditor: () => invoke<EditorPreferences>(ipcChannels.preferences.getEditor),
     updateEditor: (patch) => invoke<EditorPreferences>(ipcChannels.preferences.updateEditor, patch),
     resetEditor: () => invoke<EditorPreferences>(ipcChannels.preferences.resetEditor)
+  },
+  backup: {
+    run: (sourcePath) => invoke<BackupRunResult>(ipcChannels.backup.run, { sourcePath }),
+    getLastRun: () => invoke<BackupRunResult | null>(ipcChannels.backup.getLastRun),
+    onProgress: (callback) => {
+      const listener = (_event: IpcRendererEvent, status: BackupFileStatus): void =>
+        callback(status)
+      ipcRenderer.on(ipcChannels.backup.progress, listener)
+      return () => ipcRenderer.removeListener(ipcChannels.backup.progress, listener)
+    }
   },
   recent: {
     listFiles: () => invoke<RecentFileRecord[]>(ipcChannels.recent.listFiles),

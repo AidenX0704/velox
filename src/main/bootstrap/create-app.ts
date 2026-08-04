@@ -11,6 +11,7 @@ import { RecentRepository } from '../database/repositories/recent-repository'
 import { WorkspaceStateRepository } from '../database/repositories/workspace-state-repository'
 import { registerIpc } from '../ipc'
 import { AppService } from '../services/app-service'
+import { BackupService } from '../services/backup-service'
 import { DocumentSessionService } from '../services/document-session-service'
 import { DocumentService } from '../services/document-service'
 import { ExportService } from '../services/export-service'
@@ -146,13 +147,15 @@ export async function createApp(): Promise<void> {
   const recentService = new RecentService(new RecentRepository(database))
   const historyService = new HistoryService(new HistoryRepository(database))
   const updaterService = new UpdaterService()
+  const preferencesService = new PreferencesService(new PreferencesRepository(database))
   const services = {
     appService: new AppService(),
+    backupService: new BackupService(preferencesService),
     documentService: new DocumentService(settingsService, recentService, historyService),
     exportService: new ExportService(),
     historyService,
     settingsService,
-    preferencesService: new PreferencesService(new PreferencesRepository(database)),
+    preferencesService,
     recentService,
     workspaceStateService: new WorkspaceStateService(new WorkspaceStateRepository(database)),
     documentSessionService: new DocumentSessionService(new DocumentSessionRepository(database)),

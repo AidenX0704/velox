@@ -20,6 +20,11 @@ export const ipcChannels = {
     updateEditor: 'preferences:update-editor',
     resetEditor: 'preferences:reset-editor'
   },
+  backup: {
+    run: 'backup:run',
+    getLastRun: 'backup:get-last-run',
+    progress: 'backup:progress'
+  },
   recent: {
     listFiles: 'recent:list-files',
     listWorkspaces: 'recent:list-workspaces',

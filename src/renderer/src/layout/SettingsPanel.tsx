@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, InputNumber, Select, TextArea, Typography } from '@douyinfe/semi-ui'
+import { Button, Input, InputNumber, Select, TextArea, Toast, Typography } from '@douyinfe/semi-ui'
 import {
   IconArrowLeft,
   IconArticle,
@@ -17,8 +17,12 @@ import {
   IconSettingStroked,
   IconSunStroked
 } from '@douyinfe/semi-icons'
-import type { AppInfo } from '../../../shared/types'
-import type { UpdaterStatus } from '../../../shared/types'
+import type {
+  AppInfo,
+  BackupFileStatus,
+  BackupRunResult,
+  UpdaterStatus
+} from '../../../shared/types'
 import {
   themeColorPresets,
   type AppearanceMode,
@@ -52,6 +56,7 @@ export type PreferenceSection =
 interface SettingsPageProps {
   settings: MarkdownEditorPreferences
   updaterStatus: UpdaterStatus | null
+  workspaceRoot: string | null
   initialSection?: PreferenceSection
   onBack: () => void
   onChange: (settings: MarkdownEditorPreferences) => void
@@ -155,6 +160,7 @@ const preferenceSections: Array<{
 export function SettingsPage({
   settings,
   updaterStatus,
+  workspaceRoot,
   initialSection = 'general',
   onBack,
   onChange,
@@ -164,6 +170,8 @@ export function SettingsPage({
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const [activeSection, setActiveSection] = useState<PreferenceSection>(initialSection)
   const [settingsSearchQuery, setSettingsSearchQuery] = useState('')
+  const [backupRun, setBackupRun] = useState<BackupRunResult | null>(null)
+  const [backupRunning, setBackupRunning] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -177,6 +185,25 @@ export function SettingsPage({
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    void window.api.backup.getLastRun().then((result) => {
+      if (result.ok) setBackupRun(result.data)
+    })
+
+    return window.api.backup.onProgress((status) => {
+      setBackupRun((current) => {
+        if (!current) return current
+        const existingIndex = current.files.findIndex(
+          (file) => file.targetId === status.targetId && file.relativePath === status.relativePath
+        )
+        const files = [...current.files]
+        if (existingIndex >= 0) files[existingIndex] = status
+        else files.push(status)
+        return { ...current, files }
+      })
+    })
   }, [])
 
   const updateSettings = (patch: SettingsPatch): void => {
@@ -213,6 +240,33 @@ export function SettingsPage({
 
   const removeBackupTarget = (id: string): void => {
     updateBackup({ targets: settings.backup.targets.filter((target) => target.id !== id) })
+  }
+
+  const runBackup = async (): Promise<void> => {
+    if (!workspaceRoot) {
+      Toast.warning('请先打开一个工作区')
+      return
+    }
+
+    setBackupRunning(true)
+    setBackupRun({
+      id: 'running',
+      state: 'running',
+      startedAt: new Date().toISOString(),
+      totalFiles: 0,
+      syncedFiles: 0,
+      skippedFiles: 0,
+      failedFiles: 0,
+      files: []
+    })
+    const result = await window.api.backup.run(workspaceRoot)
+    setBackupRunning(false)
+    if (result.ok) {
+      setBackupRun(result.data)
+      Toast.success(`备份完成：${result.data.syncedFiles} 个文件`)
+    } else {
+      Toast.error(result.error.message)
+    }
   }
 
   const selectSection = (section: PreferenceSection): void => {
@@ -687,6 +741,37 @@ export function SettingsPage({
                 ))}
               </div>
             )}
+            <div className="settings-box backup-run-panel">
+              <div className="backup-run-header">
+                <div>
+                  <Typography.Text strong>同步状态</Typography.Text>
+                  <Typography.Text type="tertiary">
+                    {backupRun
+                      ? `${backupRun.syncedFiles} 已同步 · ${backupRun.skippedFiles} 已跳过 · ${backupRun.failedFiles} 失败`
+                      : '尚未执行备份'}
+                  </Typography.Text>
+                </div>
+                <Button
+                  theme="solid"
+                  type="primary"
+                  loading={backupRunning}
+                  disabled={!workspaceRoot || settings.backup.targets.length === 0}
+                  onClick={() => void runBackup()}
+                >
+                  立即同步
+                </Button>
+              </div>
+              {backupRun?.files.length ? (
+                <div className="backup-file-status-list" aria-label="同步文件状态">
+                  {backupRun.files.map((file) => (
+                    <BackupFileStatusRow
+                      key={`${file.targetId}:${file.relativePath}`}
+                      status={file}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </SettingsGroup>
 
           <SettingsGroup id="settings-shortcuts" title="快捷键">
@@ -969,6 +1054,37 @@ function BackupTargetEditor({
       ) : null}
     </section>
   )
+}
+
+const backupFileStateLabels: Record<BackupFileStatus['state'], string> = {
+  pending: '等待中',
+  syncing: '同步中',
+  synced: '已同步',
+  skipped: '已跳过',
+  conflict: '有冲突',
+  failed: '失败'
+}
+
+function BackupFileStatusRow({ status }: { status: BackupFileStatus }): React.JSX.Element {
+  return (
+    <div className="backup-file-status-row" data-state={status.state}>
+      <span className="backup-file-state-dot" />
+      <span className="backup-file-path" title={status.relativePath}>
+        {status.relativePath}
+      </span>
+      {status.message ? <span className="backup-file-message">{status.message}</span> : null}
+      {status.bytes !== undefined ? (
+        <span className="backup-file-size">{formatFileSize(status.bytes)}</span>
+      ) : null}
+      <span className="backup-file-state">{backupFileStateLabels[status.state]}</span>
+    </div>
+  )
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function SettingsGroup({

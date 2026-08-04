@@ -5,6 +5,7 @@ const nonEmptyString = z.string().min(1)
 
 export const schemas = {
   empty: z.undefined(),
+  backupRun: z.object({ sourcePath: nonEmptyString }),
   settingsPatch: z
     .object({
       editor: z

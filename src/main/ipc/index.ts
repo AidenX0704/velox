@@ -3,6 +3,7 @@ import { schemas } from './contracts'
 import { registerIpcHandler } from './router'
 import { BrowserWindow } from 'electron'
 import { AppService } from '../services/app-service'
+import { BackupService } from '../services/backup-service'
 import { resolveDocumentImage } from '../services/document-image'
 import { DocumentService } from '../services/document-service'
 import { DocumentSessionService } from '../services/document-session-service'
@@ -19,6 +20,7 @@ import { getPendingOpenFile } from '../bootstrap/create-app'
 
 export interface MainServices {
   appService: AppService
+  backupService: BackupService
   documentService: DocumentService
   exportService: ExportService
   historyService: HistoryService
@@ -74,6 +76,15 @@ export function registerIpc(services: MainServices): void {
   )
   registerIpcHandler(ipcChannels.preferences.resetEditor, schemas.empty, () =>
     services.preferencesService.resetEditorPreferences()
+  )
+
+  registerIpcHandler(ipcChannels.backup.getLastRun, schemas.empty, () =>
+    services.backupService.getLastRun()
+  )
+  registerIpcHandler(ipcChannels.backup.run, schemas.backupRun, (input, event) =>
+    services.backupService.run(input.sourcePath, (status) => {
+      event.sender.send(ipcChannels.backup.progress, status)
+    })
   )
 
   registerIpcHandler(ipcChannels.recent.listFiles, schemas.empty, () =>
