@@ -4,6 +4,34 @@ export type EditorMode = 'source' | 'preview-edit'
 export type LegacyEditorMode = EditorMode | 'split'
 export type PreviewEditWidthMode = 'wide' | 'standard' | 'narrow'
 export type AppearanceMode = 'system' | 'light' | 'dark'
+export type UiDensity = 'compact' | 'default' | 'comfortable'
+export type BackupProvider = 'local' | 'webdav' | 's3' | 'onedrive' | 'google-drive' | 'dropbox'
+export type BackupTrigger = 'manual' | 'on-save' | 'interval'
+export type BackupConflictStrategy = 'keep-both' | 'local-wins' | 'remote-wins'
+
+export interface BackupTarget {
+  id: string
+  name: string
+  provider: BackupProvider
+  enabled: boolean
+  remotePath: string
+  endpoint: string
+  bucket: string
+  region: string
+  clientId: string
+  tenantId: string
+}
+
+export interface BackupPreferences {
+  enabled: boolean
+  trigger: BackupTrigger
+  intervalMinutes: number
+  retentionCount: number
+  conflictStrategy: BackupConflictStrategy
+  includeAttachments: boolean
+  excludePatterns: string
+  targets: BackupTarget[]
+}
 
 export const themeColorPresetIds = [
   'indigo',
@@ -52,6 +80,8 @@ export interface EditorPreferences {
   previewEditWidthMode: PreviewEditWidthMode
   customPreviewCss: string
   appearanceMode: AppearanceMode
+  uiDensity: UiDensity
+  backup: BackupPreferences
   themeColorPreset: ThemeColorSelection
   customThemeColor: string
   defaultMode: EditorMode
@@ -78,6 +108,17 @@ export const defaultEditorPreferences: EditorPreferences = {
   previewEditWidthMode: 'standard',
   customPreviewCss: '',
   appearanceMode: 'system',
+  uiDensity: 'default',
+  backup: {
+    enabled: false,
+    trigger: 'manual',
+    intervalMinutes: 30,
+    retentionCount: 10,
+    conflictStrategy: 'keep-both',
+    includeAttachments: true,
+    excludePatterns: '.git\nnode_modules\n.DS_Store',
+    targets: []
+  },
   themeColorPreset: 'blue',
   customThemeColor: '#1677ff',
   defaultMode: 'preview-edit',

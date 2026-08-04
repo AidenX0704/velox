@@ -30,6 +30,13 @@ textarea,
   --titlebar-height: 52px;
   --statusbar-height: 24px;
   --mac-traffic-light-safe-width: 94px;
+  --ui-tree-row-height: 30px;
+  --ui-tabbar-height: 36px;
+  --ui-tab-height: 30px;
+  --ui-settings-nav-height: 42px;
+  --ui-settings-gap: 22px;
+  --ui-settings-box-padding-y: 20px;
+  --ui-settings-box-padding-x: 22px;
   --brand: var(--theme-accent-strong, #1260cf);
   --brand-active: var(--theme-accent, #1677ff);
   --brand-hover: var(--theme-accent-hover, #156eea);
@@ -86,6 +93,26 @@ textarea,
   height: 100vh;
   color: var(--text-primary);
   background: var(--app-bg);
+}
+
+.app-shell[data-ui-density='compact'] {
+  --ui-tree-row-height: 26px;
+  --ui-tabbar-height: 32px;
+  --ui-tab-height: 27px;
+  --ui-settings-nav-height: 36px;
+  --ui-settings-gap: 16px;
+  --ui-settings-box-padding-y: 16px;
+  --ui-settings-box-padding-x: 18px;
+}
+
+.app-shell[data-ui-density='comfortable'] {
+  --ui-tree-row-height: 34px;
+  --ui-tabbar-height: 40px;
+  --ui-tab-height: 34px;
+  --ui-settings-nav-height: 46px;
+  --ui-settings-gap: 28px;
+  --ui-settings-box-padding-y: 24px;
+  --ui-settings-box-padding-x: 26px;
 }
 
 .app-shell .semi-icon {
@@ -515,6 +542,7 @@ textarea,
 }
 
 .resource-explorer {
+  position: relative;
   display: flex;
   flex: 0 0 268px;
   width: 268px;
@@ -522,6 +550,37 @@ textarea,
   flex-direction: column;
   border-right: 1px solid var(--line-soft);
   background: var(--surface-muted);
+}
+
+.resource-explorer-resizer {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resource-explorer-resizer::after {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  content: '';
+  transition: background 120ms ease;
+}
+
+.resource-explorer-resizer:hover::after,
+.resource-explorer-resizer:focus-visible::after {
+  background: var(--brand-active);
+}
+
+.resource-explorer-resizer:focus-visible {
+  outline: none;
 }
 
 .resource-explorer-empty {
@@ -599,7 +658,7 @@ textarea,
 
 .workspace-tree {
   --tree-indent: 14px;
-  --tree-row-height: 30px;
+  --tree-row-height: var(--ui-tree-row-height);
 
   flex: 1;
   min-height: 0;
@@ -797,8 +856,8 @@ textarea,
 .tabbar {
   display: flex;
   align-items: center;
-  flex: 0 0 36px;
-  height: 36px;
+  flex: 0 0 var(--ui-tabbar-height);
+  height: var(--ui-tabbar-height);
   background: var(--surface-muted);
   border-bottom: 1px solid var(--line-soft);
   overflow-x: auto;
@@ -827,7 +886,7 @@ textarea,
   flex: 0 1 180px;
   min-width: 80px;
   max-width: 180px;
-  height: 30px;
+  height: var(--ui-tab-height);
   gap: 6px;
   padding: 0 4px 0 10px;
   border-radius: 6px 6px 0 0;
@@ -1007,7 +1066,8 @@ textarea,
     background 140ms ease;
 }
 
-.titlebar-menu-button:hover {
+.titlebar-menu-button:hover,
+.titlebar-menu-button[aria-expanded='true'] {
   color: var(--brand-active);
   background: var(--brand-softer);
 }
@@ -1358,6 +1418,10 @@ textarea,
 }
 
 .window-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
   height: 32px;
   gap: 0;
 }
@@ -1726,13 +1790,15 @@ textarea,
 
 .settings-page-content {
   display: grid;
-  grid-template-columns: 260px minmax(520px, 1fr) minmax(300px, 410px);
+  grid-template-columns: 260px minmax(520px, 1fr);
   min-height: 0;
   overflow: hidden;
   background: var(--surface-muted);
 }
 
 .settings-page-nav {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--line-soft);
   background: var(--surface-base);
@@ -1740,6 +1806,8 @@ textarea,
 
 .settings-nav-list {
   display: flex;
+  min-height: 0;
+  overflow: auto;
   flex-direction: column;
   gap: 6px;
   padding: 14px 12px 28px;
@@ -1749,7 +1817,7 @@ textarea,
   display: flex;
   align-items: center;
   width: 100%;
-  height: 42px;
+  height: var(--ui-settings-nav-height);
   gap: 12px;
   padding: 0 12px;
   border: 0;
@@ -1783,8 +1851,7 @@ textarea,
   font-size: 12px;
 }
 
-.settings-page-main,
-.settings-preview-panel {
+.settings-page-main {
   min-height: 0;
   overflow: auto;
   scrollbar-width: thin;
@@ -1793,9 +1860,16 @@ textarea,
 .settings-page-main {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 22px 24px 86px;
+  gap: var(--ui-settings-gap);
+  padding: 28px 32px 48px;
   min-width: 0;
+}
+
+.settings-page-main > * {
+  width: 100%;
+  max-width: 920px;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .settings-page-hero {
@@ -1817,6 +1891,13 @@ textarea,
   gap: 6px;
 }
 
+.settings-page-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .settings-page-hero .semi-typography {
   margin: 0;
 }
@@ -1829,16 +1910,26 @@ textarea,
 }
 
 .settings-group {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 12px;
   scroll-margin-top: 18px;
 }
 
+.settings-page-main[data-active-section='general'] #settings-general,
+.settings-page-main[data-active-section='editor'] #settings-editor,
+.settings-page-main[data-active-section='markdown'] #settings-markdown,
+.settings-page-main[data-active-section='appearance'] #settings-appearance,
+.settings-page-main[data-active-section='files'] #settings-files,
+.settings-page-main[data-active-section='sync'] #settings-sync,
+.settings-page-main[data-active-section='shortcuts'] #settings-shortcuts,
+.settings-page-main[data-active-section='plugins'] #settings-plugins,
+.settings-page-main[data-active-section='about'] #settings-about {
+  display: flex;
+}
+
 .settings-group > .semi-typography {
-  color: var(--text-primary);
-  font-size: 16px;
-  font-weight: 800;
+  display: none;
 }
 
 .settings-box {
@@ -1852,7 +1943,7 @@ textarea,
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 22px;
-  padding: 20px 22px;
+  padding: var(--ui-settings-box-padding-y) var(--ui-settings-box-padding-x);
 }
 
 .settings-box-split > * + * {
@@ -1864,7 +1955,7 @@ textarea,
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px 24px;
-  padding: 20px 22px;
+  padding: var(--ui-settings-box-padding-y) var(--ui-settings-box-padding-x);
 }
 
 .settings-field,
@@ -2025,6 +2116,55 @@ textarea,
   padding: 20px 22px;
 }
 
+.backup-targets-header,
+.backup-target-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.backup-targets-header > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backup-target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.backup-target-card {
+  overflow: hidden;
+}
+
+.backup-target-card-header {
+  padding: 14px var(--ui-settings-box-padding-x);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.backup-target-card-header > .semi-input-wrapper {
+  width: min(280px, 50%);
+  font-weight: 700;
+}
+
+.backup-target-fields {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.backup-auth-notice {
+  padding: 12px var(--ui-settings-box-padding-x);
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-tertiary);
+  background: var(--surface-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .settings-about-card {
   display: flex;
   gap: 14px;
@@ -2117,12 +2257,18 @@ textarea,
 }
 
 .settings-preview-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  padding: 26px 30px 34px 24px;
-  border-left: 1px solid var(--line-soft);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 28px;
+  padding: 22px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
   background: var(--settings-preview-panel-bg);
+  box-shadow: var(--shadow-soft);
+}
+
+.settings-preview-panel > .settings-preview-section:last-child {
+  grid-column: 1 / -1;
 }
 
 .settings-preview-section {
@@ -2213,6 +2359,18 @@ textarea,
   border-radius: 7px;
   background: var(--surface-base);
   color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.density-card:hover {
+  border-color: var(--brand-active);
+  background: var(--brand-softer);
 }
 
 .density-card span {
@@ -2737,10 +2895,6 @@ textarea,
   .settings-page-content {
     grid-template-columns: 230px minmax(0, 1fr);
   }
-
-  .settings-preview-panel {
-    display: none;
-  }
 }
 
 @media (max-width: 900px) {
@@ -2813,6 +2967,14 @@ textarea,
 
   .settings-page-main {
     padding: 22px 18px 74px;
+  }
+
+  .settings-preview-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-preview-panel > .settings-preview-section:last-child {
+    grid-column: auto;
   }
 }
 

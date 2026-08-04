@@ -29,7 +29,7 @@ export function createMainWindow(): BrowserWindow {
     ...(process.platform === 'darwin'
       ? {
           titleBarStyle: 'hidden' as const,
-          trafficLightPosition: { x: 6, y: 8 }
+          trafficLightPosition: { x: 14, y: 19 }
         }
       : { frame: false }),
     autoHideMenuBar: true,

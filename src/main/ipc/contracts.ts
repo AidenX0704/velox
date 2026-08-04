@@ -43,6 +43,34 @@ export const schemas = {
     previewEditWidthMode: z.enum(['wide', 'standard', 'narrow']).optional(),
     customPreviewCss: z.string().max(12000).optional(),
     appearanceMode: z.enum(['system', 'light', 'dark']).optional(),
+    uiDensity: z.enum(['compact', 'default', 'comfortable']).optional(),
+    backup: z
+      .object({
+        enabled: z.boolean(),
+        trigger: z.enum(['manual', 'on-save', 'interval']),
+        intervalMinutes: z.number().int().min(5).max(10080),
+        retentionCount: z.number().int().min(1).max(500),
+        conflictStrategy: z.enum(['keep-both', 'local-wins', 'remote-wins']),
+        includeAttachments: z.boolean(),
+        excludePatterns: z.string().max(4000),
+        targets: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(80),
+              name: z.string().min(1).max(80),
+              provider: z.enum(['local', 'webdav', 's3', 'onedrive', 'google-drive', 'dropbox']),
+              enabled: z.boolean(),
+              remotePath: z.string().max(1000),
+              endpoint: z.string().max(1000),
+              bucket: z.string().max(200),
+              region: z.string().max(100),
+              clientId: z.string().max(300),
+              tenantId: z.string().max(300)
+            })
+          )
+          .max(20)
+      })
+      .optional(),
     themeColorPreset: z.enum([...themeColorPresetIds, 'custom']).optional(),
     customThemeColor: z
       .string()

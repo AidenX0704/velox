@@ -22,6 +22,7 @@ import type { EditorMode } from '../modules/editor/model/types'
 import { editorModeLabels } from '../modules/editor/model/types'
 
 export type TitleBarSearchScope = 'document' | 'workspace'
+type TitleBarMenu = 'file' | 'edit' | 'window' | 'help'
 
 export interface TitleBarSearchResult {
   id: string
@@ -140,6 +141,7 @@ export function TitleBar({
 }: TitleBarProps): React.JSX.Element {
   const [isMaximized, setIsMaximized] = useState(false)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
+  const [activeMenu, setActiveMenu] = useState<TitleBarMenu | null>(null)
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const hasSearchValue = searchValue.trim().length > 0
@@ -208,6 +210,21 @@ export function TitleBar({
     }, 0)
   }
 
+  const toggleMenu = (menu: TitleBarMenu): void => {
+    setActiveMenu((current) => (current === menu ? null : menu))
+  }
+
+  const switchOpenMenu = (menu: TitleBarMenu): void => {
+    setActiveMenu((current) => (current === null ? null : menu))
+  }
+
+  const handleMenuVisibleChange = (menu: TitleBarMenu, visible: boolean): void => {
+    setActiveMenu((current) => {
+      if (visible) return menu
+      return current === menu ? null : current
+    })
+  }
+
   const showSearchPanel = searchPanelOpen && hasSearchValue
   const hiddenResultCount = Math.max(searchMatchCount - searchResults.length, 0)
   const canReplace = hasSearchValue && searchMatchCount > 0
@@ -226,6 +243,10 @@ export function TitleBar({
     <header className="titlebar" data-platform={platform}>
       <nav className="titlebar-menu" aria-label="应用菜单">
         <Dropdown
+          trigger="custom"
+          visible={activeMenu === 'file'}
+          onVisibleChange={(visible) => handleMenuVisibleChange('file', visible)}
+          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
           render={
             <Dropdown.Menu>
@@ -288,11 +309,21 @@ export function TitleBar({
             </Dropdown.Menu>
           }
         >
-          <button className="titlebar-menu-button" type="button">
+          <button
+            className="titlebar-menu-button"
+            type="button"
+            aria-expanded={activeMenu === 'file'}
+            onClick={() => toggleMenu('file')}
+            onMouseEnter={() => switchOpenMenu('file')}
+          >
             文件
           </button>
         </Dropdown>
         <Dropdown
+          trigger="custom"
+          visible={activeMenu === 'edit'}
+          onVisibleChange={(visible) => handleMenuVisibleChange('edit', visible)}
+          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
           render={
             <Dropdown.Menu>
@@ -301,18 +332,24 @@ export function TitleBar({
               </Dropdown.Item>
               <Dropdown.Item onClick={() => onSearchStep(-1)}>上一个匹配</Dropdown.Item>
               <Dropdown.Item onClick={() => onSearchStep(1)}>下一个匹配</Dropdown.Item>
-              <Dropdown.Divider />
-              <Dropdown.Item icon={<IconSettingStroked />} onClick={onOpenSettings}>
-                偏好设置
-              </Dropdown.Item>
             </Dropdown.Menu>
           }
         >
-          <button className="titlebar-menu-button" type="button">
+          <button
+            className="titlebar-menu-button"
+            type="button"
+            aria-expanded={activeMenu === 'edit'}
+            onClick={() => toggleMenu('edit')}
+            onMouseEnter={() => switchOpenMenu('edit')}
+          >
             编辑
           </button>
         </Dropdown>
         <Dropdown
+          trigger="custom"
+          visible={activeMenu === 'window'}
+          onVisibleChange={(visible) => handleMenuVisibleChange('window', visible)}
+          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
           render={
             <Dropdown.Menu>
@@ -329,14 +366,28 @@ export function TitleBar({
             </Dropdown.Menu>
           }
         >
-          <button className="titlebar-menu-button" type="button">
+          <button
+            className="titlebar-menu-button"
+            type="button"
+            aria-expanded={activeMenu === 'window'}
+            onClick={() => toggleMenu('window')}
+            onMouseEnter={() => switchOpenMenu('window')}
+          >
             窗口
           </button>
         </Dropdown>
         <Dropdown
+          trigger="custom"
+          visible={activeMenu === 'help'}
+          onVisibleChange={(visible) => handleMenuVisibleChange('help', visible)}
+          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
           render={
             <Dropdown.Menu>
+              <Dropdown.Item icon={<IconSettingStroked />} onClick={onOpenSettings}>
+                偏好设置
+              </Dropdown.Item>
+              <Dropdown.Divider />
               <Dropdown.Item onClick={onCheckForUpdates}>检查更新</Dropdown.Item>
               <Dropdown.Item icon={<IconSettingStroked />} onClick={onOpenAbout}>
                 关于 Velox
@@ -344,8 +395,14 @@ export function TitleBar({
             </Dropdown.Menu>
           }
         >
-          <button className="titlebar-menu-button" type="button">
-            帮我
+          <button
+            className="titlebar-menu-button"
+            type="button"
+            aria-expanded={activeMenu === 'help'}
+            onClick={() => toggleMenu('help')}
+            onMouseEnter={() => switchOpenMenu('help')}
+          >
+            关于
           </button>
         </Dropdown>
       </nav>

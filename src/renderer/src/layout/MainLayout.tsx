@@ -38,6 +38,13 @@ type UpdaterDialogKind = 'available' | 'downloaded' | null
 const MAX_TITLEBAR_SEARCH_RESULTS = 80
 const MAX_RESTORED_EXPLORER_PATHS = 128
 const WORKSPACE_EXPLORER_STATE_VERSION = '2'
+const DEFAULT_EXPLORER_WIDTH = 268
+const MIN_EXPLORER_WIDTH = 220
+const MAX_EXPLORER_WIDTH = 480
+
+function clampExplorerWidth(width: number): number {
+  return Math.min(MAX_EXPLORER_WIDTH, Math.max(MIN_EXPLORER_WIDTH, width))
+}
 
 const MarkdownEditor = lazy(() =>
   import('../modules/editor/MarkdownEditor').then((module) => ({
@@ -259,7 +266,10 @@ const ResourceExplorer = memo(function ResourceExplorer({
   onExpandedPathsChange,
   onCreateWorkspaceEntry,
   onRenameWorkspaceEntry,
-  onDeleteWorkspaceEntry
+  onDeleteWorkspaceEntry,
+  width,
+  onResizeStart,
+  onResizeKeyDown
 }: {
   workspaceRoot: string | null
   workspaceTree: WorkspaceEntry[]
@@ -275,6 +285,9 @@ const ResourceExplorer = memo(function ResourceExplorer({
   ) => Promise<string | null>
   onRenameWorkspaceEntry: (path: string, newName: string) => Promise<string | null>
   onDeleteWorkspaceEntry: (path: string) => Promise<boolean>
+  width: number
+  onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
 }): React.JSX.Element {
   const singleFileEntry: WorkspaceEntry | null =
     !workspaceRoot && selectedPath
@@ -286,7 +299,11 @@ const ResourceExplorer = memo(function ResourceExplorer({
       : null
 
   return (
-    <aside className="resource-explorer" aria-label="资源管理器">
+    <aside
+      className="resource-explorer"
+      aria-label="资源管理器"
+      style={{ width, flexBasis: width }}
+    >
       {workspaceRoot ? (
         <WorkspaceTree
           entries={workspaceTree}
@@ -323,6 +340,18 @@ const ResourceExplorer = memo(function ResourceExplorer({
           </button>
         </div>
       )}
+      <div
+        className="resource-explorer-resizer"
+        role="separator"
+        aria-label="调整资源管理器宽度"
+        aria-orientation="vertical"
+        aria-valuemin={MIN_EXPLORER_WIDTH}
+        aria-valuemax={MAX_EXPLORER_WIDTH}
+        aria-valuenow={width}
+        tabIndex={0}
+        onPointerDown={onResizeStart}
+        onKeyDown={onResizeKeyDown}
+      />
     </aside>
   )
 })
@@ -485,6 +514,7 @@ export function MainLayout(): React.JSX.Element {
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
   const [workspaceStateReady, setWorkspaceStateReady] = useState(false)
   const [explorerVisible, setExplorerVisible] = useState(true)
+  const [explorerWidth, setExplorerWidth] = useState(DEFAULT_EXPLORER_WIDTH)
   const [recentFiles, setRecentFiles] = useState<
     import('../../../shared/types').RecentFileRecord[]
   >([])
@@ -1969,11 +1999,66 @@ export function MainLayout(): React.JSX.Element {
     [openEditorView]
   )
 
+  const handleExplorerResizeStart = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = explorerWidth
+      const explorerElement = event.currentTarget.parentElement
+      const previousCursor = window.document.documentElement.style.cursor
+      const previousUserSelect = window.document.documentElement.style.userSelect
+      let nextWidth = startWidth
+      let resizeFrame = 0
+
+      window.document.documentElement.style.cursor = 'col-resize'
+      window.document.documentElement.style.userSelect = 'none'
+
+      const handlePointerMove = (moveEvent: PointerEvent): void => {
+        nextWidth = clampExplorerWidth(startWidth + moveEvent.clientX - startX)
+        if (resizeFrame !== 0) return
+
+        resizeFrame = window.requestAnimationFrame(() => {
+          resizeFrame = 0
+          if (!explorerElement) return
+          explorerElement.style.width = `${nextWidth}px`
+          explorerElement.style.flexBasis = `${nextWidth}px`
+        })
+      }
+
+      const stopResizing = (): void => {
+        window.removeEventListener('pointermove', handlePointerMove)
+        window.removeEventListener('pointerup', stopResizing)
+        window.removeEventListener('pointercancel', stopResizing)
+        if (resizeFrame !== 0) window.cancelAnimationFrame(resizeFrame)
+        window.document.documentElement.style.cursor = previousCursor
+        window.document.documentElement.style.userSelect = previousUserSelect
+        setExplorerWidth(nextWidth)
+      }
+
+      window.addEventListener('pointermove', handlePointerMove)
+      window.addEventListener('pointerup', stopResizing)
+      window.addEventListener('pointercancel', stopResizing)
+    },
+    [explorerWidth]
+  )
+
+  const handleExplorerResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>): void => {
+      const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
+      if (direction === 0) return
+
+      event.preventDefault()
+      setExplorerWidth((current) => clampExplorerWidth(current + direction * 10))
+    },
+    []
+  )
+
   return (
     <div
       className="app-shell"
       data-color-mode={resolvedAppearanceMode}
       data-appearance-mode={editorSettings.appearanceMode}
+      data-ui-density={editorSettings.uiDensity}
       data-platform={platform}
       data-view={activeView}
       data-dragging={isDragging}
@@ -2036,6 +2121,9 @@ export function MainLayout(): React.JSX.Element {
                   onCreateWorkspaceEntry={createWorkspaceEntry}
                   onRenameWorkspaceEntry={renameWorkspaceEntry}
                   onDeleteWorkspaceEntry={deleteWorkspaceEntry}
+                  width={explorerWidth}
+                  onResizeStart={handleExplorerResizeStart}
+                  onResizeKeyDown={handleExplorerResizeKeyDown}
                 />
               ) : null}
               <div className="editor-main">

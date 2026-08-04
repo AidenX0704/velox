@@ -3,7 +3,6 @@ import { Button, Input, InputNumber, Select, TextArea, Typography } from '@douyi
 import {
   IconArrowLeft,
   IconArticle,
-  IconCodeStroked,
   IconColorPalette,
   IconCommand,
   IconCloudStroked,
@@ -23,6 +22,8 @@ import type { UpdaterStatus } from '../../../shared/types'
 import {
   themeColorPresets,
   type AppearanceMode,
+  type BackupProvider,
+  type BackupTarget,
   type ThemeColorSelection
 } from '../../../shared/preferences'
 import type { ExportFormat, ExportImageFormat, ExportPdfPageSize } from '../../../shared/export'
@@ -46,7 +47,6 @@ export type PreferenceSection =
   | 'sync'
   | 'shortcuts'
   | 'plugins'
-  | 'advanced'
   | 'about'
 
 interface SettingsPageProps {
@@ -71,21 +71,85 @@ const appearanceModeOptions: Array<{
   { value: 'dark', label: '黑色', icon: <IconMoonStroked /> }
 ]
 
+const backupProviderOptions: Array<{ value: BackupProvider; label: string }> = [
+  { value: 'local', label: '本地目录' },
+  { value: 'webdav', label: 'WebDAV / Nextcloud / 坚果云' },
+  { value: 's3', label: 'S3 兼容存储' },
+  { value: 'onedrive', label: 'Microsoft OneDrive' },
+  { value: 'google-drive', label: 'Google Drive' },
+  { value: 'dropbox', label: 'Dropbox' }
+]
+
 const preferenceSections: Array<{
   id: PreferenceSection
   label: string
   icon: React.ReactNode
+  description: string
+  keywords: string
 }> = [
-  { id: 'general', label: '常规', icon: <IconSettingStroked /> },
-  { id: 'editor', label: '编辑器', icon: <IconEditStroked /> },
-  { id: 'markdown', label: 'Markdown', icon: <IconArticle /> },
-  { id: 'appearance', label: '外观', icon: <IconColorPalette /> },
-  { id: 'files', label: '文件管理', icon: <IconFolderStroked /> },
-  { id: 'sync', label: '同步与备份', icon: <IconCloudStroked /> },
-  { id: 'shortcuts', label: '快捷键', icon: <IconCommand /> },
-  { id: 'plugins', label: '插件扩展', icon: <IconPuzzle /> },
-  { id: 'advanced', label: '高级设置', icon: <IconCodeStroked /> },
-  { id: 'about', label: '关于', icon: <IconInfoCircle /> }
+  {
+    id: 'general',
+    label: '常规',
+    icon: <IconSettingStroked />,
+    description: '配置启动行为与默认编辑方式。',
+    keywords: '启动 会话 自动换行 行号 默认模式'
+  },
+  {
+    id: 'editor',
+    label: '编辑器',
+    icon: <IconEditStroked />,
+    description: '调整源码与预览编辑器的字号和行高。',
+    keywords: '字体 字号 行高 源码 预览'
+  },
+  {
+    id: 'markdown',
+    label: 'Markdown',
+    icon: <IconArticle />,
+    description: '控制 Markdown 排版、代码块和自定义样式。',
+    keywords: '预览 宽度 居中 代码块 行号 CSS 样式'
+  },
+  {
+    id: 'appearance',
+    label: '外观',
+    icon: <IconColorPalette />,
+    description: '选择界面主题、颜色并实时预览效果。',
+    keywords: '主题 深色 浅色 系统 颜色 外观'
+  },
+  {
+    id: 'files',
+    label: '文件管理',
+    icon: <IconFolderStroked />,
+    description: '设置 PDF、图片和文档的默认导出选项。',
+    keywords: '文件 导出 PDF PNG JPEG Word HTML 倍率'
+  },
+  {
+    id: 'sync',
+    label: '同步与备份',
+    icon: <IconCloudStroked />,
+    description: '查看版本状态并检查应用更新。',
+    keywords: '同步 备份 版本 更新 下载'
+  },
+  {
+    id: 'shortcuts',
+    label: '快捷键',
+    icon: <IconCommand />,
+    description: '查看、修改和恢复键盘快捷键。',
+    keywords: '键盘 按键 命令 快捷键 冲突'
+  },
+  {
+    id: 'plugins',
+    label: '插件扩展',
+    icon: <IconPuzzle />,
+    description: '管理应用的扩展能力。',
+    keywords: '插件 扩展'
+  },
+  {
+    id: 'about',
+    label: '关于',
+    icon: <IconInfoCircle />,
+    description: '查看 Velox 版本与技术信息。',
+    keywords: '关于 版本 Electron React ProseMirror'
+  }
 ]
 
 export function SettingsPage({
@@ -115,39 +179,56 @@ export function SettingsPage({
     }
   }, [])
 
-  useEffect(() => {
-    if (initialSection === 'general') {
-      return
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById(`settings-${initialSection}`)?.scrollIntoView({
-        block: 'start',
-        behavior: 'auto'
-      })
-    })
-
-    return () => window.cancelAnimationFrame(frame)
-  }, [initialSection])
-
   const updateSettings = (patch: SettingsPatch): void => {
     onChange({ ...settings, ...patch })
   }
 
-  const scrollToSection = (section: PreferenceSection): void => {
-    setActiveSection(section)
-    document.getElementById(`settings-${section}`)?.scrollIntoView({
-      block: 'start',
-      behavior: 'smooth'
+  const updateBackup = (patch: Partial<typeof settings.backup>): void => {
+    updateSettings({ backup: { ...settings.backup, ...patch } })
+  }
+
+  const addBackupTarget = (): void => {
+    const target: BackupTarget = {
+      id: crypto.randomUUID(),
+      name: `备份目标 ${settings.backup.targets.length + 1}`,
+      provider: 'local',
+      enabled: true,
+      remotePath: '',
+      endpoint: '',
+      bucket: '',
+      region: '',
+      clientId: '',
+      tenantId: 'common'
+    }
+    updateBackup({ targets: [...settings.backup.targets, target] })
+  }
+
+  const updateBackupTarget = (id: string, patch: Partial<BackupTarget>): void => {
+    updateBackup({
+      targets: settings.backup.targets.map((target) =>
+        target.id === id ? { ...target, ...patch } : target
+      )
     })
+  }
+
+  const removeBackupTarget = (id: string): void => {
+    updateBackup({ targets: settings.backup.targets.filter((target) => target.id !== id) })
+  }
+
+  const selectSection = (section: PreferenceSection): void => {
+    setActiveSection(section)
   }
 
   const normalizedSettingsSearchQuery = settingsSearchQuery.trim().toLowerCase()
   const visiblePreferenceSections = normalizedSettingsSearchQuery
     ? preferenceSections.filter((section) =>
-        `${section.label} ${section.id}`.toLowerCase().includes(normalizedSettingsSearchQuery)
+        `${section.label} ${section.id} ${section.description} ${section.keywords}`
+          .toLowerCase()
+          .includes(normalizedSettingsSearchQuery)
       )
     : preferenceSections
+  const activePreferenceSection =
+    preferenceSections.find((section) => section.id === activeSection) ?? preferenceSections[0]
 
   const activeThemeColor =
     settings.themeColorPreset === 'custom'
@@ -181,7 +262,7 @@ export function SettingsPage({
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && visiblePreferenceSections[0]) {
                   event.preventDefault()
-                  scrollToSection(visiblePreferenceSections[0].id)
+                  selectSection(visiblePreferenceSections[0].id)
                 }
               }}
             />
@@ -193,7 +274,7 @@ export function SettingsPage({
                 className="settings-nav-item"
                 data-active={section.id === activeSection}
                 type="button"
-                onClick={() => scrollToSection(section.id)}
+                onClick={() => selectSection(section.id)}
               >
                 {section.icon}
                 <span>{section.label}</span>
@@ -207,12 +288,15 @@ export function SettingsPage({
           </div>
         </aside>
 
-        <main className="settings-page-main">
+        <main className="settings-page-main" data-active-section={activeSection}>
           <header className="settings-page-hero">
             <div>
-              <Typography.Title heading={4}>偏好设置</Typography.Title>
+              <Typography.Text className="settings-page-eyebrow" type="tertiary">
+                偏好设置
+              </Typography.Text>
+              <Typography.Title heading={4}>{activePreferenceSection.label}</Typography.Title>
               <Typography.Text type="tertiary">
-                调整编辑、预览、导出和本地工作区体验。
+                {activePreferenceSection.description}
               </Typography.Text>
             </div>
             <div className="settings-page-hero-actions">
@@ -505,29 +589,104 @@ export function SettingsPage({
           </SettingsGroup>
 
           <SettingsGroup id="settings-sync" title="同步与备份">
-            <div className="settings-box settings-box-grid">
-              <SettingField
-                title="当前版本"
-                description={appInfo?.isPackaged ? '正式安装版本' : '开发环境'}
-              >
-                <div className="settings-version-value">v{appInfo?.version ?? '-'}</div>
-              </SettingField>
-              <SettingField title="更新状态" description={updaterStatus?.message ?? '尚未检查更新'}>
-                <span className="settings-update-state" data-state={updaterStatus?.state ?? 'idle'}>
-                  {getUpdaterStateLabel(updaterStatus)}
-                </span>
-              </SettingField>
-              <div className="settings-grid-span-2 settings-action-row">
-                <Button
-                  icon={<IconRefresh />}
-                  loading={updaterStatus?.state === 'checking'}
-                  disabled={updaterStatus?.state === 'downloading'}
-                  onClick={onCheckForUpdates}
-                >
-                  检查更新
-                </Button>
+            <div className="settings-box settings-box-grid backup-policy-box">
+              <div className="settings-checkbox-list settings-grid-span-2">
+                <CheckSetting
+                  title="启用工作区备份"
+                  checked={settings.backup.enabled}
+                  onChange={(enabled) => updateBackup({ enabled })}
+                />
+                <CheckSetting
+                  title="包含工作区内的图片和附件"
+                  checked={settings.backup.includeAttachments}
+                  onChange={(includeAttachments) => updateBackup({ includeAttachments })}
+                />
               </div>
+              <SettingField title="备份时机" description="手动、保存文档时或按固定周期运行">
+                <Select
+                  value={settings.backup.trigger}
+                  onChange={(value) =>
+                    updateBackup({ trigger: value as typeof settings.backup.trigger })
+                  }
+                >
+                  <Select.Option value="manual">仅手动</Select.Option>
+                  <Select.Option value="on-save">保存文档时</Select.Option>
+                  <Select.Option value="interval">固定周期</Select.Option>
+                </Select>
+              </SettingField>
+              <SettingField title="备份周期" description="周期备份的时间间隔，最少 5 分钟">
+                <InputNumber
+                  min={5}
+                  max={10080}
+                  suffix="分钟"
+                  disabled={settings.backup.trigger !== 'interval'}
+                  value={settings.backup.intervalMinutes}
+                  onChange={(value) => updateBackup({ intervalMinutes: Number(value) })}
+                />
+              </SettingField>
+              <SettingField title="版本保留" description="每个目标最多保留的历史备份数量">
+                <InputNumber
+                  min={1}
+                  max={500}
+                  suffix="份"
+                  value={settings.backup.retentionCount}
+                  onChange={(value) => updateBackup({ retentionCount: Number(value) })}
+                />
+              </SettingField>
+              <SettingField title="冲突处理" description="本地与云端内容同时变化时采用的策略">
+                <Select
+                  value={settings.backup.conflictStrategy}
+                  onChange={(value) =>
+                    updateBackup({
+                      conflictStrategy: value as typeof settings.backup.conflictStrategy
+                    })
+                  }
+                >
+                  <Select.Option value="keep-both">保留两个版本</Select.Option>
+                  <Select.Option value="local-wins">以本地为准</Select.Option>
+                  <Select.Option value="remote-wins">以云端为准</Select.Option>
+                </Select>
+              </SettingField>
+              <SettingField
+                className="settings-grid-span-2"
+                title="排除规则"
+                description="每行一个相对于工作区的目录、文件名或 Glob 规则"
+              >
+                <TextArea
+                  rows={4}
+                  value={settings.backup.excludePatterns}
+                  onChange={(excludePatterns) => updateBackup({ excludePatterns })}
+                />
+              </SettingField>
             </div>
+            <div className="backup-targets-header">
+              <div>
+                <Typography.Text strong>备份目标</Typography.Text>
+                <Typography.Text type="tertiary">可配置多个平台并独立启用。</Typography.Text>
+              </div>
+              <Button theme="solid" type="primary" onClick={addBackupTarget}>
+                添加目标
+              </Button>
+            </div>
+            {settings.backup.targets.length === 0 ? (
+              <div className="settings-box settings-placeholder-box">
+                <Typography.Text strong>尚未配置备份目标</Typography.Text>
+                <Typography.Text type="tertiary">
+                  添加本地目录、WebDAV、S3 或常见云盘作为备份位置。
+                </Typography.Text>
+              </div>
+            ) : (
+              <div className="backup-target-list">
+                {settings.backup.targets.map((target) => (
+                  <BackupTargetEditor
+                    key={target.id}
+                    target={target}
+                    onChange={(patch) => updateBackupTarget(target.id, patch)}
+                    onRemove={() => removeBackupTarget(target.id)}
+                  />
+                ))}
+              </div>
+            )}
           </SettingsGroup>
 
           <SettingsGroup id="settings-shortcuts" title="快捷键">
@@ -546,14 +705,6 @@ export function SettingsPage({
             </div>
           </SettingsGroup>
 
-          <SettingsGroup id="settings-advanced" title="高级设置">
-            <div className="settings-box settings-action-row">
-              <Button icon={<IconRefresh />} theme="light" onClick={onReset}>
-                恢复默认设置
-              </Button>
-            </div>
-          </SettingsGroup>
-
           <SettingsGroup id="settings-about" title="关于">
             <div className="settings-box settings-about-card">
               <BrandLogo className="settings-about-logo" />
@@ -569,116 +720,137 @@ export function SettingsPage({
                 </div>
               </div>
             </div>
-          </SettingsGroup>
-
-          <div className="settings-footer-actions">
-            <Button icon={<IconRefresh />} theme="light" onClick={onReset}>
-              恢复默认设置
-            </Button>
-            <Button theme="solid" type="primary" onClick={onBack}>
-              完成
-            </Button>
-          </div>
-        </main>
-
-        <aside className="settings-preview-panel" aria-label="外观预览">
-          <section className="settings-preview-section">
-            <Typography.Title heading={6}>外观预览</Typography.Title>
-            <Typography.Text strong>主题模式</Typography.Text>
-            <div className="appearance-mode-grid">
-              {appearanceModeOptions.map((option) => (
-                <button
-                  key={option.value}
-                  className="appearance-mode-card"
-                  data-active={settings.appearanceMode === option.value}
-                  type="button"
-                  onClick={() => updateSettings({ appearanceMode: option.value })}
+            <div className="settings-box settings-box-grid">
+              <SettingField title="更新状态" description={updaterStatus?.message ?? '尚未检查更新'}>
+                <span className="settings-update-state" data-state={updaterStatus?.state ?? 'idle'}>
+                  {getUpdaterStateLabel(updaterStatus)}
+                </span>
+              </SettingField>
+              <div className="settings-action-row">
+                <Button
+                  icon={<IconRefresh />}
+                  loading={updaterStatus?.state === 'checking'}
+                  disabled={updaterStatus?.state === 'downloading'}
+                  onClick={onCheckForUpdates}
                 >
-                  {option.icon}
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="settings-preview-section">
-            <Typography.Text strong>主题色</Typography.Text>
-            <div className="settings-preview-colors" role="radiogroup" aria-label="主题色预览">
-              {themeColorPresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  className="settings-preview-color"
-                  type="button"
-                  role="radio"
-                  aria-checked={settings.themeColorPreset === preset.id}
-                  data-active={settings.themeColorPreset === preset.id}
-                  title={preset.label}
-                  style={{ '--swatch-color': preset.color } as React.CSSProperties}
-                  onClick={() =>
-                    updateSettings({ themeColorPreset: preset.id as ThemeColorSelection })
-                  }
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="settings-preview-section">
-            <Typography.Text strong>界面密度</Typography.Text>
-            <div className="density-card-grid">
-              <DensityCard label="紧凑" active={settings.previewEditWidthMode === 'narrow'} />
-              <DensityCard label="默认" active={settings.previewEditWidthMode === 'standard'} />
-              <DensityCard label="舒适" active={settings.previewEditWidthMode === 'wide'} />
-            </div>
-          </section>
-
-          <div className="settings-preview-checks">
-            <CheckSetting
-              title="预览内容居中"
-              checked={settings.previewCentered}
-              onChange={(previewCentered) => updateSettings({ previewCentered })}
-            />
-          </div>
-
-          <section className="settings-preview-section">
-            <Typography.Text strong>预览效果</Typography.Text>
-            <div
-              className="settings-preview-window"
-              style={{ '--preview-accent': activeThemeColor } as React.CSSProperties}
-              data-mode={settings.appearanceMode}
-            >
-              <div className="settings-preview-sidebar">
-                <span />
-                <span />
-                <span />
-                <span />
+                  检查更新
+                </Button>
               </div>
-              <div className="settings-preview-doc">
-                <div className="settings-preview-window-dots">
-                  <span />
-                  <span />
-                  <span />
+            </div>
+          </SettingsGroup>
+          {activeSection === 'appearance' ? (
+            <aside className="settings-preview-panel" aria-label="外观预览">
+              <section className="settings-preview-section">
+                <Typography.Title heading={6}>外观预览</Typography.Title>
+                <Typography.Text strong>主题模式</Typography.Text>
+                <div className="appearance-mode-grid">
+                  {appearanceModeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      className="appearance-mode-card"
+                      data-active={settings.appearanceMode === option.value}
+                      type="button"
+                      onClick={() => updateSettings({ appearanceMode: option.value })}
+                    >
+                      {option.icon}
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
                 </div>
-                <h3># 标题示例</h3>
-                <p>这是一个预览示例，用于预览当前主题和排版效果。</p>
-                <pre>{`function hello() {
+              </section>
+
+              <section className="settings-preview-section">
+                <Typography.Text strong>主题色</Typography.Text>
+                <div className="settings-preview-colors" role="radiogroup" aria-label="主题色预览">
+                  {themeColorPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      className="settings-preview-color"
+                      type="button"
+                      role="radio"
+                      aria-checked={settings.themeColorPreset === preset.id}
+                      data-active={settings.themeColorPreset === preset.id}
+                      title={preset.label}
+                      style={{ '--swatch-color': preset.color } as React.CSSProperties}
+                      onClick={() =>
+                        updateSettings({ themeColorPreset: preset.id as ThemeColorSelection })
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="settings-preview-section">
+                <Typography.Text strong>界面密度</Typography.Text>
+                <div className="density-card-grid" role="radiogroup" aria-label="界面密度">
+                  <DensityCard
+                    label="紧凑"
+                    active={settings.uiDensity === 'compact'}
+                    onClick={() => updateSettings({ uiDensity: 'compact' })}
+                  />
+                  <DensityCard
+                    label="默认"
+                    active={settings.uiDensity === 'default'}
+                    onClick={() => updateSettings({ uiDensity: 'default' })}
+                  />
+                  <DensityCard
+                    label="舒适"
+                    active={settings.uiDensity === 'comfortable'}
+                    onClick={() => updateSettings({ uiDensity: 'comfortable' })}
+                  />
+                </div>
+              </section>
+
+              <div className="settings-preview-checks">
+                <CheckSetting
+                  title="预览内容居中"
+                  checked={settings.previewCentered}
+                  onChange={(previewCentered) => updateSettings({ previewCentered })}
+                />
+              </div>
+
+              <section className="settings-preview-section">
+                <Typography.Text strong>预览效果</Typography.Text>
+                <div
+                  className="settings-preview-window"
+                  style={{ '--preview-accent': activeThemeColor } as React.CSSProperties}
+                  data-mode={settings.appearanceMode}
+                >
+                  <div className="settings-preview-sidebar">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <div className="settings-preview-doc">
+                    <div className="settings-preview-window-dots">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                    <h3># 标题示例</h3>
+                    <p>这是一个预览示例，用于预览当前主题和排版效果。</p>
+                    <pre>{`function hello() {
   console.log('Hello Velox!')
 }`}</pre>
-                <table>
-                  <tbody>
-                    <tr>
-                      <th>功能</th>
-                      <th>状态</th>
-                    </tr>
-                    <tr>
-                      <td>实时预览</td>
-                      <td>●</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-        </aside>
+                    <table>
+                      <tbody>
+                        <tr>
+                          <th>功能</th>
+                          <th>状态</th>
+                        </tr>
+                        <tr>
+                          <td>实时预览</td>
+                          <td>●</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          ) : null}
+        </main>
       </div>
     </section>
   )
@@ -705,6 +877,98 @@ function getUpdaterStateLabel(status: UpdaterStatus | null): string {
     case 'error':
       return '检查失败'
   }
+}
+
+function BackupTargetEditor({
+  target,
+  onChange,
+  onRemove
+}: {
+  target: BackupTarget
+  onChange: (patch: Partial<BackupTarget>) => void
+  onRemove: () => void
+}): React.JSX.Element {
+  const isOAuthProvider = ['onedrive', 'google-drive', 'dropbox'].includes(target.provider)
+
+  return (
+    <section className="settings-box backup-target-card">
+      <div className="backup-target-card-header">
+        <Input
+          value={target.name}
+          aria-label="备份目标名称"
+          onChange={(name) => onChange({ name })}
+        />
+        <CheckSetting
+          title="启用"
+          checked={target.enabled}
+          onChange={(enabled) => onChange({ enabled })}
+        />
+        <Button theme="borderless" type="danger" onClick={onRemove}>
+          移除
+        </Button>
+      </div>
+      <div className="settings-box-grid backup-target-fields">
+        <SettingField title="存储平台" description="该目标使用的云存储协议或服务">
+          <Select
+            value={target.provider}
+            onChange={(provider) => onChange({ provider: provider as BackupProvider })}
+          >
+            {backupProviderOptions.map((option) => (
+              <Select.Option key={option.value} value={option.value}>
+                {option.label}
+              </Select.Option>
+            ))}
+          </Select>
+        </SettingField>
+        <SettingField
+          title={target.provider === 'local' ? '备份目录' : '远端目录'}
+          description="备份文件在目标平台中的保存位置"
+        >
+          <Input
+            value={target.remotePath}
+            placeholder={target.provider === 'local' ? '/Users/name/Backups' : '/Velox'}
+            onChange={(remotePath) => onChange({ remotePath })}
+          />
+        </SettingField>
+        {target.provider === 'webdav' || target.provider === 's3' ? (
+          <SettingField title="服务地址" description="自托管或兼容服务的 HTTPS Endpoint">
+            <Input
+              value={target.endpoint}
+              placeholder="https://storage.example.com"
+              onChange={(endpoint) => onChange({ endpoint })}
+            />
+          </SettingField>
+        ) : null}
+        {target.provider === 's3' ? (
+          <>
+            <SettingField title="Bucket" description="S3 存储桶名称">
+              <Input value={target.bucket} onChange={(bucket) => onChange({ bucket })} />
+            </SettingField>
+            <SettingField title="Region" description="例如 us-east-1 或 cn-north-1">
+              <Input value={target.region} onChange={(region) => onChange({ region })} />
+            </SettingField>
+          </>
+        ) : null}
+        {isOAuthProvider ? (
+          <>
+            <SettingField title="Client ID" description="由用户在对应平台开发者控制台创建">
+              <Input value={target.clientId} onChange={(clientId) => onChange({ clientId })} />
+            </SettingField>
+            {target.provider === 'onedrive' ? (
+              <SettingField title="Tenant ID" description="个人账户可填写 common">
+                <Input value={target.tenantId} onChange={(tenantId) => onChange({ tenantId })} />
+              </SettingField>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+      {target.provider !== 'local' ? (
+        <div className="backup-auth-notice">
+          凭据和 OAuth 令牌将在连接授权时写入系统安全存储，不会保存在普通偏好设置中。
+        </div>
+      ) : null}
+    </section>
+  )
 }
 
 function SettingsGroup({
@@ -770,14 +1034,29 @@ function CheckSetting({
   )
 }
 
-function DensityCard({ label, active }: { label: string; active: boolean }): React.JSX.Element {
+function DensityCard({
+  label,
+  active,
+  onClick
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}): React.JSX.Element {
   return (
-    <div className="density-card" data-active={active}>
+    <button
+      className="density-card"
+      type="button"
+      role="radio"
+      aria-checked={active}
+      data-active={active}
+      onClick={onClick}
+    >
       <span />
       <span />
       <span />
       <strong>{label}</strong>
-    </div>
+    </button>
   )
 }
 
