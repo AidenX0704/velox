@@ -103,9 +103,68 @@ jobs:
             dist/*.blockmap
           if-no-files-found: error
 
+      - name: Package Linux release artifacts
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'Linux'
+        run: npm exec -- electron-builder ${{ matrix.platform.target }} --publish never
+
       - name: Publish Linux artifacts to GitHub Release
         if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'Linux'
-        run: npm exec -- electron-builder ${{ matrix.platform.target }} --publish always
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          VERSION="$(node -p "require('./package.json').version")"
+          shopt -s nullglob
+          APPIMAGES=(dist/*.AppImage)
+          DEBS=(dist/*.deb)
+          METADATA=(dist/latest-linux.yml)
+          BLOCKMAPS=(dist/*.blockmap)
+
+          if [[ "$TAG" != "v$VERSION" ]]; then
+            echo "Release tag $TAG must match package.json version v$VERSION"
+            exit 1
+          fi
+
+          if (( ${#APPIMAGES[@]} != 1 || ${#DEBS[@]} != 1 || ${#METADATA[@]} != 1 )); then
+            echo "Expected exactly one AppImage, one deb, and one latest-linux.yml file"
+            ls -la dist
+            exit 1
+          fi
+
+          if ! grep -Eq "^version:[[:space:]]*$VERSION[[:space:]]*$" "${METADATA[0]}" ||
+             ! grep -Fq "$(basename "${APPIMAGES[0]}")" "${METADATA[0]}"; then
+            echo "latest-linux.yml does not reference the packaged Linux version and AppImage"
+            exit 1
+          fi
+
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$VERSION" \
+              --generate-notes
+          fi
+
+          gh release upload "$TAG" \
+            "${APPIMAGES[@]}" \
+            "${DEBS[@]}" \
+            "${METADATA[@]}" \
+            "${BLOCKMAPS[@]}" \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+          mapfile -t RELEASE_ASSETS < <(
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
+          )
+          for expected_asset in \
+            "$(basename "${APPIMAGES[0]}")" \
+            "$(basename "${DEBS[0]}")" \
+            "$(basename "${METADATA[0]}")"; do
+            if ! printf '%s\n' "${RELEASE_ASSETS[@]}" | grep -Fxq "$expected_asset"; then
+              echo "GitHub Release $TAG is missing Linux asset $expected_asset"
+              exit 1
+            fi
+          done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
