@@ -1,5 +1,5 @@
 import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
+import { Button, Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
 import { IconFolderStroked } from '@douyinfe/semi-icons'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
 import type {
@@ -18,6 +18,11 @@ import {
 import '../modules/editor/styles/editor.css'
 import { createWelcomeDocument, useTabs } from '../features/tabs/useTabs'
 import { TabBar } from '../features/tabs/TabBar'
+import {
+  getCloseTabAction,
+  persistTabBeforeClose,
+  type CloseTabDecision
+} from '../features/tabs/closeTabWorkflow'
 import { useEditorSettings } from '../features/settings/useEditorSettings'
 import {
   applyThemeToDocument,
@@ -254,6 +259,38 @@ function formatUpdateDate(value?: string): string | undefined {
 
 function getUpdateNotes(status: UpdaterStatus): string {
   return status.releaseNotes?.trim() || '此版本没有提供更新日志。'
+}
+
+function requestCloseTabDecision(title: string): Promise<CloseTabDecision> {
+  return new Promise((resolve) => {
+    let settled = false
+
+    const settle = (decision: CloseTabDecision): void => {
+      if (settled) return
+
+      settled = true
+      resolve(decision)
+      modal.destroy()
+    }
+
+    const modal = Modal.confirm({
+      title: '文档尚未保存',
+      content: `"${title}" 尚未保存，请选择如何关闭。`,
+      footer: (
+        <>
+          <Button onClick={() => settle('cancel')}>取消</Button>
+          <Button type="danger" onClick={() => settle('discard')}>
+            不保存并关闭
+          </Button>
+          <Button theme="solid" type="primary" onClick={() => settle('save')}>
+            保存并关闭
+          </Button>
+        </>
+      ),
+      // Esc、点击遮罩和右上角关闭都只是取消操作，绝不能等同于“不保存并关闭”。
+      onCancel: () => settle('cancel')
+    })
+  })
 }
 
 const ResourceExplorer = memo(function ResourceExplorer({
@@ -572,6 +609,7 @@ export function MainLayout(): React.JSX.Element {
     switchToNextTab,
     switchToPreviousTab,
     switchToTabByIndex,
+    completeSaveAndCloseTab,
     updateTabDocument,
     findTabByPath
   } = useTabs()
@@ -585,6 +623,7 @@ export function MainLayout(): React.JSX.Element {
     (() => Promise<import('../../../shared/types').RecentFileRecord[]>) | undefined
   >(undefined)
   const hasInitializedRef = useRef(false)
+  const closingTabIdsRef = useRef(new Set<string>())
 
   const document = useMemo(
     () =>
@@ -946,39 +985,55 @@ export function MainLayout(): React.JSX.Element {
 
   const handleCloseTab = useCallback(
     async (tabId: string): Promise<void> => {
-      const tab = tabs.find((t) => t.id === tabId)
+      // 防止双击关闭或快捷键连按触发多个确认框和并发保存。
+      if (closingTabIdsRef.current.has(tabId)) return
+
+      const tab = tabs.find((item) => item.id === tabId)
       if (!tab) return
 
-      if (tab.document.dirty) {
-        const confirmed = await new Promise<boolean>((resolve) => {
-          Modal.confirm({
-            title: '文档尚未保存',
-            content: `"${tab.document.title}" 尚未保存，是否保存后再关闭？`,
-            okText: '保存并关闭',
-            cancelText: '直接关闭',
-            onOk: () => resolve(true),
-            onCancel: () => resolve(false)
-          })
-        })
-
-        if (confirmed) {
-          setActiveTabId(tabId)
-          await new Promise((r) => setTimeout(r, 0))
-          const result = tab.document.path
-            ? await window.api.document.save({
-                path: tab.document.path,
-                content: tab.document.content
-              })
-            : await window.api.document.saveAs({ content: tab.document.content })
-          if (result.ok) {
-            updateTabDocument(tabId, { dirty: false })
-          }
-        }
+      if (!tab.document.dirty) {
+        closeTab(tabId)
+        return
       }
 
-      closeTab(tabId, { force: true })
+      closingTabIdsRef.current.add(tabId)
+      setActiveTabId(tabId)
+
+      try {
+        const decision = await requestCloseTabDecision(tab.document.title)
+        const action = getCloseTabAction(decision)
+
+        if (action === 'keep') {
+          return
+        }
+
+        if (action === 'discard') {
+          closeTab(tabId, { force: true })
+          return
+        }
+
+        const outcome = await persistTabBeforeClose(tab.document, window.api.document)
+
+        if (outcome.kind === 'failed') {
+          Toast.error(outcome.error.message)
+          return
+        }
+
+        if (outcome.kind === 'cancelled') {
+          return
+        }
+
+        completeSaveAndCloseTab(
+          tabId,
+          { path: tab.document.path, content: tab.document.content },
+          outcome.document
+        )
+        void refreshRecent()
+      } finally {
+        closingTabIdsRef.current.delete(tabId)
+      }
     },
-    [tabs, setActiveTabId, updateTabDocument, closeTab]
+    [closeTab, completeSaveAndCloseTab, refreshRecent, setActiveTabId, tabs]
   )
 
   const handleCloseOthers = useCallback(

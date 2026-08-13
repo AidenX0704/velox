@@ -12,6 +12,7 @@
     "lint": "eslint --cache .",
     "test:document-images": "node scripts/check-document-images.mjs",
     "test:rich-markdown": "node scripts/check-rich-markdown.mjs",
+    "test:tab-close": "node scripts/check-tab-close.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",

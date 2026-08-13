@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
+import type { DocumentData } from '../../../../shared/types'
 import type { EditorMode } from '../../modules/editor/model/types'
+import { reconcileSavedTab, type SavedTabSnapshot } from './closeTabWorkflow'
 import type { TabDocument, TabState } from './types'
 
 let tabIdCounter = 0
@@ -54,7 +56,7 @@ export function useTabs(): {
   setTabScrollTop: (tabId: string, scrollTop: number) => void
   addTab: (document: TabDocument, editorMode?: EditorMode, pinned?: boolean) => string
   replaceTabs: (documents: Array<{ document: TabDocument; editorMode?: EditorMode }>) => void
-  closeTab: (tabId: string, options?: { force?: boolean }) => boolean
+  closeTab: (tabId: string, options?: { force?: boolean }) => void
   closeOtherTabs: (tabId: string, options?: { force?: boolean }) => void
   closeAllTabs: (options?: { force?: boolean }) => void
   closeSavedTabs: () => void
@@ -64,6 +66,11 @@ export function useTabs(): {
   switchToNextTab: () => void
   switchToPreviousTab: () => void
   switchToTabByIndex: (index: number) => void
+  completeSaveAndCloseTab: (
+    tabId: string,
+    snapshot: SavedTabSnapshot,
+    savedDocument: DocumentData
+  ) => void
   updateTabDocument: (tabId: string, document: Partial<TabDocument>) => void
   findTabByPath: (path: string) => TabState | undefined
 } {
@@ -116,16 +123,14 @@ export function useTabs(): {
   )
 
   const closeTab = useCallback(
-    (tabId: string, options?: { force?: boolean }): boolean => {
-      const tab = tabs.find((t) => t.id === tabId)
-      if (!tab) return false
-
-      if (tab.document.dirty && !options?.force) {
-        return false
-      }
-
+    (tabId: string, options?: { force?: boolean }): void => {
       setTabs((prev) => {
         const index = prev.findIndex((t) => t.id === tabId)
+        if (index === -1) return prev
+
+        const tab = prev[index]
+        if (tab.document.dirty && !options?.force) return prev
+
         const next = prev.filter((t) => t.id !== tabId)
 
         if (next.length === 0) {
@@ -140,10 +145,8 @@ export function useTabs(): {
 
         return next
       })
-
-      return true
     },
-    [tabs, updateActiveTabId]
+    [updateActiveTabId]
   )
 
   const closeOtherTabs = useCallback(
@@ -191,6 +194,32 @@ export function useTabs(): {
       return remaining
     })
   }, [updateActiveTabId])
+
+  const completeSaveAndCloseTab = useCallback(
+    (tabId: string, snapshot: SavedTabSnapshot, savedDocument: DocumentData): void => {
+      // 比较最新状态与关闭必须在同一次函数式更新中完成，避免遗漏已排队但尚未渲染的输入。
+      setTabs((prev) => {
+        const result = reconcileSavedTab(prev, tabId, snapshot, savedDocument)
+
+        if (result.outcome !== 'closed') {
+          return result.tabs
+        }
+
+        if (result.tabs.length === 0) {
+          updateActiveTabId(null)
+          return result.tabs
+        }
+
+        if (activeTabIdRef.current === tabId) {
+          const nextIndex = Math.min(result.closedIndex ?? 0, result.tabs.length - 1)
+          updateActiveTabId(result.tabs[nextIndex].id)
+        }
+
+        return result.tabs
+      })
+    },
+    [updateActiveTabId]
+  )
 
   const pinTab = useCallback((tabId: string): void => {
     setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, pinned: true } : t)))
@@ -320,6 +349,7 @@ export function useTabs(): {
     switchToNextTab,
     switchToPreviousTab,
     switchToTabByIndex,
+    completeSaveAndCloseTab,
     updateTabDocument,
     findTabByPath
   }
