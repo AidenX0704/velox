@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.8 - 2026-08-13
+
+### Fixed
+
+- Prevented unsaved tabs from closing when Save As is canceled, saving fails, or the save IPC call rejects.
+- Changed the dirty-tab prompt to explicit save, discard, and cancel outcomes so Esc, backdrop clicks, and the dialog close button preserve the document.
+- Preserved edits and path changes made while an asynchronous save is in progress instead of overwriting or closing the latest tab state.
+- Added regression coverage for the save-before-close workflow and included it in the release pipeline.
+
 ## 1.0.7 - 2026-07-29
 
 ### Fixed
