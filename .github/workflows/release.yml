@@ -63,6 +63,9 @@ jobs:
       - name: Test document images
         run: npm run test:document-images
 
+      - name: Test tab close workflow
+        run: npm run test:tab-close
+
       - name: Verify release tag
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         shell: bash
