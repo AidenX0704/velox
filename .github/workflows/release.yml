@@ -103,11 +103,88 @@ jobs:
             dist/*.blockmap
           if-no-files-found: error
 
-      - name: Publish artifacts to GitHub Release
-        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os != 'macOS'
+      - name: Publish Linux artifacts to GitHub Release
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'Linux'
         run: npm exec -- electron-builder ${{ matrix.platform.target }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Windows release artifacts
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'Windows'
+        run: npm exec -- electron-builder ${{ matrix.platform.target }} --publish never
+
+      - name: Publish Windows artifacts to GitHub Release
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $tag = $env:RELEASE_TAG
+          $version = node -p "require('./package.json').version"
+          $installers = @(Get-ChildItem -Path dist -Filter 'Velox-*-setup.exe' -File)
+          $metadata = @(Get-ChildItem -Path dist -Filter 'latest.yml' -File)
+
+          if ($tag -ne "v$version") {
+            throw "Release tag $tag must match package.json version v$version"
+          }
+
+          if ($installers.Count -ne 1 -or $metadata.Count -ne 1) {
+            Get-ChildItem -Path dist -File | Format-Table Name, Length
+            throw 'Expected exactly one Windows installer and one latest.yml file'
+          }
+
+          $installer = $installers[0]
+          $blockmap = Get-Item -LiteralPath "$($installer.FullName).blockmap" -ErrorAction SilentlyContinue
+
+          if (-not $blockmap) {
+            Get-ChildItem -Path dist -File | Format-Table Name, Length
+            throw "Expected blockmap for $($installer.Name)"
+          }
+
+          $metadataContent = Get-Content -LiteralPath $metadata[0].FullName -Raw
+          if ($metadataContent -notmatch "(?m)^version:\s*$([regex]::Escape($version))\s*$" -or
+              $metadataContent -notmatch [regex]::Escape($installer.Name)) {
+            throw 'latest.yml does not reference the packaged Windows version and installer'
+          }
+
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag `
+              --repo $env:GITHUB_REPOSITORY `
+              --verify-tag `
+              --title $version `
+              --generate-notes
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create GitHub Release $tag"
+            }
+          }
+
+          gh release upload $tag `
+            $installer.FullName `
+            $blockmap.FullName `
+            $metadata[0].FullName `
+            --clobber `
+            --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to upload Windows release artifacts for $tag"
+          }
+
+          $releaseAssets = @(gh release view $tag `
+            --repo $env:GITHUB_REPOSITORY `
+            --json assets `
+            --jq '.assets[].name')
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to verify GitHub Release assets for $tag"
+          }
+
+          foreach ($expectedAsset in @($installer.Name, $blockmap.Name, $metadata[0].Name)) {
+            if ($releaseAssets -notcontains $expectedAsset) {
+              throw "GitHub Release $tag is missing Windows asset $expectedAsset"
+            }
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
       - name: Package macOS release artifacts
         if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && runner.os == 'macOS'
