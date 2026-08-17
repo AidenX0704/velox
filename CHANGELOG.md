@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.9 - 2026-08-17
+
+### Added
+
+- Added resource explorer visibility controls to the title bar and Window menu, with clear active, disabled, tooltip, and accessibility states.
+- Added a compact explorer toolbar with file and folder creation, collapse-all, item count, and contextual workspace actions.
+
+### Changed
+
+- Kept the resource explorer hidden when no folder is open, showed it for new folder workspaces, and preserved each workspace's saved visibility preference.
+- Refined the explorer hierarchy, workspace header, icons, selection states, empty states, spacing, and resize affordance for a cleaner document-focused layout.
+
+### Fixed
+
+- Restored reliable window dragging across unused title bar areas while keeping menus, search, editor modes, explorer controls, and window buttons interactive.
+- Prevented failed workspace loads from leaving stale workspace state or an empty explorer visible.
+- Published and verified the Windows and Linux auto-update metadata and release assets required by `electron-updater`.
+
 ## 1.0.8 - 2026-08-13
 
 ### Fixed
