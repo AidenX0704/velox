@@ -550,7 +550,7 @@ export function MainLayout(): React.JSX.Element {
   const [workspaceTree, setWorkspaceTree] = useState<WorkspaceEntry[]>([])
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
   const [workspaceStateReady, setWorkspaceStateReady] = useState(false)
-  const [explorerVisible, setExplorerVisible] = useState(true)
+  const [explorerVisible, setExplorerVisible] = useState(false)
   const [explorerWidth, setExplorerWidth] = useState(DEFAULT_EXPLORER_WIDTH)
   const [recentFiles, setRecentFiles] = useState<
     import('../../../shared/types').RecentFileRecord[]
@@ -637,6 +637,8 @@ export function MainLayout(): React.JSX.Element {
   )
   const activeResourceKind = activeTab?.document.kind ?? 'markdown'
   const isImagePreview = activeResourceKind === 'image'
+  const workspaceAvailable = Boolean(workspaceRoot) && workspaceStateReady
+  const isExplorerVisible = workspaceAvailable && explorerVisible
   const editorMode = activeTab?.editorMode ?? 'preview-edit'
   const cursorPosition = useMemo<CursorPosition>(
     () => ({
@@ -670,7 +672,7 @@ export function MainLayout(): React.JSX.Element {
       : 0
   const searchResultsForNavigation = titlebarSearchResults
   const workspaceSearchDisabledError =
-    searchScope === 'workspace' && !workspaceRoot ? '先打开一个工作区' : undefined
+    searchScope === 'workspace' && !workspaceAvailable ? '先打开一个工作区' : undefined
 
   const refreshRecent = useCallback(async () => {
     const filesResult = await window.api.recent.listFiles()
@@ -850,6 +852,7 @@ export function MainLayout(): React.JSX.Element {
     setWorkspaceTree([])
     setExpandedWorkspacePaths([])
     setWorkspaceStateReady(false)
+    setExplorerVisible(false)
 
     const [treeResult, stateResult] = await Promise.all([
       window.api.workspace.getTree({ rootPath: path }),
@@ -861,7 +864,11 @@ export function MainLayout(): React.JSX.Element {
     }
 
     if (!treeResult.ok) {
-      setWorkspaceStateReady(true)
+      setWorkspaceRoot(null)
+      setWorkspaceTree([])
+      setExpandedWorkspacePaths([])
+      setWorkspaceStateReady(false)
+      setExplorerVisible(false)
       Toast.error(treeResult.error.message)
       return
     }
@@ -871,9 +878,7 @@ export function MainLayout(): React.JSX.Element {
       stateResult.ok && stateResult.data ? stateResult.data.expandedPaths : []
     )
 
-    if (stateResult.ok && stateResult.data) {
-      setExplorerVisible(stateResult.data.sidebarVisible)
-    }
+    setExplorerVisible(stateResult.ok && stateResult.data ? stateResult.data.sidebarVisible : true)
 
     setExpandedWorkspacePaths(restoredExpandedPaths)
     setWorkspaceTree(treeResult.data)
@@ -2054,6 +2059,11 @@ export function MainLayout(): React.JSX.Element {
     [openEditorView]
   )
 
+  const toggleExplorer = useCallback((): void => {
+    if (!workspaceAvailable) return
+    setExplorerVisible((current) => !current)
+  }, [workspaceAvailable])
+
   const handleExplorerResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
       event.preventDefault()
@@ -2136,10 +2146,10 @@ export function MainLayout(): React.JSX.Element {
           searchResults={titlebarSearchResults}
           searchLoading={workspaceSearchLoading}
           searchError={workspaceSearchDisabledError ?? workspaceSearchError}
-          workspaceAvailable={Boolean(workspaceRoot)}
+          workspaceAvailable={workspaceAvailable}
           searchTruncated={titlebarSearchTruncated}
           searchFocusRequestId={searchFocusRequestId}
-          explorerVisible={explorerVisible}
+          explorerVisible={isExplorerVisible}
           onModeChange={setEditorMode}
           onSearchChange={updateSearchQuery}
           onSearchScopeChange={updateSearchScope}
@@ -2157,14 +2167,14 @@ export function MainLayout(): React.JSX.Element {
           onSave={() => void saveDocument()}
           onOpenSettings={() => openSettingsView('general')}
           onOpenAbout={() => openSettingsView('about')}
-          onToggleExplorer={() => setExplorerVisible((current) => !current)}
+          onToggleExplorer={toggleExplorer}
           onCheckForUpdates={() => void checkForUpdates()}
           onExport={(format) => void handleExport(format)}
         />
         {activeView === 'editor' ? (
           <>
-            <div className="editor-workspace" data-explorer-visible={explorerVisible}>
-              {explorerVisible ? (
+            <div className="editor-workspace" data-explorer-visible={isExplorerVisible}>
+              {isExplorerVisible ? (
                 <ResourceExplorer
                   workspaceRoot={workspaceRoot}
                   workspaceTree={workspaceTree}

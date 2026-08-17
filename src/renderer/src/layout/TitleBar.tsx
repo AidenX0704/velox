@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Dropdown, Input } from '@douyinfe/semi-ui'
+import { Dropdown, Input, Tooltip } from '@douyinfe/semi-ui'
 import {
   IconCaseSensitive,
   IconChevronDown,
@@ -14,6 +14,7 @@ import {
   IconPlusStroked,
   IconSaveStroked,
   IconSearchStroked,
+  IconSidebar,
   IconSettingStroked
 } from '@douyinfe/semi-icons'
 import type { ExportFormat } from '../../../shared/export'
@@ -241,6 +242,7 @@ export function TitleBar({
 
   return (
     <header className="titlebar" data-platform={platform}>
+      <div className="titlebar-drag-region" aria-hidden="true" />
       <nav className="titlebar-menu" aria-label="应用菜单">
         <Dropdown
           trigger="custom"
@@ -353,7 +355,12 @@ export function TitleBar({
           position="bottomLeft"
           render={
             <Dropdown.Menu>
-              <Dropdown.Item onClick={onToggleExplorer}>
+              <Dropdown.Item
+                icon={<IconSidebar />}
+                active={workspaceAvailable && explorerVisible}
+                disabled={!workspaceAvailable}
+                onClick={onToggleExplorer}
+              >
                 {explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
               </Dropdown.Item>
               <Dropdown.Divider />
@@ -618,6 +625,23 @@ export function TitleBar({
       </div>
 
       <div className="titlebar-right">
+        {workspaceAvailable ? (
+          <Tooltip
+            content={explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
+            position="bottom"
+          >
+            <button
+              className="titlebar-explorer-toggle"
+              type="button"
+              aria-label={explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
+              aria-pressed={explorerVisible}
+              data-active={explorerVisible}
+              onClick={onToggleExplorer}
+            >
+              <IconSidebar />
+            </button>
+          </Tooltip>
+        ) : null}
         {documentActionsEnabled ? (
           <Segment
             className="mode-segment"

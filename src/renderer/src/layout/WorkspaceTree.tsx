@@ -7,11 +7,12 @@ import {
   IconEditStroked,
   IconExternalOpenStroked,
   IconFile,
-  IconFolder,
-  IconFolderOpen,
   IconFolderOpenStroked,
   IconFolderStroked,
   IconImageStroked,
+  IconMoreStroked,
+  IconPlusStroked,
+  IconShrink,
   IconTreeTriangleRight
 } from '@douyinfe/semi-icons'
 import type { WorkspaceEntry } from '../../../shared/types'
@@ -40,9 +41,9 @@ function WorkspaceEntryIcon({
     >
       {type === 'directory' ? (
         expanded ? (
-          <IconFolderOpen />
+          <IconFolderOpenStroked />
         ) : (
-          <IconFolder />
+          <IconFolderStroked />
         )
       ) : resourceKind === 'image' ? (
         <IconImageStroked />
@@ -230,9 +231,102 @@ function WorkspaceTreeContent({
     }
   }
 
+  const workspaceMenu = (
+    <Dropdown.Menu>
+      {onCreateWorkspaceEntry ? (
+        <>
+          <Dropdown.Item
+            icon={<IconFile />}
+            onClick={() => handleCreateRequest(workspaceRoot, 'file')}
+          >
+            新建文件
+          </Dropdown.Item>
+          <Dropdown.Item
+            icon={<IconFolderStroked />}
+            onClick={() => handleCreateRequest(workspaceRoot, 'directory')}
+          >
+            新建文件夹
+          </Dropdown.Item>
+        </>
+      ) : null}
+      {localExpandedPaths.size > 0 ? (
+        <Dropdown.Item icon={<IconTreeTriangleRight />} onClick={collapseAllDirectories}>
+          全部折叠
+        </Dropdown.Item>
+      ) : null}
+      {onCreateWorkspaceEntry || localExpandedPaths.size > 0 ? <Dropdown.Divider /> : null}
+      <Dropdown.Item
+        icon={<IconExternalOpenStroked />}
+        onClick={() => void window.api.shell.showItemInFolder(workspaceRoot)}
+      >
+        在访达中显示
+      </Dropdown.Item>
+    </Dropdown.Menu>
+  )
+
+  const workspaceTreeToolbar = (
+    <div className="workspace-tree-toolbar">
+      <div className="workspace-tree-toolbar-title">
+        <span className="workspace-tree-toolbar-icon" aria-hidden="true">
+          <IconFolderOpenStroked />
+        </span>
+        <span>资源管理器</span>
+        <span className="workspace-tree-toolbar-count">{entries.length}</span>
+      </div>
+      {workspaceRootType === 'directory' ? (
+        <div className="workspace-tree-toolbar-actions">
+          {onCreateWorkspaceEntry ? (
+            <>
+              <button
+                className="workspace-tree-toolbar-button"
+                type="button"
+                aria-label="新建文件"
+                title="新建文件"
+                onClick={() => handleCreateRequest(workspaceRoot, 'file')}
+              >
+                <IconPlusStroked />
+              </button>
+              <button
+                className="workspace-tree-toolbar-button"
+                type="button"
+                aria-label="新建文件夹"
+                title="新建文件夹"
+                onClick={() => handleCreateRequest(workspaceRoot, 'directory')}
+              >
+                <IconFolderStroked />
+              </button>
+            </>
+          ) : null}
+          {localExpandedPaths.size > 0 ? (
+            <button
+              className="workspace-tree-toolbar-button"
+              type="button"
+              aria-label="全部折叠"
+              title="全部折叠"
+              onClick={collapseAllDirectories}
+            >
+              <IconShrink />
+            </button>
+          ) : null}
+          <Dropdown trigger="click" position="bottomRight" render={workspaceMenu}>
+            <button
+              className="workspace-tree-toolbar-button"
+              type="button"
+              aria-label="资源管理器更多操作"
+              title="更多操作"
+            >
+              <IconMoreStroked />
+            </button>
+          </Dropdown>
+        </div>
+      ) : null}
+    </div>
+  )
+
   if (workspaceRootType === 'file') {
     return (
       <div className="workspace-tree" role="tree">
+        {workspaceTreeToolbar}
         <button
           className="workspace-tree-single-file"
           type="button"
@@ -251,47 +345,19 @@ function WorkspaceTreeContent({
 
   return (
     <div className="workspace-tree" role="tree">
-      <Dropdown
-        trigger="contextMenu"
-        render={
-          <Dropdown.Menu>
-            {onCreateWorkspaceEntry ? (
-              <>
-                <Dropdown.Item
-                  icon={<IconFile />}
-                  onClick={() => handleCreateRequest(workspaceRoot, 'file')}
-                >
-                  新建文件
-                </Dropdown.Item>
-                <Dropdown.Item
-                  icon={<IconFolderStroked />}
-                  onClick={() => handleCreateRequest(workspaceRoot, 'directory')}
-                >
-                  新建文件夹
-                </Dropdown.Item>
-              </>
-            ) : null}
-            {localExpandedPaths.size > 0 ? (
-              <Dropdown.Item icon={<IconTreeTriangleRight />} onClick={collapseAllDirectories}>
-                全部折叠
-              </Dropdown.Item>
-            ) : null}
-            {onCreateWorkspaceEntry || localExpandedPaths.size > 0 ? <Dropdown.Divider /> : null}
-            <Dropdown.Item
-              icon={<IconExternalOpenStroked />}
-              onClick={() => void window.api.shell.showItemInFolder(workspaceRoot)}
-            >
-              在访达中显示
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        }
-      >
+      {workspaceTreeToolbar}
+      <Dropdown trigger="contextMenu" render={workspaceMenu}>
         <div className="explorer-root-header">
-          <IconFolderOpen className="explorer-root-folder-icon" />
+          <IconFolderOpenStroked className="explorer-root-folder-icon" />
           <div className="explorer-root-copy">
-            <Typography.Text className="explorer-root-name" ellipsis={{ showTooltip: true }}>
-              {workspaceRoot ? basename(workspaceRoot) : '未打开工作区'}
+            <Typography.Text
+              className="explorer-root-name"
+              ellipsis={{ showTooltip: true }}
+              title={workspaceRoot}
+            >
+              {basename(workspaceRoot)}
             </Typography.Text>
+            <span className="explorer-root-meta">工作区</span>
           </div>
         </div>
       </Dropdown>
