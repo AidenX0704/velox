@@ -78,6 +78,13 @@ jobs:
             exit 1
           fi
 
+          # Release notes are curated for users, not a copy of CHANGELOG.md.
+          # Fail here — before ~10 minutes of packaging — when they are missing.
+          if [ ! -f "release-notes/$TAG.md" ]; then
+            echo "Missing release notes: release-notes/$TAG.md (write user-facing notes for $TAG first)"
+            exit 1
+          fi
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -125,6 +132,12 @@ jobs:
             exit 1
           fi
 
+          NOTES="release-notes/$TAG.md"
+          if [[ ! -f "$NOTES" ]]; then
+            echo "Missing release notes: $NOTES"
+            exit 1
+          fi
+
           if (( ${#APPIMAGES[@]} != 1 || ${#DEBS[@]} != 1 || ${#METADATA[@]} != 1 )); then
             echo "Expected exactly one AppImage, one deb, and one latest-linux.yml file"
             ls -la dist
@@ -142,7 +155,13 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "$VERSION" \
-              --generate-notes
+              --notes-file "$NOTES"
+          else
+            # Re-runs and manual dispatches refresh the published notes instead
+            # of leaving whatever the first run happened to write.
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --notes-file "$NOTES"
           fi
 
           gh release upload "$TAG" \
@@ -187,6 +206,11 @@ jobs:
             throw "Release tag $tag must match package.json version v$version"
           }
 
+          $notes = Join-Path $env:GITHUB_WORKSPACE "release-notes/$tag.md"
+          if (-not (Test-Path -LiteralPath $notes)) {
+            throw "Missing release notes: release-notes/$tag.md"
+          }
+
           if ($installers.Count -ne 1 -or $metadata.Count -ne 1) {
             Get-ChildItem -Path dist -File | Format-Table Name, Length
             throw 'Expected exactly one Windows installer and one latest.yml file'
@@ -212,9 +236,16 @@ jobs:
               --repo $env:GITHUB_REPOSITORY `
               --verify-tag `
               --title $version `
-              --generate-notes
+              --notes-file $notes
             if ($LASTEXITCODE -ne 0) {
               throw "Failed to create GitHub Release $tag"
+            }
+          } else {
+            gh release edit $tag `
+              --repo $env:GITHUB_REPOSITORY `
+              --notes-file $notes
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to update GitHub Release notes for $tag"
             }
           }
 
@@ -266,12 +297,22 @@ jobs:
             exit 1
           fi
 
+          NOTES="release-notes/$TAG.md"
+          if [[ ! -f "$NOTES" ]]; then
+            echo "Missing release notes: $NOTES"
+            exit 1
+          fi
+
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "${TAG#v}" \
-              --generate-notes
+              --notes-file "$NOTES"
+          else
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --notes-file "$NOTES"
           fi
 
           gh release upload "$TAG" \
