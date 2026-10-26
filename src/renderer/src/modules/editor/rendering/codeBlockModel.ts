@@ -1,4 +1,4 @@
-import { Toast } from '@douyinfe/semi-ui'
+import { Toast } from '../../../ui'
 import { getCodeLanguageMeta } from '../markdown/codeLanguage'
 import { writeClipboardText } from '../services/clipboard'
 
@@ -51,7 +51,9 @@ export async function copyCodeBlock(codeBlock: HTMLElement): Promise<void> {
   try {
     await writeClipboardText(code)
     setCodeBlockCopied(codeBlock)
-    Toast.success('代码已复制')
+    // The checkmark is the visual confirmation; a toast on top of it is double
+    // feedback. Screen readers still need a signal, so use a live region.
+    announceToScreenReader('代码已复制')
   } catch {
     Toast.error('复制失败')
   }
@@ -69,13 +71,40 @@ export function renderCodeLineNumbers(lineCount: number): string {
   return Array.from({ length: Math.max(1, lineCount) }, (_, index) => String(index + 1)).join('\n')
 }
 
+const copiedTimers = new WeakMap<HTMLElement, number>()
+
+/** Visually hidden live region shared by all silent confirmations. */
+function announceToScreenReader(message: string): void {
+  let region = document.getElementById('velox-live-region')
+
+  if (!region) {
+    region = document.createElement('div')
+    region.id = 'velox-live-region'
+    region.setAttribute('role', 'status')
+    region.setAttribute('aria-live', 'polite')
+    region.style.cssText =
+      'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0'
+    document.body.append(region)
+  }
+
+  region.textContent = message
+}
+
 function setCodeBlockCopied(codeBlock: HTMLElement): void {
   codeBlock.dataset.copyState = 'copied'
-  window.setTimeout(() => {
-    if (codeBlock.dataset.copyState === 'copied') {
-      delete codeBlock.dataset.copyState
-    }
-  }, 1200)
+  window.clearTimeout(copiedTimers.get(codeBlock))
+  // Rule 10: feedback retracts itself after 2.5s (the CSS fade is tuned to the
+  // same duration, so the icon never snaps back while still visible).
+  copiedTimers.set(
+    codeBlock,
+    window.setTimeout(() => {
+      if (codeBlock.dataset.copyState === 'copied') {
+        delete codeBlock.dataset.copyState
+      }
+
+      copiedTimers.delete(codeBlock)
+    }, 2500)
+  )
 }
 
 function decodeRawCode(rawCode: string): string {

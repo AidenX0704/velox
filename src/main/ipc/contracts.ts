@@ -5,6 +5,7 @@ const nonEmptyString = z.string().min(1)
 
 export const schemas = {
   empty: z.undefined(),
+  appearance: z.enum(['system', 'light', 'dark']),
   backupRun: z.object({ sourcePath: nonEmptyString }),
   settingsPatch: z
     .object({

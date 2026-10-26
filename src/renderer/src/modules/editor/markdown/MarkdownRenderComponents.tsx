@@ -6,11 +6,11 @@ import {
   resolveDocumentImageSource,
   type DocumentImageContext
 } from '../services/documentImage'
+import type { MarkdownFrontmatterEntry } from './pipeline'
 
-export interface MarkdownFrontmatterEntry {
-  key: string
-  value: string | string[]
-}
+// The type lives in the React-free pipeline module so the Markdown worker can
+// use it without pulling React into its bundle.
+export type { MarkdownFrontmatterEntry }
 
 const githubAlertLabels: Record<string, string> = {
   note: 'Note',

@@ -102,9 +102,10 @@ export const defaultEditorPreferences: EditorPreferences = {
   editorFontSize: 15,
   editorLineHeight: 1.72,
   previewFontSize: 16,
-  previewLineHeight: 1.72,
-  previewMaxWidth: 920,
-  previewCentered: false,
+  // 680–760px is the 65–75ch comfort band for 16px body text; 920px was ~95ch.
+  previewLineHeight: 1.68,
+  previewMaxWidth: 720,
+  previewCentered: true,
   previewEditWidthMode: 'standard',
   customPreviewCss: '',
   appearanceMode: 'system',

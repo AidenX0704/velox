@@ -73,6 +73,8 @@ export function useTabs(): {
   ) => void
   updateTabDocument: (tabId: string, document: Partial<TabDocument>) => void
   findTabByPath: (path: string) => TabState | undefined
+  applyExternalContent: (path: string, content: string) => void
+  markTabMissing: (path: string, missing: boolean) => void
 } {
   const [tabs, setTabs] = useState<TabState[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null)
@@ -328,6 +330,34 @@ export function useTabs(): {
     )
   }, [])
 
+  /**
+   * Replaces a clean buffer with the on-disk text. Bumping `externalRevision`
+   * is what tells the mounted editor to swap its document, because ProseMirror
+   * and CodeMirror both ignore a changed `content`/`value` prop on their own.
+   */
+  const applyExternalContent = useCallback((path: string, content: string): void => {
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (tab.document.path !== path) {
+          return tab
+        }
+
+        return {
+          ...tab,
+          externalRevision: (tab.externalRevision ?? 0) + 1,
+          missingOnDisk: false,
+          document: { ...tab.document, content, dirty: false }
+        }
+      })
+    )
+  }, [])
+
+  const markTabMissing = useCallback((path: string, missing: boolean): void => {
+    setTabs((prev) =>
+      prev.map((tab) => (tab.document.path === path ? { ...tab, missingOnDisk: missing } : tab))
+    )
+  }, [])
+
   return {
     tabs,
     activeTabId,
@@ -351,6 +381,8 @@ export function useTabs(): {
     switchToTabByIndex,
     completeSaveAndCloseTab,
     updateTabDocument,
-    findTabByPath
+    findTabByPath,
+    applyExternalContent,
+    markTabMissing
   }
 }

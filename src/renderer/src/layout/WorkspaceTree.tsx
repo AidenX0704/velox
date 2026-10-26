@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Typography, Dropdown, Input } from '@douyinfe/semi-ui'
+import { Typography, Dropdown, Input } from '../ui'
 import {
   IconBriefStroked,
   IconChevronRight,
@@ -308,7 +308,7 @@ function WorkspaceTreeContent({
               <IconShrink />
             </button>
           ) : null}
-          <Dropdown trigger="click" position="bottomRight" render={workspaceMenu}>
+          <Dropdown trigger="click" position="bottomRight" render={() => workspaceMenu}>
             <button
               className="workspace-tree-toolbar-button"
               type="button"
@@ -346,15 +346,11 @@ function WorkspaceTreeContent({
   return (
     <div className="workspace-tree" role="tree">
       {workspaceTreeToolbar}
-      <Dropdown trigger="contextMenu" render={workspaceMenu}>
+      <Dropdown trigger="contextMenu" render={() => workspaceMenu}>
         <div className="explorer-root-header">
           <IconFolderOpenStroked className="explorer-root-folder-icon" />
           <div className="explorer-root-copy">
-            <Typography.Text
-              className="explorer-root-name"
-              ellipsis={{ showTooltip: true }}
-              title={workspaceRoot}
-            >
+            <Typography.Text className="explorer-root-name" ellipsis={{ showTooltip: true }}>
               {basename(workspaceRoot)}
             </Typography.Text>
             <span className="explorer-root-meta">工作区</span>
@@ -489,7 +485,7 @@ function WorkspaceTreeNode({
     <div className="workspace-tree-item" role="none">
       <Dropdown
         trigger="contextMenu"
-        render={
+        render={() => (
           <Dropdown.Menu>
             {isDirectory && (
               <>
@@ -537,7 +533,7 @@ function WorkspaceTreeNode({
               在访达中显示
             </Dropdown.Item>
           </Dropdown.Menu>
-        }
+        )}
       >
         <div
           className="workspace-tree-node"

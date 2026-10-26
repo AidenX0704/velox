@@ -1,13 +1,14 @@
 import { ipcChannels } from './channels'
 import { schemas } from './contracts'
 import { registerIpcHandler } from './router'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, nativeTheme } from 'electron'
 import { AppService } from '../services/app-service'
 import { BackupService } from '../services/backup-service'
 import { resolveDocumentImage } from '../services/document-image'
 import { DocumentService } from '../services/document-service'
 import { DocumentSessionService } from '../services/document-session-service'
-import { ExportService } from '../services/export-service'
+import type { ExportService } from '../services/export-service'
+import type { FileWatchService } from '../services/file-watch-service'
 import { HistoryService } from '../services/history-service'
 import { PreferencesService } from '../services/preferences-service'
 import { RecentService } from '../services/recent-service'
@@ -16,13 +17,13 @@ import { ShellService } from '../services/shell-service'
 import { UpdaterService } from '../services/updater-service'
 import { WorkspaceService } from '../services/workspace-service'
 import { WorkspaceStateService } from '../services/workspace-state-service'
-import { getPendingOpenFile } from '../bootstrap/create-app'
+import { getPendingOpenFile, markRendererReady } from '../bootstrap/create-app'
+import { saveStoredAppearance } from '../windows/window-state'
 
 export interface MainServices {
   appService: AppService
   backupService: BackupService
   documentService: DocumentService
-  exportService: ExportService
   historyService: HistoryService
   settingsService: SettingsService
   preferencesService: PreferencesService
@@ -32,11 +33,42 @@ export interface MainServices {
   shellService: ShellService
   updaterService: UpdaterService
   workspaceService: WorkspaceService
+  fileWatchService: FileWatchService
+}
+
+/**
+ * `docx`, `katex` and `markdown-it` together weigh several megabytes and are
+ * only needed when the user actually exports. Keeping the service behind a
+ * dynamic import removes that cost from every cold start.
+ */
+let exportServicePromise: Promise<ExportService> | undefined
+
+function getExportService(): Promise<ExportService> {
+  exportServicePromise ??= import('../services/export-service').then(
+    (module) => new module.ExportService()
+  )
+
+  return exportServicePromise
 }
 
 export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.app.getInfo, schemas.empty, () => services.appService.getInfo())
   registerIpcHandler(ipcChannels.app.getPendingOpenFile, schemas.empty, () => getPendingOpenFile())
+  registerIpcHandler(ipcChannels.app.reportReady, schemas.empty, () => {
+    markRendererReady()
+  })
+
+  // Launch switches that affect rendering (visual regression, screenshots).
+  // Read here rather than in the sandboxed preload, which cannot see argv.
+  registerIpcHandler(ipcChannels.app.getLaunchOptions, schemas.empty, () => {
+    const appearanceArgument = process.argv.find((argument) => argument.startsWith('--appearance='))
+    const appearance = appearanceArgument?.slice('--appearance='.length)
+
+    return {
+      appearance: appearance === 'light' || appearance === 'dark' ? appearance : null,
+      capture: process.argv.some((argument) => argument.startsWith('--capture='))
+    }
+  })
 
   registerIpcHandler(ipcChannels.window.getIsMaximized, schemas.empty, (_input, event) => {
     return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized())
@@ -59,6 +91,10 @@ export function registerIpc(services: MainServices): void {
   })
   registerIpcHandler(ipcChannels.window.close, schemas.empty, (_input, event) => {
     BrowserWindow.fromWebContents(event.sender)?.close()
+  })
+  registerIpcHandler(ipcChannels.window.setAppearance, schemas.appearance, (appearance) => {
+    nativeTheme.themeSource = appearance
+    saveStoredAppearance(appearance)
   })
 
   registerIpcHandler(ipcChannels.settings.get, schemas.empty, () => services.settingsService.get())
@@ -131,11 +167,19 @@ export function registerIpc(services: MainServices): void {
   registerIpcHandler(ipcChannels.document.saveAs, schemas.saveDocumentAs, (input) =>
     services.documentService.saveAs(input)
   )
-  registerIpcHandler(ipcChannels.document.export, schemas.exportDocument, (input, event) =>
-    services.exportService.exportDocument(input, (progress) => {
+  registerIpcHandler(ipcChannels.document.unwatch, schemas.path, (path) =>
+    services.documentService.unwatch(path)
+  )
+  registerIpcHandler(ipcChannels.document.reloadFromDisk, schemas.path, (path) =>
+    services.documentService.reloadFromDisk(path)
+  )
+  registerIpcHandler(ipcChannels.document.export, schemas.exportDocument, async (input, event) => {
+    const exportService = await getExportService()
+
+    return exportService.exportDocument(input, (progress) => {
       event.sender.send(ipcChannels.document.exportProgress, progress)
     })
-  )
+  })
 
   registerIpcHandler(ipcChannels.workspace.openFolder, schemas.empty, () =>
     services.workspaceService.openFolder()

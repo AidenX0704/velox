@@ -1,13 +1,55 @@
+/*
+ * Shiki emits `--shiki-light` / `--shiki-dark` custom properties per token
+ * (defaultColor:false). This is the only place the two themes are stitched
+ * together, so code colouring follows the app theme exactly.
+ */
+.markdown-code-block .shiki,
+.markdown-code-block .shiki span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+  text-decoration: var(--shiki-light-text-decoration);
+  background: transparent !important;
+}
+
+[data-color-mode='dark'] .markdown-code-block .shiki,
+[data-color-mode='dark'] .markdown-code-block .shiki span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style);
+  font-weight: var(--shiki-dark-font-weight);
+  text-decoration: var(--shiki-dark-text-decoration);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-mode='light']) .markdown-code-block .shiki,
+  :root:not([data-color-mode='light']) .markdown-code-block .shiki span {
+    color: var(--shiki-dark);
+    font-style: var(--shiki-dark-font-style);
+    font-weight: var(--shiki-dark-font-weight);
+    text-decoration: var(--shiki-dark-text-decoration);
+  }
+}
+
+.markdown-code-block .shiki {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent !important;
+  font-family: var(--code-font-family);
+  font-size: var(--code-font-size);
+  line-height: var(--code-line-height);
+}
+
 .markdown-code-block {
-  --code-bg: #f6f8fa;
-  --code-toolbar-bg: #f6f8fa;
-  --code-toolbar-hover-bg: #eaeef2;
-  --code-text: #24292f;
-  --code-muted: #6e7781;
-  --code-border: rgba(100, 116, 139, 0.2);
-  --code-popover-shadow: 0 8px 24px rgba(15, 23, 42, 0.13);
+  --code-bg: color-mix(in oklab, var(--surface-canvas), #1c1b19 3.5%);
+  --code-toolbar-bg: transparent;
+  --code-toolbar-hover-bg: color-mix(in oklab, currentColor 8%, transparent);
+  --code-text: var(--text-primary);
+  --code-muted: var(--text-tertiary);
+  --code-border: color-mix(in oklab, #1c1b19 8%, transparent);
+  --code-popover-shadow: 0 12px 32px -12px rgba(15, 14, 12, 0.28);
   --code-font-size: 0.875em;
-  --code-line-height: 1.5;
+  --code-line-height: 1.62;
   --syntax-keyword: #cf222e;
   --syntax-string: #0a3069;
   --syntax-comment: #6e7781;
@@ -16,24 +58,26 @@
   --syntax-tag: #116329;
 
   position: relative;
-  margin: 1.1em 0;
+  margin: 1.3em 0;
   padding: 0 !important;
   overflow: visible;
   border: 0 !important;
-  border-radius: 6px !important;
+  border-radius: var(--radius-xl) !important;
   background: var(--code-bg) !important;
-  box-shadow: none !important;
+  /* Rule 1: the block is defined by a 1px inset hairline, never a border. */
+  box-shadow: inset 0 0 0 1px var(--code-border) !important;
   font-family: var(--code-font-family, ui-monospace, SFMono-Regular, Consolas, monospace);
+  font-variant-numeric: tabular-nums;
 }
 
 [data-color-mode='dark'] .markdown-code-block {
-  --code-bg: #161b22;
-  --code-toolbar-bg: #161b22;
-  --code-toolbar-hover-bg: #272d36;
-  --code-text: #e6edf3;
-  --code-muted: #8b949e;
-  --code-border: rgba(226, 232, 240, 0.11);
-  --code-popover-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+  --code-bg: #111110;
+  --code-toolbar-bg: transparent;
+  --code-toolbar-hover-bg: color-mix(in oklab, #ffffff 8%, transparent);
+  --code-text: #d6d3cc;
+  --code-muted: #8d8981;
+  --code-border: color-mix(in oklab, #e8e6e1 7%, transparent);
+  --code-popover-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.6);
   --syntax-keyword: #ff7b72;
   --syntax-string: #a5d6ff;
   --syntax-comment: #8b949e;
@@ -63,7 +107,7 @@
   line-height: 1;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dur-fast) var(--ease-out-quart);
 }
 
 .markdown-code-block:hover .markdown-code-toolbar,
@@ -294,15 +338,19 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 18px;
-  min-width: 18px;
-  height: 18px;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
   padding: 0;
   border: 0 !important;
-  border-radius: 4px;
+  border-radius: 5px;
   color: var(--code-muted);
-  background: var(--code-toolbar-bg);
+  background: transparent;
   cursor: pointer;
+  transform-origin: center;
+  transition:
+    color var(--dur-fast) var(--ease-out-quart),
+    background var(--dur-fast) var(--ease-out-quart);
 }
 
 .markdown-code-action:hover,
@@ -338,11 +386,50 @@
 }
 
 .markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy {
-  color: #059669;
+  color: var(--success, #15803d);
 }
 
 .markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m20 6-11 11-5-5'/%3E%3C/svg%3E");
+}
+
+/* Rule 9 + rule 10: under-damped micro-bounce (k=380, c=18 → ~6% visible
+   overshoot), then the confirmation holds ~2.2s and fades over the last 0.3s. */
+.markdown-code-block[data-copy-state='copied'] .markdown-code-action-copy {
+  animation:
+    code-copy-pop var(--dur-pop, 420ms) linear both,
+    code-copy-fade var(--dur-feedback, 2500ms) var(--ease-out-quart) forwards;
+}
+
+@keyframes code-copy-pop {
+  0% {
+    transform: scale(0.68);
+  }
+  25% {
+    transform: scale(0.967);
+  }
+  45% {
+    transform: scale(1.062);
+  }
+  65% {
+    transform: scale(1.014);
+  }
+  85% {
+    transform: scale(0.988);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes code-copy-fade {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .markdown-code-block .markdown-code-pre {
@@ -358,14 +445,16 @@
 
 .markdown-code-line-numbers {
   display: none;
-  min-width: 36px;
-  padding: 20px 9px 10px;
-  border-right: 1px solid var(--code-border);
-  color: color-mix(in srgb, var(--code-muted), transparent 24%);
-  background: color-mix(in srgb, var(--code-toolbar-bg), transparent 30%);
+  min-width: 2.6em;
+  padding: 20px 10px 10px;
+  /* Rule 1: the gutter is separated by tone, not a vertical rule. */
+  border-right: 0;
+  color: color-mix(in oklab, var(--code-muted) 62%, transparent);
+  background: color-mix(in oklab, var(--code-toolbar-bg), #1c1b19 2%);
   font-family: var(--code-font-family);
   font-size: var(--code-font-size);
   line-height: var(--code-line-height);
+  font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: pre;
   user-select: none;
@@ -504,81 +593,6 @@
   .markdown-code-editor-layer::selection {
   color: transparent;
   background: rgba(var(--theme-accent-rgb, 22, 119, 255), 0.24);
-}
-
-.markdown-code-block .hljs {
-  color: inherit;
-  background: transparent;
-}
-
-.markdown-code-block .hljs-keyword,
-.markdown-code-block .hljs-selector-tag,
-.markdown-code-block .hljs-title.function_ {
-  color: var(--syntax-keyword);
-  font-weight: 600;
-}
-
-.markdown-code-block .hljs-built_in,
-.markdown-code-block .hljs-type,
-.markdown-code-block .hljs-class .hljs-title,
-.markdown-code-block .hljs-title.class_,
-.markdown-code-block .hljs-title.class_.inherited__,
-.markdown-code-block .hljs-selector-class,
-.markdown-code-block .hljs-selector-id {
-  color: var(--syntax-type);
-}
-
-.markdown-code-block .hljs-string,
-.markdown-code-block .hljs-attr,
-.markdown-code-block .hljs-attribute,
-.markdown-code-block .hljs-symbol,
-.markdown-code-block .hljs-template-variable,
-.markdown-code-block .hljs-regexp,
-.markdown-code-block .hljs-link,
-.markdown-code-block .hljs-selector-attr,
-.markdown-code-block .hljs-selector-pseudo {
-  color: var(--syntax-string);
-}
-
-.markdown-code-block .hljs-number,
-.markdown-code-block .hljs-literal,
-.markdown-code-block .hljs-variable,
-.markdown-code-block .hljs-params,
-.markdown-code-block .hljs-property {
-  color: var(--syntax-number);
-}
-
-.markdown-code-block .hljs-comment,
-.markdown-code-block .hljs-quote {
-  color: var(--syntax-comment);
-  font-style: italic;
-}
-
-.markdown-code-block .hljs-meta,
-.markdown-code-block .hljs-doctag,
-.markdown-code-block .hljs-section,
-.markdown-code-block .hljs-tag,
-.markdown-code-block .hljs-name {
-  color: var(--syntax-tag);
-}
-
-.markdown-code-block .hljs-subst {
-  color: var(--code-text);
-}
-
-.markdown-code-block .hljs-operator,
-.markdown-code-block .hljs-punctuation {
-  color: var(--text-secondary);
-}
-
-.markdown-code-block .hljs-addition {
-  color: #047857;
-  background: rgba(0, 168, 112, 0.1);
-}
-
-.markdown-code-block .hljs-deletion {
-  color: #b91c1c;
-  background: rgba(247, 105, 100, 0.12);
 }
 
 @media (hover: none), (max-width: 760px) {

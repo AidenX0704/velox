@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, InputNumber, Select, TextArea, Toast, Typography } from '@douyinfe/semi-ui'
+import { Button, Input, InputNumber, Select, TextArea, Toast, Typography } from '../ui'
 import {
   IconArrowLeft,
   IconArticle,
@@ -348,7 +348,7 @@ export function SettingsPage({
               <Typography.Text className="settings-page-eyebrow" type="tertiary">
                 偏好设置
               </Typography.Text>
-              <Typography.Title heading={4}>{activePreferenceSection.label}</Typography.Title>
+              <Typography.Title as="h4">{activePreferenceSection.label}</Typography.Title>
               <Typography.Text type="tertiary">
                 {activePreferenceSection.description}
               </Typography.Text>
@@ -382,7 +382,6 @@ export function SettingsPage({
                 <Typography.Text type="tertiary">新会话打开时使用的编辑视图</Typography.Text>
                 <Select
                   value={settings.defaultMode}
-                  style={{ width: '100%' }}
                   onChange={(value) => updateSettings({ defaultMode: value as EditorMode })}
                 >
                   {(Object.keys(editorModeLabels) as EditorMode[]).map((mode) => (
@@ -450,7 +449,6 @@ export function SettingsPage({
               </SettingField>
               <SettingField title="预览页宽" description="控制类 Typora 预览编辑版心">
                 <Select
-                  style={{ width: '100%' }}
                   value={settings.previewEditWidthMode}
                   onChange={(value) =>
                     updateSettings({
@@ -495,7 +493,6 @@ export function SettingsPage({
                 description="注入到预览渲染区域的附加样式"
               >
                 <TextArea
-                  autosize={false}
                   rows={5}
                   placeholder="/* 在这里添加自定义预览样式 */"
                   value={settings.customPreviewCss}
@@ -510,7 +507,6 @@ export function SettingsPage({
               <SettingField title="主题模式" description="选择黑色、亮色，或跟随系统设置自动切换">
                 <Select
                   value={settings.appearanceMode}
-                  style={{ width: '100%' }}
                   onChange={(value) => updateSettings({ appearanceMode: value as AppearanceMode })}
                 >
                   {appearanceModeOptions.map((option) => (
@@ -571,7 +567,6 @@ export function SettingsPage({
               <SettingField title="默认导出格式" description="用于后续快捷导出和菜单默认行为">
                 <Select
                   value={settings.export.defaultFormat}
-                  style={{ width: '100%' }}
                   onChange={(value) =>
                     updateSettings({
                       export: {
@@ -591,7 +586,6 @@ export function SettingsPage({
               <SettingField title="PDF 页面尺寸" description="控制 PDF 导出的分页纸张尺寸">
                 <Select
                   value={settings.export.pdfPageSize}
-                  style={{ width: '100%' }}
                   onChange={(value) =>
                     updateSettings({
                       export: {
@@ -608,7 +602,6 @@ export function SettingsPage({
               <SettingField title="图片格式" description="从菜单导出图片时使用的默认格式">
                 <Select
                   value={settings.export.imageFormat}
-                  style={{ width: '100%' }}
                   onChange={(value) =>
                     updateSettings({
                       export: {
@@ -794,8 +787,8 @@ export function SettingsPage({
             <div className="settings-box settings-about-card">
               <BrandLogo className="settings-about-logo" />
               <div className="settings-about-content">
-                <Typography.Title heading={6}>Velox Markdown Editor</Typography.Title>
-                <Typography.Paragraph type="tertiary" spacing="extended">
+                <Typography.Title as="h6">Velox Markdown Editor</Typography.Title>
+                <Typography.Paragraph type="tertiary">
                   面向桌面写作场景的 Markdown 编辑器，提供源码和实时预览编辑体验。
                 </Typography.Paragraph>
                 <div className="settings-about-meta">
@@ -826,7 +819,7 @@ export function SettingsPage({
           {activeSection === 'appearance' ? (
             <aside className="settings-preview-panel" aria-label="外观预览">
               <section className="settings-preview-section">
-                <Typography.Title heading={6}>外观预览</Typography.Title>
+                <Typography.Title as="h6">外观预览</Typography.Title>
                 <Typography.Text strong>主题模式</Typography.Text>
                 <div className="appearance-mode-grid">
                   {appearanceModeOptions.map((option) => (
@@ -1098,7 +1091,7 @@ function SettingsGroup({
 }): React.JSX.Element {
   return (
     <section id={id} className="settings-group">
-      <Typography.Title heading={6}>{title}</Typography.Title>
+      <Typography.Title as="h6">{title}</Typography.Title>
       {children}
     </section>
   )

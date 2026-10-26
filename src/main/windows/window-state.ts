@@ -2,6 +2,8 @@ import type Store from 'electron-store'
 import type { BrowserWindow, BrowserWindowConstructorOptions } from 'electron'
 import { getElectronStoreConstructor } from '../shared/electron-store'
 
+export type StoredAppearance = 'system' | 'light' | 'dark'
+
 interface WindowState {
   width: number
   height: number
@@ -16,7 +18,9 @@ const defaultWindowState: WindowState = {
   isMaximized: false
 }
 
-type WindowStateStore = Store<{ mainWindow: WindowState }>
+const defaultAppearance: StoredAppearance = 'system'
+
+type WindowStateStore = Store<{ mainWindow: WindowState; appearance: StoredAppearance }>
 
 let windowStateStore: WindowStateStore | undefined
 
@@ -26,7 +30,8 @@ function getStore(): WindowStateStore {
   windowStateStore ??= new Store({
     name: 'window-state',
     defaults: {
-      mainWindow: defaultWindowState
+      mainWindow: defaultWindowState,
+      appearance: defaultAppearance
     }
   }) as unknown as WindowStateStore
 
@@ -59,4 +64,19 @@ export function saveMainWindowState(window: BrowserWindow): void {
 
 export function shouldMaximizeMainWindow(): boolean {
   return getStore().get('mainWindow', defaultWindowState).isMaximized
+}
+
+/**
+ * Appearance is mirrored into a tiny electron-store file so the very first paint
+ * can already use the right colors, long before the SQLite-backed preferences
+ * are available. Kept in sync by the window:set-appearance IPC.
+ */
+export function getStoredAppearance(): StoredAppearance {
+  const value = getStore().get('appearance', defaultAppearance)
+
+  return value === 'light' || value === 'dark' || value === 'system' ? value : defaultAppearance
+}
+
+export function saveStoredAppearance(appearance: StoredAppearance): void {
+  getStore().set('appearance', appearance)
 }

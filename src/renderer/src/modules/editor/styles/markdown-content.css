@@ -32,11 +32,13 @@
 .markdown-preview h6 {
   scroll-margin-top: 32px;
   position: relative;
-  margin: 1.55em 0 0.72em;
+  margin: 2em 0 0.6em;
   color: var(--markdown-color-text);
-  font-weight: 760;
+  font-weight: var(--w-heading);
   line-height: 1.22;
-  letter-spacing: 0;
+  letter-spacing: -0.005em;
+  /* Rule 8: headings break in balance, never leave one word alone. */
+  text-wrap: balance;
 }
 
 .markdown-preview h1:first-child,
@@ -48,34 +50,49 @@
   margin-top: 0;
 }
 
+/* Modular scale, ratio ≈ 1.25. Fixed sizes instead of viewport clamps: a
+   reading column should not restyle itself when the window is resized. */
 .markdown-preview h1 {
   margin-top: 0;
-  font-size: clamp(2rem, 1.45rem + 1.7vw, 3rem);
-  line-height: 1.08;
+  font-size: 2rem;
+  line-height: 1.16;
+  letter-spacing: -0.012em;
 }
 
 .markdown-preview h2 {
-  font-size: clamp(1.55rem, 1.2rem + 0.9vw, 2.1rem);
+  margin-top: 1.9em;
+  padding-bottom: 0.28em;
+  font-size: 1.625rem;
+  line-height: 1.2;
+  box-shadow: inset 0 -1px 0 var(--markdown-soft-line);
 }
 
 .markdown-preview h3 {
-  font-size: 1.28em;
+  margin-top: 1.7em;
+  font-size: 1.375rem;
+  line-height: 1.26;
 }
 
 .markdown-preview h4 {
   color: var(--markdown-color-text);
-  font-size: 1.06em;
+  margin-top: 1.5em;
+  font-size: 1.125rem;
+  line-height: 1.35;
 }
 
 .markdown-preview h5 {
   color: var(--markdown-color-text-muted);
-  font-size: 0.96em;
+  margin-top: 1.35em;
+  font-size: 1rem;
+  line-height: 1.4;
 }
 
 .markdown-preview h6 {
   color: var(--markdown-color-text-muted);
-  font-size: 0.88em;
-  text-transform: uppercase;
+  margin-top: 1.3em;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
 }
 
 .markdown-preview p,
@@ -90,9 +107,10 @@
 }
 
 .markdown-preview p {
-  margin: 0.85em 0;
+  margin: 0.78em 0;
   line-height: inherit;
   white-space: normal;
+  text-wrap: pretty;
 }
 
 .markdown-preview p:first-child {
@@ -105,18 +123,18 @@
 
 .markdown-preview p:has(+ ul),
 .markdown-preview p:has(+ ol) {
-  margin-bottom: 0.35em;
+  margin-bottom: 0.3em;
 }
 
 .markdown-preview hr {
   height: 1px;
-  margin: 2.25em 0;
+  margin: 2.2em 0;
   border: 0;
   background: linear-gradient(
     90deg,
     transparent,
-    var(--markdown-soft-line) 14%,
-    var(--markdown-soft-line) 86%,
+    var(--markdown-soft-line) 12%,
+    var(--markdown-soft-line) 88%,
     transparent
   );
 }
@@ -131,6 +149,7 @@
 
 .markdown-preview ul,
 .markdown-preview ol {
+  margin: 0.68em 0;
   padding-left: 1.45em;
   list-style-position: outside;
 }
@@ -177,16 +196,16 @@
 
 .markdown-preview blockquote {
   position: relative;
-  margin: 1.45em 0;
-  padding: 0.9em 1.05em 0.9em 1.2em;
-  border: 1px solid var(--markdown-token-border);
-  border-left: 4px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.5);
-  border-radius: 8px;
+  margin: 1.2em 0;
+  padding: 0.7em 1em 0.7em 1.15em;
+  /* Rule 1: no box border — a 2px accent hairline plus a canvas tint. */
+  border: 0;
+  border-inline-start: 2px solid color-mix(in oklab, var(--accent-fill) 42%, transparent);
+  border-radius: 0 8px 8px 0;
   color: var(--markdown-color-text-muted);
-  background:
-    linear-gradient(90deg, rgba(var(--theme-accent-rgb, 22, 119, 255), 0.08), transparent 58%),
-    var(--surface-raised);
+  background: color-mix(in oklab, var(--surface-canvas) 72%, var(--surface-base));
   font-style: normal;
+  text-wrap: pretty;
 }
 
 .markdown-preview blockquote > :first-child {
@@ -316,7 +335,7 @@
   mask-repeat: no-repeat;
   mask-size: contain;
   opacity: 0.7;
-  transition: transform 140ms ease;
+  transition: transform var(--dur-fast) var(--ease-out-quart);
 }
 
 .markdown-preview details[open] summary {
@@ -374,22 +393,24 @@
 }
 
 .markdown-preview :not(pre) > code {
-  padding: 0.1em 0.34em;
+  padding: 0.12em 0.36em;
   margin: 0 0.04em;
   border: 0;
   border-radius: 4px;
-  color: #0550ae;
-  background: rgba(175, 184, 193, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.12);
+  /* One layer only: a tinted surface, no ring, no coloured text. */
+  color: color-mix(in oklab, var(--markdown-color-text) 82%, var(--accent-text));
+  background: color-mix(in oklab, var(--surface-canvas), #1c1b19 6%);
+  box-shadow: none;
   font-size: 0.9em;
+  font-variant-ligatures: none;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 [data-color-mode='dark'] .markdown-preview :not(pre) > code {
-  color: #79c0ff;
-  background: rgba(110, 118, 129, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(139, 148, 158, 0.14);
+  color: #d6d3cc;
+  background: color-mix(in oklab, var(--surface-raised), #ffffff 9%);
+  box-shadow: none;
 }
 
 .markdown-preview code {
@@ -413,14 +434,17 @@
 
 .markdown-table-scroller {
   width: 100%;
-  margin: 1.35em 0;
+  margin: 1.3em 0;
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid var(--markdown-token-border);
-  border-radius: 8px;
-  background: var(--surface-raised);
-  scrollbar-color: rgba(100, 116, 139, 0.38) transparent;
+  border: 0;
+  border-radius: 9px;
+  background: var(--surface-base);
+  box-shadow: inset 0 0 0 1px var(--markdown-token-border);
+  scrollbar-color: var(--scrollbar-thumb) transparent;
   scrollbar-width: thin;
+  /* Fade on the right edge hints that the table can scroll sideways. */
+  mask-image: linear-gradient(90deg, #000 96%, transparent);
 }
 
 .markdown-table-scroller::-webkit-scrollbar {
@@ -430,7 +454,7 @@
 .markdown-table-scroller::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(100, 116, 139, 0.38);
+  background: var(--scrollbar-thumb);
   background-clip: padding-box;
 }
 
@@ -440,22 +464,29 @@
   border-spacing: 0;
   border-collapse: separate;
   color: var(--markdown-color-text);
-  font-size: 0.92em;
-  line-height: 1.5;
+  font-size: 0.925em;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
 }
 
 .markdown-preview thead {
-  background: var(--surface-muted);
+  background: color-mix(in oklab, var(--surface-base), #1c1b19 2.4%);
 }
 
 .markdown-preview th,
 .markdown-preview td {
   min-width: 96px;
-  padding: 0.64em 0.78em;
-  border-right: 1px solid var(--markdown-token-border);
-  border-bottom: 1px solid var(--markdown-token-border);
+  padding: 0.6em 0.78em;
+  border-right: 0;
+  border-bottom: 0;
   vertical-align: top;
   text-align: left;
+}
+
+/* One hairline under each row instead of a full grid. */
+.markdown-preview tbody tr + tr th,
+.markdown-preview tbody tr + tr td {
+  box-shadow: inset 0 1px 0 var(--markdown-token-border);
 }
 
 .markdown-preview th:last-child,

@@ -6,7 +6,7 @@ import {
   type CodeLanguageMeta
 } from '../../markdown/codeLanguage'
 import { createCodeBlockShell } from '../../rendering/codeBlockDom'
-import { highlightCodeSync } from '../../rendering/codeHighlight'
+import { highlightCodeSync, onHighlightLanguagesChanged } from '../../rendering/codeHighlight'
 import { handleCodeBlockAction } from '../../rendering/blockActions'
 import { getCodeLineCount, renderCodeLineNumbers } from '../../rendering/codeBlockModel'
 import {
@@ -52,7 +52,7 @@ function createEditableCodeBlockNodeView(
   let lastRenderedCode = ''
   let lastRenderedHighlightLanguage = ''
 
-  highlightLayer.className = 'markdown-code-highlight-layer hljs'
+  highlightLayer.className = 'markdown-code-highlight-layer'
   highlightLayer.setAttribute('aria-hidden', 'true')
   highlightLayer.contentEditable = 'false'
   contentDOM.className = 'markdown-code-editor-layer'
@@ -87,7 +87,15 @@ function createEditableCodeBlockNodeView(
       highlightLayer.innerHTML = highlightCodeSync(code, languageMeta.highlightLanguage)
     }
   }
+  // Grammars are fetched on demand. Until one lands the block shows escaped
+  // plain text; once it arrives we forget the render memo and re-highlight.
+  const disposeHighlightListener = onHighlightLanguagesChanged(() => {
+    lastRenderedCode = ''
+    syncRenderedCode()
+  })
+
   const contentObserver = new MutationObserver(syncRenderedCode)
+
   contentObserver.observe(contentDOM, {
     characterData: true,
     childList: true,
@@ -156,6 +164,7 @@ function createEditableCodeBlockNodeView(
     },
     destroy() {
       contentObserver.disconnect()
+      disposeHighlightListener()
       shell.copyButton.removeEventListener('click', handleCodeActionClick)
       shell.copyButton.removeEventListener('mousedown', stopCodeButtonMouseDown)
       languagePicker.destroy()

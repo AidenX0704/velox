@@ -1,28 +1,13 @@
-import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Modal, Progress, Toast, Typography } from '@douyinfe/semi-ui'
-import { IconFolderStroked } from '@douyinfe/semi-icons'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Modal, Progress, Toast, Typography } from '../ui'
 import { exportFormatLabels, type ExportFormat, type ExportProgress } from '../../../shared/export'
-import type {
-  HistoryDocumentActivity,
-  UpdaterStatus,
-  WorkspaceEntry,
-  WorkspaceSearchResult
-} from '../../../shared/types'
+import type { HistoryDocumentActivity, WorkspaceEntry } from '../../../shared/types'
 import { normalizeEditorMode } from '../../../shared/preferences'
 import type { CursorPosition, EditorMode } from '../modules/editor/model/types'
-import {
-  findTextSearchMatches,
-  normalizeSearchQuery,
-  replaceTextSearchMatches
-} from '../modules/editor/services/documentSearch'
 import '../modules/editor/styles/editor.css'
 import { createWelcomeDocument, useTabs } from '../features/tabs/useTabs'
 import { TabBar } from '../features/tabs/TabBar'
-import {
-  getCloseTabAction,
-  persistTabBeforeClose,
-  type CloseTabDecision
-} from '../features/tabs/closeTabWorkflow'
+import { getCloseTabAction, persistTabBeforeClose } from '../features/tabs/closeTabWorkflow'
 import { useEditorSettings } from '../features/settings/useEditorSettings'
 import {
   applyThemeToDocument,
@@ -32,526 +17,50 @@ import {
   type ResolvedAppearanceMode
 } from '../features/theme/theme'
 import { StatusBar } from './StatusBar'
+import { InlineNotice } from '../app/InlineNotice'
 import { SettingsPage, type PreferenceSection } from './SettingsPanel'
-import { TitleBar, type TitleBarSearchResult, type TitleBarSearchScope } from './TitleBar'
+import { TitleBar } from './TitleBar'
 import { WorkspaceImagePreview } from './WorkspaceImagePreview'
-import { WorkspaceTree } from './WorkspaceTree'
 import { isWorkspaceImageResource } from './workspaceResource'
+import { EditorLoadingFallback } from './app/EditorLoadingFallback'
+import { CloseTabDecisionHost } from '../app/CloseTabDecision'
+import { requestCloseTabDecision } from '../app/closeTabDecisionStore'
+import { basename, computeWordCount, formatUpdateDate, getUpdateNotes } from './app/format'
+import { MarkdownEditor } from './app/lazyEditors'
+import { RecentWorkbench } from './app/RecentWorkbench'
+import { useUpdaterState } from './app/useUpdaterState'
+import { useExternalDocuments } from './app/useExternalDocuments'
+import { useExplorerResize } from './app/useExplorerResize'
+import { useTitleBarSearch } from './app/useTitleBarSearch'
+import { getAppActions, setAppActions } from './app/appActionsStore'
+import { ResourceExplorer } from './app/ResourceExplorer'
+import {
+  getDroppedFilePath,
+  hasExternalFiles,
+  isPathInsideWorkspace,
+  restoreWorkspaceExpandedPaths
+} from './app/paths'
 
 type AppView = 'editor' | 'recent' | 'settings'
-type UpdaterDialogKind = 'available' | 'downloaded' | null
-const MAX_TITLEBAR_SEARCH_RESULTS = 80
-const MAX_RESTORED_EXPLORER_PATHS = 128
-const WORKSPACE_EXPLORER_STATE_VERSION = '2'
-const DEFAULT_EXPLORER_WIDTH = 268
-const MIN_EXPLORER_WIDTH = 220
-const MAX_EXPLORER_WIDTH = 480
-
-function clampExplorerWidth(width: number): number {
-  return Math.min(MAX_EXPLORER_WIDTH, Math.max(MIN_EXPLORER_WIDTH, width))
-}
-
-const MarkdownEditor = lazy(() =>
-  import('../modules/editor/MarkdownEditor').then((module) => ({
-    default: module.MarkdownEditor
-  }))
-)
-
-const MarkdownPreview = lazy(() =>
-  import('../modules/editor/preview/MarkdownPreview').then((module) => ({
-    default: module.MarkdownPreview
-  }))
-)
-
-function computeWordCount(content: string): number {
-  const text = content.trim()
-  if (!text) return 0
-  return text.split(/\s+/).length
-}
-
-function getDroppedFilePath(file: File): string {
-  return (file as File & { path?: string }).path || window.api.app.getPathForFile(file)
-}
-
-function hasExternalFiles(dataTransfer: DataTransfer): boolean {
-  return Array.from(dataTransfer.types).includes('Files')
-}
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
-}
-
-function compactSearchSnippetPart(value: string): string {
-  return value.replace(/\s+/g, ' ')
-}
-
-function buildSearchResultSnippet(
-  content: string,
-  from: number,
-  to: number
-): Pick<TitleBarSearchResult, 'before' | 'match' | 'after'> {
-  const lineStart = content.lastIndexOf('\n', Math.max(0, from - 1)) + 1
-  const nextLineBreak = content.indexOf('\n', to)
-  const lineEnd = nextLineBreak === -1 ? content.length : nextLineBreak
-  const beforeStart = Math.max(lineStart, from - 42)
-  const afterEnd = Math.min(lineEnd, to + 58)
-
-  return {
-    before: `${beforeStart > lineStart ? '...' : ''}${compactSearchSnippetPart(
-      content.slice(beforeStart, from)
-    )}`,
-    match: compactSearchSnippetPart(content.slice(from, to)),
-    after: `${compactSearchSnippetPart(content.slice(to, afterEnd))}${
-      afterEnd < lineEnd ? '...' : ''
-    }`
-  }
-}
-
-function buildTitlebarSearchResults(
-  content: string,
-  query: string,
-  caseSensitive: boolean
-): { totalCount: number; items: TitleBarSearchResult[] } {
-  const normalizedQuery = normalizeSearchQuery(query)
-  if (!normalizedQuery) {
-    return { totalCount: 0, items: [] }
-  }
-
-  const matches = findTextSearchMatches(content, normalizedQuery, { caseSensitive })
-  let currentLine = 1
-  let scannedOffset = 0
-
-  const items = matches.slice(0, MAX_TITLEBAR_SEARCH_RESULTS).map((match, index) => {
-    let newlineOffset = content.indexOf('\n', scannedOffset)
-    while (newlineOffset !== -1 && newlineOffset < match.from) {
-      currentLine += 1
-      scannedOffset = newlineOffset + 1
-      newlineOffset = content.indexOf('\n', scannedOffset)
-    }
-
-    const lineStart = content.lastIndexOf('\n', Math.max(0, match.from - 1)) + 1
-
-    return {
-      id: `document-${index}-${currentLine}-${match.from}`,
-      scope: 'document' as const,
-      index,
-      matchIndex: index,
-      line: currentLine,
-      column: match.from - lineStart + 1,
-      ...buildSearchResultSnippet(content, match.from, match.to)
-    }
-  })
-
-  return { totalCount: matches.length, items }
-}
-
-function flattenWorkspaceSearchResults(
-  result: WorkspaceSearchResult | null
-): TitleBarSearchResult[] {
-  if (!result) {
-    return []
-  }
-
-  let globalIndex = 0
-  const items: TitleBarSearchResult[] = []
-
-  for (const file of result.files) {
-    for (const match of file.matches) {
-      items.push({
-        id: `workspace-${globalIndex}-${file.path}-${match.index}`,
-        scope: 'workspace',
-        index: globalIndex,
-        matchIndex: match.index,
-        path: file.path,
-        relativePath: file.relativePath,
-        fileName: file.name,
-        line: match.line,
-        column: match.column,
-        before: match.before,
-        match: match.match,
-        after: match.after
-      })
-      globalIndex += 1
-    }
-  }
-
-  return items
-}
-
-function isPathInsideWorkspace(filePath: string, workspacePath: string): boolean {
-  const normalizedFilePath = filePath.replace(/\\/g, '/')
-  const normalizedWorkspacePath = workspacePath.replace(/\\/g, '/').replace(/\/$/, '')
-
-  return (
-    normalizedFilePath === normalizedWorkspacePath ||
-    normalizedFilePath.startsWith(`${normalizedWorkspacePath}/`)
-  )
-}
-
-function restoreWorkspaceExpandedPaths(workspacePath: string, paths: string[]): string[] {
-  const migrationKey = `velox:workspace-explorer-state:${workspacePath}`
-
-  try {
-    if (window.localStorage.getItem(migrationKey) !== WORKSPACE_EXPLORER_STATE_VERSION) {
-      window.localStorage.setItem(migrationKey, WORKSPACE_EXPLORER_STATE_VERSION)
-      return []
-    }
-  } catch {
-    return []
-  }
-
-  if (paths.length > MAX_RESTORED_EXPLORER_PATHS) {
-    return []
-  }
-
-  return [...new Set(paths)].filter(
-    (path) => path !== workspacePath && isPathInsideWorkspace(path, workspacePath)
-  )
-}
-
-function EditorLoadingFallback(): React.JSX.Element {
-  return (
-    <div className="editor-loading" aria-label="正在加载编辑器">
-      <div className="editor-loading-toolbar" />
-      <div className="editor-loading-body">
-        <div className="editor-loading-column">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="editor-loading-column editor-loading-column-preview">
-          <span />
-          <span />
-          <span />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function formatActivityTime(value?: string): string {
-  if (!value) return '暂无'
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value))
-}
-
-function formatUpdateDate(value?: string): string | undefined {
-  if (!value) return undefined
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return undefined
-  }
-
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date)
-}
-
-function getUpdateNotes(status: UpdaterStatus): string {
-  return status.releaseNotes?.trim() || '此版本没有提供更新日志。'
-}
-
-function requestCloseTabDecision(title: string): Promise<CloseTabDecision> {
-  return new Promise((resolve) => {
-    let settled = false
-
-    const settle = (decision: CloseTabDecision): void => {
-      if (settled) return
-
-      settled = true
-      resolve(decision)
-      modal.destroy()
-    }
-
-    const modal = Modal.confirm({
-      title: '文档尚未保存',
-      content: `"${title}" 尚未保存，请选择如何关闭。`,
-      footer: (
-        <>
-          <Button onClick={() => settle('cancel')}>取消</Button>
-          <Button type="danger" onClick={() => settle('discard')}>
-            不保存并关闭
-          </Button>
-          <Button theme="solid" type="primary" onClick={() => settle('save')}>
-            保存并关闭
-          </Button>
-        </>
-      ),
-      // Esc、点击遮罩和右上角关闭都只是取消操作，绝不能等同于“不保存并关闭”。
-      onCancel: () => settle('cancel')
-    })
-  })
-}
-
-const ResourceExplorer = memo(function ResourceExplorer({
-  workspaceRoot,
-  workspaceTree,
-  selectedPath,
-  expandedPaths,
-  onOpenWorkspace,
-  onOpenFile,
-  onExpandedPathsChange,
-  onCreateWorkspaceEntry,
-  onRenameWorkspaceEntry,
-  onDeleteWorkspaceEntry,
-  width,
-  onResizeStart,
-  onResizeKeyDown
-}: {
-  workspaceRoot: string | null
-  workspaceTree: WorkspaceEntry[]
-  selectedPath?: string
-  expandedPaths: string[]
-  onOpenWorkspace: () => void
-  onOpenFile: (path: string) => void
-  onExpandedPathsChange: (paths: string[]) => void
-  onCreateWorkspaceEntry: (
-    parentPath: string,
-    name: string,
-    type: 'file' | 'directory'
-  ) => Promise<string | null>
-  onRenameWorkspaceEntry: (path: string, newName: string) => Promise<string | null>
-  onDeleteWorkspaceEntry: (path: string) => Promise<boolean>
-  width: number
-  onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void
-  onResizeKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
-}): React.JSX.Element {
-  const singleFileEntry: WorkspaceEntry | null =
-    !workspaceRoot && selectedPath
-      ? {
-          path: selectedPath,
-          name: basename(selectedPath),
-          type: 'file'
-        }
-      : null
-
-  return (
-    <aside
-      className="resource-explorer"
-      aria-label="资源管理器"
-      style={{ width, flexBasis: width }}
-    >
-      {workspaceRoot ? (
-        <WorkspaceTree
-          entries={workspaceTree}
-          selectedPath={selectedPath}
-          expandedPaths={expandedPaths}
-          workspaceRoot={workspaceRoot}
-          onOpenFile={onOpenFile}
-          onExpandedPathsChange={onExpandedPathsChange}
-          onCreateWorkspaceEntry={onCreateWorkspaceEntry}
-          onRenameWorkspaceEntry={onRenameWorkspaceEntry}
-          onDeleteWorkspaceEntry={onDeleteWorkspaceEntry}
-        />
-      ) : singleFileEntry ? (
-        <WorkspaceTree
-          entries={[singleFileEntry]}
-          selectedPath={selectedPath}
-          workspaceRoot={singleFileEntry.path}
-          workspaceRootType="file"
-          onOpenFile={onOpenFile}
-        />
-      ) : (
-        <div className="resource-explorer-empty">
-          <IconFolderStroked />
-          <Typography.Text strong>未打开文件夹</Typography.Text>
-          <Typography.Text type="tertiary">
-            打开一个本地文件夹后可浏览 Markdown 文档和图片资源。
-          </Typography.Text>
-          <button
-            className="resource-explorer-empty-action"
-            type="button"
-            onClick={onOpenWorkspace}
-          >
-            打开文件夹
-          </button>
-        </div>
-      )}
-      <div
-        className="resource-explorer-resizer"
-        role="separator"
-        aria-label="调整资源管理器宽度"
-        aria-orientation="vertical"
-        aria-valuemin={MIN_EXPLORER_WIDTH}
-        aria-valuemax={MAX_EXPLORER_WIDTH}
-        aria-valuenow={width}
-        tabIndex={0}
-        onPointerDown={onResizeStart}
-        onKeyDown={onResizeKeyDown}
-      />
-    </aside>
-  )
-})
-
-function RecentWorkbench({
-  activity,
-  recentFiles,
-  selectedPath,
-  onSelectFile,
-  onOpenInEditor,
-  onBack,
-  customCss,
-  showCodeBlockLineNumbers
-}: {
-  activity: HistoryDocumentActivity | null
-  recentFiles: import('../../../shared/types').RecentFileRecord[]
-  selectedPath?: string
-  onSelectFile: (path: string) => void
-  onOpenInEditor: (path: string) => void
-  onBack: () => void
-  customCss?: string
-  showCodeBlockLineNumbers: boolean
-}): React.JSX.Element {
-  const selectedFile = recentFiles.find((file) => file.path === selectedPath)
-
-  return (
-    <section className="recent-workbench" aria-label="最近活动">
-      <header className="recent-workbench-header">
-        <div className="recent-workbench-title">
-          <Typography.Title heading={5}>最近活动</Typography.Title>
-          <Typography.Text type="tertiary">
-            查看打开记录、分支推进和当前文档相对最近快照的变化。
-          </Typography.Text>
-        </div>
-        <div className="recent-workbench-actions">
-          <button className="recent-workbench-open" type="button" onClick={onBack}>
-            返回编辑
-          </button>
-          {activity ? (
-            <button
-              className="recent-workbench-open recent-workbench-open-primary"
-              type="button"
-              onClick={() => onOpenInEditor(activity.path)}
-            >
-              打开编辑
-            </button>
-          ) : null}
-        </div>
-      </header>
-      <div className="recent-workbench-body">
-        <aside className="recent-workbench-list" aria-label="最近文档">
-          {recentFiles.map((file) => (
-            <button
-              key={file.path}
-              className="recent-workbench-file"
-              data-active={file.path === selectedPath}
-              type="button"
-              title={file.path}
-              onClick={() => onSelectFile(file.path)}
-            >
-              <span className="recent-workbench-file-title">{file.title}</span>
-              <span className="recent-workbench-file-path">{file.path}</span>
-              <span className="recent-workbench-file-time">
-                {formatActivityTime(file.lastOpenedAt)}
-              </span>
-            </button>
-          ))}
-          {recentFiles.length === 0 ? (
-            <Typography.Text className="recent-workbench-empty" type="tertiary">
-              拖入或打开 Markdown 文档后会出现在这里
-            </Typography.Text>
-          ) : null}
-        </aside>
-        {activity ? (
-          <>
-            <section className="recent-workbench-state" aria-label="文档状态">
-              <div className="recent-state-card">
-                <span className="recent-state-label">当前文档</span>
-                <strong title={activity.path}>{activity.title}</strong>
-                <span className="recent-state-path">{activity.path}</span>
-              </div>
-              <div className="recent-state-grid">
-                <div className="recent-state-metric">
-                  <span>新增</span>
-                  <strong>+{activity.diff.addedLines}</strong>
-                </div>
-                <div className="recent-state-metric">
-                  <span>删除</span>
-                  <strong>-{activity.diff.removedLines}</strong>
-                </div>
-                <div className="recent-state-metric">
-                  <span>分支</span>
-                  <strong>{activity.headSnapshot?.branchName ?? 'main'}</strong>
-                </div>
-              </div>
-              <div className="recent-state-card">
-                <span className="recent-state-label">最近快照</span>
-                <strong>
-                  {activity.headSnapshot
-                    ? `#${activity.headSnapshot.id}`
-                    : selectedFile
-                      ? '等待首次快照'
-                      : '暂无'}
-                </strong>
-                <span className="recent-state-path">
-                  {formatActivityTime(activity.headSnapshot?.createdAt)}
-                </span>
-              </div>
-              <div className="recent-diff-panel">
-                <header>
-                  <span>变化对比</span>
-                  <strong>{activity.diff.unchanged ? '无未保存变化' : '当前文件有变化'}</strong>
-                </header>
-                <div className="recent-diff-lines">
-                  {activity.diff.lines.map((line, index) => (
-                    <div
-                      key={`${line.type}-${index}`}
-                      className="recent-diff-line"
-                      data-type={line.type}
-                    >
-                      <span>
-                        {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
-                      </span>
-                      <code>{line.text || ' '}</code>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-            <section className="recent-rendered-preview" aria-label="渲染预览">
-              <Suspense fallback={<div className="recent-preview-loading" />}>
-                <MarkdownPreview
-                  content={activity.currentContent}
-                  currentPath={activity.path}
-                  customCss={customCss}
-                  showCodeBlockLineNumbers={showCodeBlockLineNumbers}
-                />
-              </Suspense>
-            </section>
-          </>
-        ) : (
-          <div className="recent-workbench-placeholder">
-            <Typography.Text type="tertiary">
-              选择一个最近文档查看渲染状态和变化对比
-            </Typography.Text>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
 export function MainLayout(): React.JSX.Element {
   const [activeView, setActiveView] = useState<AppView>('editor')
   const [platform, setPlatform] = useState<string>('')
   const [resolvedAppearanceMode, setResolvedAppearanceMode] =
     useState<ResolvedAppearanceMode>('light')
+  const [launchAppearance, setLaunchAppearance] = useState<ResolvedAppearanceMode | null>(null)
+
+  useEffect(() => {
+    void window.api.app.getLaunchOptions().then((result) => {
+      if (result.ok && result.data.appearance) {
+        setLaunchAppearance(result.data.appearance)
+      }
+    })
+  }, [])
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
   const [workspaceTree, setWorkspaceTree] = useState<WorkspaceEntry[]>([])
   const [expandedWorkspacePaths, setExpandedWorkspacePaths] = useState<string[]>([])
   const [workspaceStateReady, setWorkspaceStateReady] = useState(false)
   const [explorerVisible, setExplorerVisible] = useState(false)
-  const [explorerWidth, setExplorerWidth] = useState(DEFAULT_EXPLORER_WIDTH)
   const [recentFiles, setRecentFiles] = useState<
     import('../../../shared/types').RecentFileRecord[]
   >([])
@@ -559,34 +68,16 @@ export function MainLayout(): React.JSX.Element {
   const [recentActivity, setRecentActivity] = useState<HistoryDocumentActivity | null>(null)
   const [settingsInitialSection, setSettingsInitialSection] = useState<PreferenceSection>('general')
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
-  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
-  const [updaterDialog, setUpdaterDialog] = useState<UpdaterDialogKind>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchScope, setSearchScope] = useState<TitleBarSearchScope>('document')
-  const [searchCaseSensitive, setSearchCaseSensitive] = useState(false)
-  const [replaceValue, setReplaceValue] = useState('')
-  const [replaceVisible, setReplaceVisible] = useState(false)
-  const [, setSearchMatchCount] = useState(0)
-  const [activeSearchResultIndex, setActiveSearchResultIndex] = useState(0)
-  const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
-  const [searchFocusRequestId, setSearchFocusRequestId] = useState(0)
-  const [searchNavigationRequestId, setSearchNavigationRequestId] = useState(0)
-  const [workspaceSearchResult, setWorkspaceSearchResult] = useState<WorkspaceSearchResult | null>(
-    null
-  )
-  const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false)
-  const [workspaceSearchError, setWorkspaceSearchError] = useState<string | undefined>(undefined)
   const workspacePersistTimerRef = useRef<number | undefined>(undefined)
   const workspaceTreeRequestRef = useRef(0)
   const sessionPersistTimerRef = useRef<number | undefined>(undefined)
   const exportProgressCloseTimerRef = useRef<number | undefined>(undefined)
   const editorHostRef = useRef<HTMLElement | null>(null)
-  const updaterManualCheckRef = useRef(false)
-  const updaterAvailablePromptRef = useRef<string | undefined>(undefined)
-  const updaterInstallPromptRef = useRef<string | undefined>(undefined)
   const { settings: editorSettings, updateSettings, resetSettings } = useEditorSettings()
+  const updater = useUpdaterState()
+  const checkForUpdates = updater.check
 
   const {
     tabs,
@@ -611,17 +102,13 @@ export function MainLayout(): React.JSX.Element {
     switchToTabByIndex,
     completeSaveAndCloseTab,
     updateTabDocument,
-    findTabByPath
+    findTabByPath,
+    applyExternalContent,
+    markTabMissing
   } = useTabs()
 
-  // Refs for stable callback references
-  const openPathRef = useRef<
-    ((path: string, options?: { mode?: EditorMode }) => Promise<boolean>) | undefined
-  >(undefined)
-  const loadWorkspaceRef = useRef<((path: string) => Promise<void>) | undefined>(undefined)
-  const refreshRecentRef = useRef<
-    (() => Promise<import('../../../shared/types').RecentFileRecord[]>) | undefined
-  >(undefined)
+  // Long-lived listeners (drag & drop, menu commands) read the latest command
+  // implementations from this store instead of through ref mirrors.
   const hasInitializedRef = useRef(false)
   const closingTabIdsRef = useRef(new Set<string>())
 
@@ -648,32 +135,6 @@ export function MainLayout(): React.JSX.Element {
     [activeTab?.cursorLine, activeTab?.cursorColumn]
   )
   const wordCount = useMemo(() => computeWordCount(document.content), [document.content])
-  const searchResultSummary = useMemo(
-    () => buildTitlebarSearchResults(document.content, searchQuery, searchCaseSensitive),
-    [document.content, searchCaseSensitive, searchQuery]
-  )
-  const workspaceSearchResults = useMemo(
-    () => flattenWorkspaceSearchResults(workspaceSearchResult),
-    [workspaceSearchResult]
-  )
-  const titlebarSearchResults =
-    searchScope === 'workspace' ? workspaceSearchResults : searchResultSummary.items
-  const effectiveSearchMatchCount =
-    searchScope === 'workspace'
-      ? (workspaceSearchResult?.totalCount ?? 0)
-      : searchResultSummary.totalCount
-  const titlebarSearchTruncated =
-    searchScope === 'workspace'
-      ? Boolean(workspaceSearchResult?.truncated)
-      : searchResultSummary.totalCount > searchResultSummary.items.length
-  const activeSearchOrdinal =
-    searchQuery && effectiveSearchMatchCount > 0
-      ? Math.min(activeSearchResultIndex, effectiveSearchMatchCount - 1) + 1
-      : 0
-  const searchResultsForNavigation = titlebarSearchResults
-  const workspaceSearchDisabledError =
-    searchScope === 'workspace' && !workspaceAvailable ? '先打开一个工作区' : undefined
-
   const refreshRecent = useCallback(async () => {
     const filesResult = await window.api.recent.listFiles()
     if (filesResult.ok) {
@@ -841,81 +302,122 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [findTabByPath, setActiveTabId, addTab, refreshRecent])
 
-  const loadWorkspace = useCallback(async (path: string) => {
-    const requestId = ++workspaceTreeRequestRef.current
+  const openEditorView = useCallback((): void => {
+    setActiveView('editor')
+  }, [])
 
-    window.clearTimeout(workspacePersistTimerRef.current)
-    setWorkspaceSearchLoading(false)
-    setWorkspaceSearchError(undefined)
-    setWorkspaceSearchResult(null)
-    setWorkspaceRoot(path)
-    setWorkspaceTree([])
-    setExpandedWorkspacePaths([])
-    setWorkspaceStateReady(false)
-    setExplorerVisible(false)
+  const {
+    searchQuery,
+    searchScope,
+    searchCaseSensitive,
+    replaceValue,
+    setReplaceValue,
+    replaceVisible,
+    setReplaceVisible,
+    activeSearchMatchIndex,
+    searchFocusRequestId,
+    searchNavigationRequestId,
+    workspaceSearchLoading,
+    workspaceSearchError,
+    titlebarSearchResults,
+    titlebarSearchTruncated,
+    activeSearchOrdinal,
+    workspaceSearchDisabledError,
+    effectiveSearchMatchCount,
+    triggerDocumentSearch,
+    clearWorkspaceSearch,
+    updateSearchQuery,
+    updateSearchScope,
+    updateSearchCaseSensitive,
+    updateSearchMatchCount,
+    stepSearchMatch,
+    selectSearchMatch,
+    replaceCurrentSearchMatch,
+    replaceAllSearchMatches
+  } = useTitleBarSearch({
+    documentContent: document.content,
+    workspaceRoot,
+    workspaceAvailable,
+    tabs,
+    openEditorView,
+    openPath,
+    setEditorMode,
+    setContent,
+    findTabByPath,
+    updateTabDocument
+  })
 
-    const [treeResult, stateResult] = await Promise.all([
-      window.api.workspace.getTree({ rootPath: path }),
-      window.api.workspace.getState(path)
-    ])
+  const loadWorkspace = useCallback(
+    async (path: string) => {
+      const requestId = ++workspaceTreeRequestRef.current
 
-    if (requestId !== workspaceTreeRequestRef.current) {
-      return
-    }
+      window.clearTimeout(workspacePersistTimerRef.current)
+      clearWorkspaceSearch()
 
-    if (!treeResult.ok) {
-      setWorkspaceRoot(null)
+      setWorkspaceRoot(path)
       setWorkspaceTree([])
       setExpandedWorkspacePaths([])
       setWorkspaceStateReady(false)
       setExplorerVisible(false)
-      Toast.error(treeResult.error.message)
-      return
-    }
 
-    const restoredExpandedPaths = restoreWorkspaceExpandedPaths(
-      path,
-      stateResult.ok && stateResult.data ? stateResult.data.expandedPaths : []
-    )
+      const [treeResult, stateResult] = await Promise.all([
+        window.api.workspace.getTree({ rootPath: path }),
+        window.api.workspace.getState(path)
+      ])
 
-    setExplorerVisible(stateResult.ok && stateResult.data ? stateResult.data.sidebarVisible : true)
+      if (requestId !== workspaceTreeRequestRef.current) {
+        return
+      }
 
-    setExpandedWorkspacePaths(restoredExpandedPaths)
-    setWorkspaceTree(treeResult.data)
-    setWorkspaceStateReady(true)
+      if (!treeResult.ok) {
+        setWorkspaceRoot(null)
+        setWorkspaceTree([])
+        setExpandedWorkspacePaths([])
+        setWorkspaceStateReady(false)
+        setExplorerVisible(false)
+        Toast.error(treeResult.error.message)
+        return
+      }
 
-    if (restoredExpandedPaths.length === 0) {
-      return
-    }
+      const restoredExpandedPaths = restoreWorkspaceExpandedPaths(
+        path,
+        stateResult.ok && stateResult.data ? stateResult.data.expandedPaths : []
+      )
 
-    const expandedTreeResult = await window.api.workspace.getTree({
-      rootPath: path,
-      expandedPaths: restoredExpandedPaths
-    })
+      setExplorerVisible(
+        stateResult.ok && stateResult.data ? stateResult.data.sidebarVisible : true
+      )
 
-    if (requestId !== workspaceTreeRequestRef.current) {
-      return
-    }
+      setExpandedWorkspacePaths(restoredExpandedPaths)
+      setWorkspaceTree(treeResult.data)
+      setWorkspaceStateReady(true)
 
-    setWorkspaceTree(expandedTreeResult.ok ? expandedTreeResult.data : treeResult.data)
+      if (restoredExpandedPaths.length === 0) {
+        return
+      }
 
-    if (!expandedTreeResult.ok) {
-      Toast.error(expandedTreeResult.error.message)
-    }
-  }, [])
+      const expandedTreeResult = await window.api.workspace.getTree({
+        rootPath: path,
+        expandedPaths: restoredExpandedPaths
+      })
 
-  // Update refs when callbacks change
+      if (requestId !== workspaceTreeRequestRef.current) {
+        return
+      }
+
+      setWorkspaceTree(expandedTreeResult.ok ? expandedTreeResult.data : treeResult.data)
+
+      if (!expandedTreeResult.ok) {
+        Toast.error(expandedTreeResult.error.message)
+      }
+    },
+    [clearWorkspaceSearch]
+  )
+
+  // Publish the latest command implementations for long-lived listeners.
   useEffect(() => {
-    openPathRef.current = openPath
-  }, [openPath])
-
-  useEffect(() => {
-    loadWorkspaceRef.current = loadWorkspace
-  }, [loadWorkspace])
-
-  useEffect(() => {
-    refreshRecentRef.current = refreshRecent
-  }, [refreshRecent])
+    setAppActions({ openPath, loadWorkspace, refreshRecent })
+  }, [openPath, loadWorkspace, refreshRecent])
 
   const openWorkspace = useCallback(async () => {
     const result = await window.api.workspace.openFolder()
@@ -1100,7 +602,9 @@ export function MainLayout(): React.JSX.Element {
 
   useEffect(() => {
     const updateResolvedMode = (): void => {
-      setResolvedAppearanceMode(resolveAppearanceMode(editorSettings.appearanceMode))
+      setResolvedAppearanceMode(
+        launchAppearance ?? resolveAppearanceMode(editorSettings.appearanceMode)
+      )
     }
 
     updateResolvedMode()
@@ -1110,7 +614,7 @@ export function MainLayout(): React.JSX.Element {
     }
 
     return subscribeToSystemAppearance(updateResolvedMode)
-  }, [editorSettings.appearanceMode])
+  }, [editorSettings.appearanceMode, launchAppearance])
 
   useEffect(() => {
     applyThemeToDocument({
@@ -1119,6 +623,13 @@ export function MainLayout(): React.JSX.Element {
       resolvedMode: resolvedAppearanceMode
     })
   }, [editorSettings, resolvedAppearanceMode])
+
+  // Mirror the resolved appearance into the main process so the next launch can
+  // paint the window background and the static skeleton in the right theme
+  // before any JavaScript runs.
+  useEffect(() => {
+    void window.api.window.setAppearance(editorSettings.appearanceMode)
+  }, [editorSettings.appearanceMode])
 
   useEffect(() => {
     if (activeResourceKind !== 'markdown' || !document.path) return
@@ -1181,342 +692,13 @@ export function MainLayout(): React.JSX.Element {
     }
   }, [])
 
-  const openEditorView = useCallback((): void => {
-    setActiveView('editor')
-  }, [])
-
   const openSettingsView = useCallback((section: PreferenceSection = 'general'): void => {
     setSettingsInitialSection(section)
     setActiveView('settings')
   }, [])
 
-  const triggerDocumentSearch = useCallback((): void => {
-    openEditorView()
-    setSearchFocusRequestId((current) => current + 1)
-  }, [openEditorView])
-
-  const updateSearchQuery = useCallback((value: string): void => {
-    setSearchQuery(value)
-    setSearchMatchCount(0)
-    setActiveSearchResultIndex(0)
-    setActiveSearchMatchIndex(0)
-    setWorkspaceSearchResult(null)
-    setWorkspaceSearchError(undefined)
-    setWorkspaceSearchLoading(false)
-  }, [])
-
-  const updateSearchScope = useCallback((scope: TitleBarSearchScope): void => {
-    setSearchScope(scope)
-    setSearchMatchCount(0)
-    setActiveSearchResultIndex(0)
-    setActiveSearchMatchIndex(0)
-    setWorkspaceSearchResult(null)
-    setWorkspaceSearchError(undefined)
-    setWorkspaceSearchLoading(false)
-  }, [])
-
-  const updateSearchCaseSensitive = useCallback((caseSensitive: boolean): void => {
-    setSearchCaseSensitive(caseSensitive)
-    setSearchMatchCount(0)
-    setActiveSearchResultIndex(0)
-    setActiveSearchMatchIndex(0)
-    setWorkspaceSearchResult(null)
-    setWorkspaceSearchError(undefined)
-    setWorkspaceSearchLoading(false)
-  }, [])
-
-  const updateSearchMatchCount = useCallback((count: number): void => {
-    setSearchMatchCount(count)
-    setActiveSearchMatchIndex((current) => (count === 0 ? 0 : Math.min(current, count - 1)))
-  }, [])
-
-  useEffect(() => {
-    const normalizedQuery = normalizeSearchQuery(searchQuery)
-
-    if (searchScope !== 'workspace' || !normalizedQuery || !workspaceRoot) return
-
-    let cancelled = false
-
-    const timer = window.setTimeout(() => {
-      if (cancelled) {
-        return
-      }
-
-      setWorkspaceSearchLoading(true)
-      setWorkspaceSearchError(undefined)
-      setWorkspaceSearchResult(null)
-
-      window.api.workspace
-        .search({
-          rootPath: workspaceRoot,
-          query: normalizedQuery,
-          caseSensitive: searchCaseSensitive
-        })
-        .then((result) => {
-          if (cancelled) {
-            return
-          }
-
-          if (result.ok) {
-            setWorkspaceSearchResult(result.data)
-            setActiveSearchResultIndex((current) =>
-              result.data.totalCount === 0 ? 0 : Math.min(current, result.data.totalCount - 1)
-            )
-          } else {
-            setWorkspaceSearchResult(null)
-            setWorkspaceSearchError(result.error.message)
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setWorkspaceSearchLoading(false)
-          }
-        })
-    }, 180)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [searchCaseSensitive, searchQuery, searchScope, workspaceRoot])
-
-  const navigateToSearchResult = useCallback(
-    async (result: TitleBarSearchResult): Promise<void> => {
-      openEditorView()
-
-      if (result.scope === 'workspace' && result.path) {
-        const opened = await openPath(result.path, { mode: 'source' })
-        if (!opened) {
-          return
-        }
-      } else {
-        setEditorMode('source')
-      }
-
-      setActiveSearchResultIndex(result.index)
-      setActiveSearchMatchIndex(result.matchIndex)
-      setSearchNavigationRequestId((current) => current + 1)
-    },
-    [openEditorView, openPath, setEditorMode]
-  )
-
-  const stepSearchMatch = useCallback(
-    (direction: 1 | -1): void => {
-      if (searchScope === 'workspace') {
-        const visibleResultCount = searchResultsForNavigation.length
-
-        if (visibleResultCount === 0) {
-          setSearchFocusRequestId((current) => current + 1)
-          return
-        }
-
-        const nextIndex =
-          (activeSearchResultIndex + direction + visibleResultCount) % visibleResultCount
-        const nextResult = searchResultsForNavigation[nextIndex]
-
-        if (nextResult) {
-          void navigateToSearchResult(nextResult)
-        }
-        return
-      }
-
-      const matchCount = searchResultSummary.totalCount
-
-      if (matchCount === 0) {
-        setSearchFocusRequestId((current) => current + 1)
-        return
-      }
-
-      const nextIndex = (activeSearchResultIndex + direction + matchCount) % matchCount
-      openEditorView()
-      setEditorMode('source')
-      setActiveSearchResultIndex(nextIndex)
-      setActiveSearchMatchIndex(nextIndex)
-      setSearchNavigationRequestId((current) => current + 1)
-    },
-    [
-      activeSearchResultIndex,
-      navigateToSearchResult,
-      openEditorView,
-      searchResultSummary.totalCount,
-      searchResultsForNavigation,
-      searchScope,
-      setEditorMode
-    ]
-  )
-
-  const selectSearchMatch = useCallback(
-    (result: TitleBarSearchResult): void => {
-      void navigateToSearchResult(result)
-    },
-    [navigateToSearchResult]
-  )
-
-  const replaceCurrentSearchMatch = useCallback((): void => {
-    const normalizedQuery = normalizeSearchQuery(searchQuery)
-
-    if (!normalizedQuery) {
-      setSearchFocusRequestId((current) => current + 1)
-      return
-    }
-
-    if (searchScope === 'workspace') {
-      Toast.warning('工作区范围请使用全部替换')
-      return
-    }
-
-    const matches = findTextSearchMatches(document.content, normalizedQuery, {
-      caseSensitive: searchCaseSensitive
-    })
-
-    if (matches.length === 0) {
-      setSearchFocusRequestId((current) => current + 1)
-      return
-    }
-
-    const matchIndex = Math.min(activeSearchMatchIndex, matches.length - 1)
-    const match = matches[matchIndex]
-    const nextContent = replaceTextSearchMatches(document.content, [match], replaceValue)
-    const nextMatches = findTextSearchMatches(nextContent, normalizedQuery, {
-      caseSensitive: searchCaseSensitive
-    })
-    const nextIndex = nextMatches.length === 0 ? 0 : Math.min(matchIndex, nextMatches.length - 1)
-
-    openEditorView()
-    setEditorMode('source')
-    setContent(nextContent)
-    setActiveSearchResultIndex(nextIndex)
-    setActiveSearchMatchIndex(nextIndex)
-    setSearchNavigationRequestId((current) => current + 1)
-    Toast.success('已替换 1 处')
-  }, [
-    activeSearchMatchIndex,
-    document.content,
-    openEditorView,
-    replaceValue,
-    searchCaseSensitive,
-    searchQuery,
-    searchScope,
-    setContent,
-    setEditorMode
-  ])
-
-  const replaceAllSearchMatches = useCallback(async (): Promise<void> => {
-    const normalizedQuery = normalizeSearchQuery(searchQuery)
-
-    if (!normalizedQuery) {
-      setSearchFocusRequestId((current) => current + 1)
-      return
-    }
-
-    if (searchScope !== 'workspace') {
-      const matches = findTextSearchMatches(document.content, normalizedQuery, {
-        caseSensitive: searchCaseSensitive
-      })
-
-      if (matches.length === 0) {
-        setSearchFocusRequestId((current) => current + 1)
-        return
-      }
-
-      openEditorView()
-      setEditorMode('source')
-      setContent(replaceTextSearchMatches(document.content, matches, replaceValue))
-      setActiveSearchResultIndex(0)
-      setActiveSearchMatchIndex(0)
-      setSearchNavigationRequestId((current) => current + 1)
-      Toast.success(`已替换 ${matches.length} 处`)
-      return
-    }
-
-    if (!workspaceRoot) {
-      Toast.error('先打开一个工作区')
-      return
-    }
-
-    const dirtyWorkspaceTabs = tabs.filter(
-      (tab) =>
-        tab.document.dirty &&
-        tab.document.path &&
-        isPathInsideWorkspace(tab.document.path, workspaceRoot)
-    )
-    const confirmed = await new Promise<boolean>((resolve) => {
-      Modal.confirm({
-        title: '替换整个工作区匹配项？',
-        content:
-          dirtyWorkspaceTabs.length > 0
-            ? `将按磁盘文件替换 ${effectiveSearchMatchCount} 处匹配，并刷新已打开的命中文件。${dirtyWorkspaceTabs.length} 个未保存标签可能被磁盘内容覆盖。`
-            : `将按磁盘文件替换 ${effectiveSearchMatchCount} 处匹配。`,
-        okText: '全部替换',
-        cancelText: '取消',
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false)
-      })
-    })
-
-    if (!confirmed) {
-      return
-    }
-
-    const result = await window.api.workspace.replaceAll({
-      rootPath: workspaceRoot,
-      query: normalizedQuery,
-      replacement: replaceValue,
-      caseSensitive: searchCaseSensitive
-    })
-
-    if (!result.ok) {
-      Toast.error(result.error.message)
-      return
-    }
-
-    for (const file of result.data.files) {
-      const openTab = findTabByPath(file.path)
-
-      if (!openTab) {
-        continue
-      }
-
-      const documentResult = await window.api.document.openPath(file.path)
-      if (documentResult.ok) {
-        updateTabDocument(openTab.id, {
-          path: documentResult.data.path,
-          title: documentResult.data.title,
-          content: documentResult.data.content,
-          dirty: false,
-          updatedAt: documentResult.data.updatedAt
-        })
-      }
-    }
-
-    const searchResult = await window.api.workspace.search({
-      rootPath: workspaceRoot,
-      query: normalizedQuery,
-      caseSensitive: searchCaseSensitive
-    })
-
-    if (searchResult.ok) {
-      setWorkspaceSearchResult(searchResult.data)
-    }
-
-    setActiveSearchResultIndex(0)
-    setActiveSearchMatchIndex(0)
-    Toast.success(`已替换 ${result.data.replacements} 处，涉及 ${result.data.changedFiles} 个文件`)
-  }, [
-    document.content,
-    effectiveSearchMatchCount,
-    findTabByPath,
-    openEditorView,
-    replaceValue,
-    searchCaseSensitive,
-    searchQuery,
-    searchScope,
-    setContent,
-    setEditorMode,
-    tabs,
-    updateTabDocument,
-    workspaceRoot
-  ])
+  // Title-bar search: query state, workspace search, navigation and both
+  // replace flows live in their own hook (see layout/app/useTitleBarSearch).
 
   const openRecentView = useCallback((): void => {
     setActiveView('recent')
@@ -1584,110 +766,6 @@ export function MainLayout(): React.JSX.Element {
       isImagePreview
     ]
   )
-
-  const downloadUpdate = useCallback(async (): Promise<void> => {
-    setUpdaterDialog(null)
-
-    const result = await window.api.updater.downloadUpdate()
-
-    if (!result.ok) {
-      Toast.error(result.error.message)
-    }
-  }, [])
-
-  const installUpdate = useCallback(async (): Promise<void> => {
-    setUpdaterDialog(null)
-
-    const result = await window.api.updater.quitAndInstall()
-
-    if (!result.ok) {
-      Toast.error(result.error.message)
-    }
-  }, [])
-
-  const handleUpdaterStatus = useCallback((status: UpdaterStatus): void => {
-    setUpdaterStatus(status)
-
-    if (status.state === 'available') {
-      updaterManualCheckRef.current = false
-
-      const version = status.version ?? status.updatedAt
-      if (updaterAvailablePromptRef.current === version) {
-        return
-      }
-
-      updaterAvailablePromptRef.current = version
-      setUpdaterDialog('available')
-      return
-    }
-
-    if (status.state === 'downloading') {
-      setUpdaterDialog(null)
-      return
-    }
-
-    if (status.state === 'downloaded') {
-      const version = status.version ?? status.updatedAt
-      if (updaterInstallPromptRef.current === version) {
-        return
-      }
-
-      updaterInstallPromptRef.current = version
-      setUpdaterDialog('downloaded')
-      return
-    }
-
-    if (status.state === 'not-available' && updaterManualCheckRef.current) {
-      updaterManualCheckRef.current = false
-      Toast.success(status.message)
-      return
-    }
-
-    if (status.state === 'error' && updaterManualCheckRef.current) {
-      updaterManualCheckRef.current = false
-      Toast.error(status.error || status.message)
-    }
-  }, [])
-
-  const checkForUpdates = useCallback(async (): Promise<void> => {
-    updaterManualCheckRef.current = true
-    updaterAvailablePromptRef.current = undefined
-    updaterInstallPromptRef.current = undefined
-    Toast.info('正在检查更新')
-
-    const result = await window.api.updater.checkForUpdates()
-
-    if (!result.ok) {
-      updaterManualCheckRef.current = false
-      Toast.error(result.error.message)
-      return
-    }
-
-    handleUpdaterStatus(result.data)
-  }, [handleUpdaterStatus])
-
-  useEffect(() => {
-    return window.api.document.onExportProgress((progress) => {
-      setExportProgress(progress)
-    })
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    window.api.updater.getStatus().then((result) => {
-      if (!cancelled && result.ok) {
-        handleUpdaterStatus(result.data)
-      }
-    })
-
-    const unsubscribe = window.api.updater.onStatusChange(handleUpdaterStatus)
-
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
-  }, [handleUpdaterStatus])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent): void => {
@@ -1847,58 +925,59 @@ export function MainLayout(): React.JSX.Element {
         hasInitializedRef.current = true
         void refreshRecent()
 
-        const pendingOpenFileResult = await window.api.app.getPendingOpenFile()
-        if (cancelled) return
+        // Everything needed to decide *what* to show is fetched in one round
+        // trip budget instead of four sequential awaits. The workspace tree is
+        // deliberately excluded: it starts a recursive watcher and must not sit
+        // on the critical path to the first editable document.
+        const [pendingOpenFileResult, preferenceResult, recentWorkspaceResult, lastDocumentResult] =
+          await Promise.all([
+            window.api.app.getPendingOpenFile(),
+            window.api.preferences.getEditor(),
+            window.api.recent.listWorkspaces(),
+            window.api.session.getLastDocument()
+          ])
 
-        if (pendingOpenFileResult.ok && pendingOpenFileResult.data) {
-          openEditorView()
-          await openPath(pendingOpenFileResult.data, { mode: 'preview-edit' })
+        if (cancelled) {
           return
         }
-
-        const preferenceResult = await window.api.preferences.getEditor()
-        if (cancelled) return
 
         if (!preferenceResult.ok) {
           Toast.error(preferenceResult.error.message)
           return
         }
 
-        const recentWorkspaceResult = await window.api.recent.listWorkspaces()
-        if (cancelled) return
+        const preferences = preferenceResult.data
         const recentWorkspace = recentWorkspaceResult.ok ? recentWorkspaceResult.data[0] : undefined
 
-        if (!preferenceResult.data.hasSeenWelcome) {
+        const pendingPath =
+          pendingOpenFileResult.ok && pendingOpenFileResult.data ? pendingOpenFileResult.data : null
+        const lastDocument =
+          lastDocumentResult.ok && lastDocumentResult.data ? lastDocumentResult.data : null
+
+        // A file passed on the command line always wins — including on the very
+        // first launch, where the welcome document used to win instead.
+        if (pendingPath) {
+          openEditorView()
+          await openPath(pendingPath, { mode: 'preview-edit' })
+
+          if (!preferences.hasSeenWelcome) {
+            void window.api.preferences.updateEditor({ hasSeenWelcome: true })
+          }
+        } else if (!preferences.hasSeenWelcome) {
           replaceTabs([
             {
               document: createWelcomeDocument(),
-              editorMode: preferenceResult.data.defaultMode
+              editorMode: preferences.defaultMode
             }
           ])
           void window.api.preferences.updateEditor({ hasSeenWelcome: true })
-          if (recentWorkspace) {
-            await loadWorkspace(recentWorkspace.path)
-          }
-          return
-        }
-
-        const lastDocumentResult = await window.api.session.getLastDocument()
-        if (cancelled) return
-
-        if (lastDocumentResult.ok && lastDocumentResult.data) {
-          const opened = await openPath(lastDocumentResult.data.path, {
-            mode: normalizeEditorMode(lastDocumentResult.data.mode)
-          })
-
-          if (opened && recentWorkspace) {
-            await loadWorkspace(recentWorkspace.path)
-          }
-
-          return
+        } else if (lastDocument) {
+          await openPath(lastDocument.path, { mode: normalizeEditorMode(lastDocument.mode) })
         }
 
         if (recentWorkspace) {
-          await loadWorkspace(recentWorkspace.path)
+          // Deferred: the document is already interactive by now.
+          void loadWorkspace(recentWorkspace.path)
         }
       })()
     }, 0)
@@ -1914,6 +993,19 @@ export function MainLayout(): React.JSX.Element {
       void refreshWorkspaceTree()
     })
   }, [refreshWorkspaceTree])
+
+  const externalDocs = useExternalDocuments({
+    tabs,
+    applyExternalContent,
+    markTabMissing,
+    updateTabDocument,
+    onDocumentSaved: () => void refreshRecent()
+  })
+
+  const activeTabNoticePath = activeTab?.document.path ?? ''
+  const activeTabNotice = activeTabNoticePath
+    ? externalDocs.notices[activeTabNoticePath]
+    : undefined
 
   const dragOverFrameRef = useRef<number | undefined>(undefined)
 
@@ -1971,8 +1063,8 @@ export function MainLayout(): React.JSX.Element {
       if (files.length === 1 && firstFilePath) {
         const statResult = await window.api.workspace.getTree({ rootPath: firstFilePath })
         if (statResult.ok) {
-          await loadWorkspaceRef.current?.(firstFilePath)
-          void refreshRecentRef.current?.()
+          await getAppActions().loadWorkspace?.(firstFilePath)
+          void getAppActions().refreshRecent?.()
           return
         }
       }
@@ -1981,13 +1073,13 @@ export function MainLayout(): React.JSX.Element {
         const filePath = getDroppedFilePath(file)
         if (filePath && /\.(md|markdown|mdown|mkd|txt)$/i.test(filePath)) {
           openEditorView()
-          await openPathRef.current?.(filePath, { mode: 'preview-edit' })
+          await getAppActions().openPath?.(filePath, { mode: 'preview-edit' })
           firstOpenedFilePath ??= filePath
         }
       }
 
       if (firstOpenedFilePath) {
-        await refreshRecentRef.current?.()
+        await getAppActions().refreshRecent?.()
         setSelectedRecentPath(firstOpenedFilePath)
         void loadRecentActivity(firstOpenedFilePath)
       }
@@ -2054,69 +1146,21 @@ export function MainLayout(): React.JSX.Element {
   const openWorkspaceFile = useCallback(
     (path: string): void => {
       openEditorView()
-      void openPathRef.current?.(path)
+      void getAppActions().openPath?.(path)
     },
     [openEditorView]
   )
+
+  const {
+    width: explorerWidth,
+    handleResizeStart: handleExplorerResizeStart,
+    handleResizeKeyDown: handleExplorerResizeKeyDown
+  } = useExplorerResize()
 
   const toggleExplorer = useCallback((): void => {
     if (!workspaceAvailable) return
     setExplorerVisible((current) => !current)
   }, [workspaceAvailable])
-
-  const handleExplorerResizeStart = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>): void => {
-      event.preventDefault()
-      const startX = event.clientX
-      const startWidth = explorerWidth
-      const explorerElement = event.currentTarget.parentElement
-      const previousCursor = window.document.documentElement.style.cursor
-      const previousUserSelect = window.document.documentElement.style.userSelect
-      let nextWidth = startWidth
-      let resizeFrame = 0
-
-      window.document.documentElement.style.cursor = 'col-resize'
-      window.document.documentElement.style.userSelect = 'none'
-
-      const handlePointerMove = (moveEvent: PointerEvent): void => {
-        nextWidth = clampExplorerWidth(startWidth + moveEvent.clientX - startX)
-        if (resizeFrame !== 0) return
-
-        resizeFrame = window.requestAnimationFrame(() => {
-          resizeFrame = 0
-          if (!explorerElement) return
-          explorerElement.style.width = `${nextWidth}px`
-          explorerElement.style.flexBasis = `${nextWidth}px`
-        })
-      }
-
-      const stopResizing = (): void => {
-        window.removeEventListener('pointermove', handlePointerMove)
-        window.removeEventListener('pointerup', stopResizing)
-        window.removeEventListener('pointercancel', stopResizing)
-        if (resizeFrame !== 0) window.cancelAnimationFrame(resizeFrame)
-        window.document.documentElement.style.cursor = previousCursor
-        window.document.documentElement.style.userSelect = previousUserSelect
-        setExplorerWidth(nextWidth)
-      }
-
-      window.addEventListener('pointermove', handlePointerMove)
-      window.addEventListener('pointerup', stopResizing)
-      window.addEventListener('pointercancel', stopResizing)
-    },
-    [explorerWidth]
-  )
-
-  const handleExplorerResizeKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>): void => {
-      const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
-      if (direction === 0) return
-
-      event.preventDefault()
-      setExplorerWidth((current) => clampExplorerWidth(current + direction * 10))
-    },
-    []
-  )
 
   return (
     <div
@@ -2211,6 +1255,58 @@ export function MainLayout(): React.JSX.Element {
                   data-editor-mode={editorMode}
                   data-resource-kind={activeResourceKind}
                 >
+                  {activeTabNotice ? (
+                    <InlineNotice
+                      tone={
+                        activeTabNotice.kind === 'removed'
+                          ? 'danger'
+                          : activeTabNotice.kind === 'conflict'
+                            ? 'warning'
+                            : 'success'
+                      }
+                      title={
+                        activeTabNotice.kind === 'removed'
+                          ? '文件已不在磁盘上'
+                          : activeTabNotice.kind === 'conflict'
+                            ? '文件已被外部修改'
+                            : '已同步外部修改'
+                      }
+                      description={
+                        activeTabNotice.kind === 'removed'
+                          ? '该文件被移动或删除，当前内容仍保留在编辑器中。'
+                          : activeTabNotice.kind === 'conflict'
+                            ? '磁盘上的版本与你的未保存修改存在冲突。'
+                            : undefined
+                      }
+                      actions={
+                        activeTabNotice.kind === 'conflict'
+                          ? [
+                              {
+                                label: '重新加载',
+                                primary: true,
+                                onClick: () =>
+                                  externalDocs.resolveConflict(activeTabNoticePath, 'reload')
+                              },
+                              {
+                                label: '保留我的修改',
+                                onClick: () =>
+                                  externalDocs.resolveConflict(activeTabNoticePath, 'keep')
+                              }
+                            ]
+                          : activeTabNotice.kind === 'removed'
+                            ? [
+                                {
+                                  label: '另存为…',
+                                  primary: true,
+                                  onClick: () => void externalDocs.saveMissing(activeTabNoticePath)
+                                }
+                              ]
+                            : undefined
+                      }
+                      autoDismissMs={activeTabNotice.kind === 'synced' ? 2500 : undefined}
+                      onDismiss={() => externalDocs.clearNotice(activeTabNoticePath)}
+                    />
+                  ) : null}
                   {activeTab ? (
                     isImagePreview ? (
                       document.imageSource ? (
@@ -2229,6 +1325,7 @@ export function MainLayout(): React.JSX.Element {
                           mode={editorMode}
                           dirty={document.dirty}
                           content={document.content}
+                          externalRevision={activeTab.externalRevision ?? 0}
                           settings={editorSettings}
                           currentPath={document.path}
                           workspaceRoot={workspaceRoot}
@@ -2294,7 +1391,7 @@ export function MainLayout(): React.JSX.Element {
           <SettingsPage
             key={settingsInitialSection}
             settings={editorSettings}
-            updaterStatus={updaterStatus}
+            updaterStatus={updater.status}
             workspaceRoot={workspaceRoot}
             initialSection={settingsInitialSection}
             onBack={openEditorView}
@@ -2306,15 +1403,8 @@ export function MainLayout(): React.JSX.Element {
           />
         )}
       </main>
-      <Modal
-        visible={!!exportProgress}
-        title="正在导出"
-        footer={null}
-        closable={false}
-        maskClosable={false}
-        centered
-        width={420}
-      >
+      <CloseTabDecisionHost />
+      <Modal visible={!!exportProgress} title="正在导出" footer={null} closable={false} width={420}>
         {exportProgress ? (
           <div className="export-progress-modal">
             <Progress percent={exportProgress.percent} showInfo />
@@ -2323,68 +1413,64 @@ export function MainLayout(): React.JSX.Element {
         ) : null}
       </Modal>
       <Modal
-        visible={updaterDialog === 'available' && updaterStatus?.state === 'available'}
-        title={updaterStatus?.version ? `发现新版本 ${updaterStatus.version}` : '发现新版本'}
+        visible={updater.dialog === 'available' && updater.status?.state === 'available'}
+        title={updater.status?.version ? `发现新版本 ${updater.status.version}` : '发现新版本'}
         okText="下载更新"
         cancelText="稍后"
-        centered
         width={560}
-        onOk={() => void downloadUpdate()}
-        onCancel={() => setUpdaterDialog(null)}
+        onOk={() => void updater.download()}
+        onCancel={() => updater.setDialog(null)}
       >
-        {updaterStatus ? (
+        {updater.status ? (
           <div className="updater-dialog-content">
             <div className="updater-dialog-meta">
-              {updaterStatus.releaseName ? <span>{updaterStatus.releaseName}</span> : null}
-              {updaterStatus.releaseDate ? (
-                <span>发布于 {formatUpdateDate(updaterStatus.releaseDate)}</span>
+              {updater.status.releaseName ? <span>{updater.status.releaseName}</span> : null}
+              {updater.status.releaseDate ? (
+                <span>发布于 {formatUpdateDate(updater.status.releaseDate)}</span>
               ) : null}
             </div>
-            <Typography.Text type="tertiary">{updaterStatus.message}</Typography.Text>
+            <Typography.Text type="tertiary">{updater.status.message}</Typography.Text>
             <div className="updater-release-notes" aria-label="更新日志">
               <div className="updater-release-notes-title">更新日志</div>
-              <pre>{getUpdateNotes(updaterStatus)}</pre>
+              <pre>{getUpdateNotes(updater.status)}</pre>
             </div>
           </div>
         ) : null}
       </Modal>
       <Modal
-        visible={updaterDialog === 'downloaded' && updaterStatus?.state === 'downloaded'}
+        visible={updater.dialog === 'downloaded' && updater.status?.state === 'downloaded'}
         title="更新已准备就绪"
         okText="重启安装"
         cancelText="稍后"
-        centered
         width={520}
-        onOk={() => void installUpdate()}
-        onCancel={() => setUpdaterDialog(null)}
+        onOk={() => void updater.install()}
+        onCancel={() => updater.setDialog(null)}
       >
-        {updaterStatus ? (
+        {updater.status ? (
           <div className="updater-dialog-content">
             <Typography.Text>
-              {updaterStatus.version
-                ? `版本 ${updaterStatus.version} 已下载，重启后会完成安装。`
+              {updater.status.version
+                ? `版本 ${updater.status.version} 已下载，重启后会完成安装。`
                 : '更新已下载，重启后会完成安装。'}
             </Typography.Text>
             <div className="updater-release-notes" aria-label="更新日志">
               <div className="updater-release-notes-title">更新日志</div>
-              <pre>{getUpdateNotes(updaterStatus)}</pre>
+              <pre>{getUpdateNotes(updater.status)}</pre>
             </div>
           </div>
         ) : null}
       </Modal>
       <Modal
-        visible={updaterStatus?.state === 'downloading'}
+        visible={updater.status?.state === 'downloading'}
         title="正在下载更新"
         footer={null}
         closable={false}
-        maskClosable={false}
-        centered
         width={420}
       >
-        {updaterStatus ? (
+        {updater.status ? (
           <div className="export-progress-modal">
-            <Progress percent={Math.round(updaterStatus.percent ?? 0)} showInfo />
-            <Typography.Text type="tertiary">{updaterStatus.message}</Typography.Text>
+            <Progress percent={Math.round(updater.status.percent ?? 0)} showInfo />
+            <Typography.Text type="tertiary">{updater.status.message}</Typography.Text>
           </div>
         ) : null}
       </Modal>

@@ -15,36 +15,26 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            semi: ['@douyinfe/semi-ui', '@douyinfe/semi-icons'],
-            editor: [
-              '@codemirror/state',
-              '@codemirror/view',
-              '@codemirror/commands',
-              '@codemirror/lang-markdown',
-              '@codemirror/language',
-              '@codemirror/search'
-            ],
-            prosemirror: [
-              'prosemirror-state',
-              'prosemirror-view',
-              'prosemirror-model',
-              'prosemirror-schema-list',
-              'prosemirror-markdown',
-              'prosemirror-history',
-              'prosemirror-keymap',
-              'prosemirror-commands',
-              'prosemirror-inputrules'
-            ],
-            markdown: [
-              'markdown-it',
-              'markdown-it-task-lists',
-              'markdown-it-texmath',
-              'markdown-it-multimd-table',
-              'highlight.js',
-              'dompurify',
-              'katex'
-            ]
+          /**
+           * First paint must not wait for the editor stack. Only the shell
+           * (React + local primitives + icons) belongs to the entry chunk;
+           * everything else is split so it can arrive after the window is up.
+           *
+           * NOTE: this is a function on purpose. A static map with
+           * `['@douyinfe/semi-ui']` would keep that package in the graph even
+           * after every import was removed, dragging ~760 KB of CSS along.
+           */
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) {
+              // Only group stable, always-together vendor code. Highlighting and
+              // diagram grammars must stay split per language/diagram so they
+              // keep loading on demand instead of one multi-megabyte bundle.
+              if (id.includes('@douyinfe/semi-icons')) return 'icons'
+              if (id.includes('codemirror') || id.includes('@lezer')) return 'cm'
+              if (id.includes('prosemirror')) return 'pm'
+            }
+
+            return undefined
           }
         }
       }

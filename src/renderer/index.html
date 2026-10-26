@@ -2,15 +2,164 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Electron</title>
-    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <meta name="color-scheme" content="light dark" />
+    <title>Velox</title>
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
+    <!--
+      First-paint skeleton. It lives in the document so the window has real
+      pixels before the 2 MB renderer bundle is even parsed. Colors follow
+      `prefers-color-scheme`, which the main process pins through
+      nativeTheme.themeSource before the window exists — no flash, no inline
+      script, CSP untouched.
+    -->
+    <style>
+      :root {
+        --boot-canvas: #f5f5f3;
+        --boot-surface: #fcfcfb;
+        --boot-skeleton: rgba(28, 27, 25, 0.06);
+        --boot-skeleton-strong: rgba(28, 27, 25, 0.09);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --boot-canvas: #0b0b0a;
+          --boot-surface: #151515;
+          --boot-skeleton: rgba(232, 230, 225, 0.06);
+          --boot-skeleton-strong: rgba(232, 230, 225, 0.09);
+        }
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--boot-canvas);
+      }
+
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--boot-canvas);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+          'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+        /* Skeleton disappears on the first React commit; fade instead of popping. */
+        transition: opacity 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
+      }
+
+      #boot[data-dismissed='true'] {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .boot-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 44px;
+        flex: none;
+        padding: 0 12px;
+        background: var(--boot-surface);
+      }
+
+      .boot-pill {
+        height: 22px;
+        width: 56px;
+        border-radius: 6px;
+        background: var(--boot-skeleton);
+      }
+
+      .boot-pill--wide {
+        width: 132px;
+      }
+
+      .boot-body {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .boot-side {
+        width: 268px;
+        flex: none;
+        padding: 14px 12px;
+        background: var(--boot-canvas);
+      }
+
+      .boot-main {
+        flex: 1;
+        min-width: 0;
+        background: var(--boot-surface);
+      }
+
+      .boot-lines {
+        width: min(68ch, calc(100% - 96px));
+        margin: 18px auto 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .boot-line {
+        height: 12px;
+        border-radius: 4px;
+        background: var(--boot-skeleton);
+      }
+
+      .boot-line--title {
+        height: 24px;
+        width: 46%;
+        border-radius: 6px;
+        background: var(--boot-skeleton-strong);
+      }
+
+      .boot-line--short {
+        width: 62%;
+      }
+
+      .boot-line--block {
+        height: 84px;
+        border-radius: 8px;
+        background: var(--boot-skeleton);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #boot {
+          transition: none;
+        }
+      }
+    </style>
   </head>
 
   <body>
+    <div id="boot" aria-hidden="true">
+      <div class="boot-bar">
+        <span class="boot-pill boot-pill--wide"></span>
+        <span class="boot-pill"></span>
+        <span class="boot-pill"></span>
+      </div>
+      <div class="boot-body">
+        <div class="boot-side"></div>
+        <div class="boot-main">
+          <div class="boot-lines">
+            <div class="boot-line boot-line--title"></div>
+            <div class="boot-line"></div>
+            <div class="boot-line"></div>
+            <div class="boot-line boot-line--short"></div>
+            <div class="boot-line boot-line--block"></div>
+            <div class="boot-line"></div>
+            <div class="boot-line boot-line--short"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

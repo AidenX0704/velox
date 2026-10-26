@@ -52,6 +52,24 @@ export interface AppSettingsPatch {
   workspace?: Partial<AppSettings['workspace']>
 }
 
+/** Emitted when an open document changed on disk outside of the app. */
+export interface ExternalDocumentChange {
+  path: string
+  mtimeMs: number
+  size: number
+}
+
+/** Launch-time switches that affect rendering (visual regression, screenshots). */
+export interface LaunchOptions {
+  appearance: 'light' | 'dark' | null
+  capture: boolean
+}
+
+/** Emitted when an open document disappeared from disk. */
+export interface ExternalDocumentRemoval {
+  path: string
+}
+
 export interface DocumentData {
   path?: string
   content: string
@@ -324,6 +342,8 @@ export interface VeloxAPI {
   app: {
     getInfo: () => Promise<Result<AppInfo>>
     getPendingOpenFile: () => Promise<Result<string | null>>
+    getLaunchOptions: () => Promise<Result<LaunchOptions>>
+    reportReady: () => Promise<Result<void>>
     getPathForFile: (file: File) => string
     onOpenFile: (callback: (filePath: string) => void) => () => void
   }
@@ -332,6 +352,7 @@ export interface VeloxAPI {
     minimize: () => Promise<Result<void>>
     toggleMaximize: () => Promise<Result<void>>
     close: () => Promise<Result<void>>
+    setAppearance: (appearance: 'system' | 'light' | 'dark') => Promise<Result<void>>
     onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
   }
   settings: {
@@ -375,6 +396,10 @@ export interface VeloxAPI {
     onExportProgress: (
       callback: (progress: import('./export').ExportProgress) => void
     ) => () => void
+    unwatch: (path: string) => Promise<Result<void>>
+    reloadFromDisk: (path: string) => Promise<Result<string | null>>
+    onExternalChange: (callback: (change: ExternalDocumentChange) => void) => () => void
+    onExternalRemoval: (callback: (change: ExternalDocumentRemoval) => void) => () => void
   }
   workspace: {
     openFolder: () => Promise<Result<string | null>>

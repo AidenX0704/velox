@@ -1,0 +1,280 @@
+/*
+ * Velox design tokens — v2
+ *
+ * Rules encoded here:
+ *  1. No borders for hierarchy. Surfaces are separated by 1–3% L* steps
+ *     (measured: light 96.49 / 98.94 / 100.00, dark 3.00 / 5.85 / 9.23 / 12.18).
+ *  2. Pure black is banned. The darkest surface is #0b0b0a.
+ *  3. Dark mode drops every weight by 40 (400→360, 700→660, 620→580).
+ *
+ * The media-query blocks come first so the first paint (static skeleton) picks
+ * the right palette before any JavaScript runs; the [data-color-mode] blocks
+ * later win once the renderer knows the user's explicit choice.
+ */
+
+:root {
+  /* ── type ─────────────────────────────────────────────────────────── */
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --font-code: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  --w-body: 400;
+  --w-medium: 520;
+  --w-strong: 700;
+  --w-label: 600;
+  --w-heading: 620;
+
+  /* reading measure: 68ch ≈ 720px at 16px — inside the 65–75ch comfort band */
+  --measure: 68ch;
+
+  /* ── shape ────────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-pill: 999px;
+
+  /* ── motion ───────────────────────────────────────────────────────── */
+  --ease-out-quart: cubic-bezier(0.215, 0.61, 0.355, 1);
+
+  /* Overdamped spring (k=1200, c=80): ζ=1.155, settles at 366 ms, 0% overshoot.
+     Sampled from the analytic step response — "dead-stop" drag release. */
+  --ease-drag: linear(
+    0,
+    0.095,
+    0.265,
+    0.431,
+    0.57,
+    0.679,
+    0.761,
+    0.823,
+    0.87,
+    0.904,
+    0.929,
+    0.948,
+    0.961,
+    0.972,
+    0.979,
+    0.985,
+    0.989,
+    0.992,
+    0.994,
+    0.995,
+    0.997,
+    0.998,
+    0.998,
+    0.999,
+    1
+  );
+
+  /* Underdamped spring (k=380, c=18): ζ=0.462, 19.5% overshoot at 775 ms.
+     Used for entrances; icons use the amplitude-scaled keyframes instead. */
+  --ease-spring: linear(
+    0,
+    0.16,
+    0.493,
+    0.827,
+    1.064,
+    1.178,
+    1.19,
+    1.141,
+    1.073,
+    1.014,
+    0.976,
+    0.963,
+    0.966,
+    0.977,
+    0.99,
+    1.001,
+    1.006,
+    1.007,
+    1.006,
+    1.003,
+    1.001,
+    0.999,
+    0.999,
+    0.999,
+    1
+  );
+
+  --dur-fast: 140ms;
+  --dur-base: 180ms;
+  --dur-slow: 320ms;
+  --dur-drag: 366ms;
+  --dur-pop: 420ms;
+  --dur-feedback: 2500ms;
+}
+
+/* ── light ──────────────────────────────────────────────────────────── */
+:root,
+:root[data-color-mode='light'] {
+  color-scheme: light;
+
+  --surface-sunken: #eeedea;
+  --surface-canvas: #f5f5f3;
+  --surface-base: #fcfcfb;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-float: #ffffff;
+
+  --text-primary: #1c1b19;
+  --text-secondary: #56534b;
+  --text-tertiary: #6f6b62;
+  --text-disabled: #a5a199;
+
+  --accent-fill: #2563eb;
+  --accent-fill-hover: #1d4ed8;
+  --accent-fill-active: #1e40af;
+  --accent-text: #1d4ed8;
+  --label-on-accent: #ffffff;
+
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b4432f;
+
+  --hairline: color-mix(in oklab, #1c1b19 7%, transparent);
+  --hairline-strong: color-mix(in oklab, #1c1b19 11%, transparent);
+  --skeleton: color-mix(in oklab, #1c1b19 6%, transparent);
+  --scrollbar-thumb: rgba(28, 27, 25, 0.26);
+  --scrollbar-thumb-hover: rgba(28, 27, 25, 0.42);
+  --selection: color-mix(in oklab, #2563eb 18%, transparent);
+}
+
+/* ── dark ───────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-mode='light']) {
+    color-scheme: dark;
+
+    --surface-sunken: #0b0b0a;
+    --surface-canvas: #0b0b0a;
+    --surface-base: #131312;
+    --surface-raised: #1a1a19;
+    --surface-overlay: #20201e;
+    --surface-float: #262624;
+
+    --text-primary: #e8e6e1;
+    --text-secondary: #a8a49b;
+    --text-tertiary: #8d8981;
+    --text-disabled: #6f6b63;
+
+    --accent-fill: #4f8cff;
+    --accent-fill-hover: #6ea3ff;
+    --accent-fill-active: #7aaaff;
+    --accent-text: #6ea3ff;
+    --label-on-accent: #0b0b0a;
+
+    --success: #79c8a8;
+    --warning: #e8b463;
+    --danger: #e08b78;
+
+    --hairline: color-mix(in oklab, #e8e6e1 7%, transparent);
+    --hairline-strong: color-mix(in oklab, #e8e6e1 11%, transparent);
+    --skeleton: color-mix(in oklab, #e8e6e1 6%, transparent);
+    --scrollbar-thumb: rgba(232, 230, 225, 0.22);
+    --scrollbar-thumb-hover: rgba(232, 230, 225, 0.36);
+    --selection: color-mix(in oklab, #4f8cff 22%, transparent);
+
+    /* dark compensation: every weight drops by 40 */
+    --w-body: 360;
+    --w-medium: 480;
+    --w-strong: 660;
+    --w-label: 560;
+    --w-heading: 580;
+  }
+}
+
+:root[data-color-mode='dark'] {
+  color-scheme: dark;
+
+  --surface-sunken: #0b0b0a;
+  --surface-canvas: #0b0b0a;
+  --surface-base: #131312;
+  --surface-raised: #1a1a19;
+  --surface-overlay: #20201e;
+  --surface-float: #262624;
+
+  --text-primary: #e8e6e1;
+  --text-secondary: #a8a49b;
+  --text-tertiary: #8d8981;
+  --text-disabled: #6f6b63;
+
+  --accent-fill: #4f8cff;
+  --accent-fill-hover: #6ea3ff;
+  --accent-fill-active: #7aaaff;
+  --accent-text: #6ea3ff;
+  --label-on-accent: #0b0b0a;
+
+  --success: #79c8a8;
+  --warning: #e8b463;
+  --danger: #e08b78;
+
+  --hairline: color-mix(in oklab, #e8e6e1 7%, transparent);
+  --hairline-strong: color-mix(in oklab, #e8e6e1 11%, transparent);
+  --skeleton: color-mix(in oklab, #e8e6e1 6%, transparent);
+  --scrollbar-thumb: rgba(232, 230, 225, 0.22);
+  --scrollbar-thumb-hover: rgba(232, 230, 225, 0.36);
+  --selection: color-mix(in oklab, #4f8cff 22%, transparent);
+
+  --w-body: 360;
+  --w-medium: 480;
+  --w-strong: 660;
+  --w-label: 560;
+  --w-heading: 580;
+}
+
+/* ── derived interaction states ─────────────────────────────────────── */
+/* Any component can declare the layer it sits on; hover/press follow it.
+   .sidebar { --local-surface: var(--surface-canvas); }
+   .sidebar .row:hover { background: var(--surface-hover); } */
+:root {
+  --surface-hover: color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 3.2%);
+  --surface-active: color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 6%);
+  --surface-press: color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 9%);
+}
+
+:root[data-color-mode='dark'] {
+  --surface-hover: color-mix(in oklab, var(--local-surface, var(--surface-base)), #ffffff 5%);
+  --surface-active: color-mix(in oklab, var(--local-surface, var(--surface-base)), #ffffff 8%);
+  --surface-press: color-mix(in oklab, var(--local-surface, var(--surface-base)), #ffffff 11%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-mode='light']) {
+    --surface-hover: color-mix(in oklab, var(--local-surface, var(--surface-base)), #ffffff 5%);
+    --surface-active: color-mix(in oklab, var(--local-surface, var(--surface-base)), #ffffff 8%);
+    --surface-press: color-mix(in oklab, var(--local-surface, var(--surface-base)), #ffffff 11%);
+  }
+}
+
+/* ── legacy aliases ─────────────────────────────────────────────────────
+   The v1 stylesheets reference these names in ~160 places. Keeping them as
+   aliases lets the palette swap land in one commit instead of 160 edits. */
+:root {
+  --app-bg: var(--surface-canvas);
+  --surface-muted: var(--surface-canvas);
+  --surface-elevated: var(--surface-overlay);
+  --line-soft: var(--hairline);
+  --line-strong: var(--hairline-strong);
+  --control-border: var(--hairline-strong);
+  --text-on-brand: var(--label-on-accent);
+
+  --brand: var(--accent-fill);
+  --brand-active: var(--accent-fill);
+  --brand-hover: var(--accent-fill-hover);
+  --brand-soft: color-mix(in oklab, var(--accent-fill) 12%, transparent);
+  --brand-softer: color-mix(in oklab, var(--accent-fill) 7%, transparent);
+
+  --theme-accent: var(--accent-fill);
+  --theme-accent-strong: var(--accent-text);
+  --theme-accent-hover: var(--accent-fill-hover);
+  --theme-accent-active: var(--accent-fill-active);
+  --theme-accent-soft: color-mix(in oklab, var(--accent-fill) 12%, transparent);
+  --theme-accent-softer: color-mix(in oklab, var(--accent-fill) 7%, transparent);
+
+  --danger-strong: var(--danger);
+
+  --shadow-soft: 0 1px 2px rgba(15, 14, 12, 0.04);
+  --shadow-medium: 0 6px 18px -8px rgba(15, 14, 12, 0.14);
+  --shadow-strong: 0 18px 42px -16px rgba(15, 14, 12, 0.24);
+}

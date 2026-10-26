@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Dropdown, Input, Tooltip } from '@douyinfe/semi-ui'
+import { Dropdown, Input, Tooltip } from '../ui'
 import {
   IconCaseSensitive,
   IconChevronDown,
@@ -244,13 +244,29 @@ export function TitleBar({
     <header className="titlebar" data-platform={platform}>
       <div className="titlebar-drag-region" aria-hidden="true" />
       <nav className="titlebar-menu" aria-label="应用菜单">
+        {workspaceAvailable ? (
+          <Tooltip
+            content={explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
+            position="bottom"
+          >
+            <button
+              className="titlebar-explorer-toggle"
+              type="button"
+              aria-label={explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
+              aria-pressed={explorerVisible}
+              data-active={explorerVisible}
+              onClick={onToggleExplorer}
+            >
+              <IconSidebar />
+            </button>
+          </Tooltip>
+        ) : null}
         <Dropdown
           trigger="custom"
           visible={activeMenu === 'file'}
           onVisibleChange={(visible) => handleMenuVisibleChange('file', visible)}
-          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
-          render={
+          render={() => (
             <Dropdown.Menu>
               <Dropdown.Item icon={<IconPlusStroked />} onClick={onNew}>
                 新建文档
@@ -309,7 +325,7 @@ export function TitleBar({
                 导出 HTML
               </Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <button
             className="titlebar-menu-button"
@@ -325,9 +341,8 @@ export function TitleBar({
           trigger="custom"
           visible={activeMenu === 'edit'}
           onVisibleChange={(visible) => handleMenuVisibleChange('edit', visible)}
-          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
-          render={
+          render={() => (
             <Dropdown.Menu>
               <Dropdown.Item icon={<IconSearchStroked />} onClick={focusSearchInput}>
                 查找
@@ -335,7 +350,7 @@ export function TitleBar({
               <Dropdown.Item onClick={() => onSearchStep(-1)}>上一个匹配</Dropdown.Item>
               <Dropdown.Item onClick={() => onSearchStep(1)}>下一个匹配</Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <button
             className="titlebar-menu-button"
@@ -351,14 +366,13 @@ export function TitleBar({
           trigger="custom"
           visible={activeMenu === 'window'}
           onVisibleChange={(visible) => handleMenuVisibleChange('window', visible)}
-          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
-          render={
+          render={() => (
             <Dropdown.Menu>
               <Dropdown.Item
                 icon={<IconSidebar />}
-                active={workspaceAvailable && explorerVisible}
                 disabled={!workspaceAvailable}
+                active={workspaceAvailable && explorerVisible}
                 onClick={onToggleExplorer}
               >
                 {explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
@@ -371,7 +385,7 @@ export function TitleBar({
                 {isMaximized ? '还原窗口' : '最大化'}
               </Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <button
             className="titlebar-menu-button"
@@ -387,9 +401,8 @@ export function TitleBar({
           trigger="custom"
           visible={activeMenu === 'help'}
           onVisibleChange={(visible) => handleMenuVisibleChange('help', visible)}
-          onClickOutSide={() => setActiveMenu(null)}
           position="bottomLeft"
-          render={
+          render={() => (
             <Dropdown.Menu>
               <Dropdown.Item icon={<IconSettingStroked />} onClick={onOpenSettings}>
                 偏好设置
@@ -400,7 +413,7 @@ export function TitleBar({
                 关于 Velox
               </Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <button
             className="titlebar-menu-button"
@@ -529,44 +542,49 @@ export function TitleBar({
                 <span>替换</span>
               </button>
             </div>
-            {replaceVisible ? (
-              <div className="titlebar-replace-row">
-                <Input
-                  value={replaceValue}
-                  placeholder="替换为"
-                  aria-label="替换为"
-                  onChange={onReplaceChange}
-                  onKeyDown={(event) => {
-                    event.stopPropagation()
+            {/* Rule 7: height-free collapse — the row stays mounted so the
+                input keeps its value and focus, and CSS animates 0fr → 1fr
+                without measuring anything in JS. */}
+            <div className="collapsible" data-open={replaceVisible ? 'true' : undefined}>
+              <div className="collapsible-inner">
+                <div className="titlebar-replace-row">
+                  <Input
+                    value={replaceValue}
+                    placeholder="替换为"
+                    aria-label="替换为"
+                    onChange={onReplaceChange}
+                    onKeyDown={(event) => {
+                      event.stopPropagation()
 
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      if (event.metaKey || event.ctrlKey) {
-                        onReplaceAll()
-                      } else {
-                        onReplaceCurrent()
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        if (event.metaKey || event.ctrlKey) {
+                          onReplaceAll()
+                        } else {
+                          onReplaceCurrent()
+                        }
                       }
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!canReplace}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={onReplaceCurrent}
-                >
-                  替换
-                </button>
-                <button
-                  type="button"
-                  disabled={!canReplace}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={onReplaceAll}
-                >
-                  全部替换
-                </button>
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!canReplace}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={onReplaceCurrent}
+                  >
+                    替换
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canReplace}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={onReplaceAll}
+                  >
+                    全部替换
+                  </button>
+                </div>
               </div>
-            ) : null}
+            </div>
             {searchResults.length > 0 ? (
               <div className="titlebar-search-results">
                 {searchResults.map((result, resultPosition) => {
@@ -625,23 +643,6 @@ export function TitleBar({
       </div>
 
       <div className="titlebar-right">
-        {workspaceAvailable ? (
-          <Tooltip
-            content={explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
-            position="bottom"
-          >
-            <button
-              className="titlebar-explorer-toggle"
-              type="button"
-              aria-label={explorerVisible ? '隐藏资源管理器' : '显示资源管理器'}
-              aria-pressed={explorerVisible}
-              data-active={explorerVisible}
-              onClick={onToggleExplorer}
-            >
-              <IconSidebar />
-            </button>
-          </Tooltip>
-        ) : null}
         {documentActionsEnabled ? (
           <Segment
             className="mode-segment"

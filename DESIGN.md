@@ -1,196 +1,212 @@
 ---
 name: Velox
 description: A Typora-inspired desktop Markdown editor built with Electron, React and TypeScript
+version: 2
 colors:
-  primary: "#1260cf"
-  primary-active: "#1677ff"
-  primary-hover: "#156eea"
-  primary-soft: "rgba(22, 119, 255, 0.12)"
-  primary-softer: "rgba(22, 119, 255, 0.07)"
-  app-bg-light: "#f5f7fb"
-  app-bg-dark: "#0f1117"
-  surface-base-light: "#ffffff"
-  surface-base-dark: "#151821"
-  surface-muted-light: "#f8fafc"
-  surface-muted-dark: "#10131a"
-  surface-raised-light: "#ffffff"
-  surface-raised-dark: "#1b1f2a"
-  surface-hover-light: "#f1f5f9"
-  surface-hover-dark: "#242936"
-  line-soft-light: "#e2e8f0"
-  line-soft-dark: "rgba(226, 232, 240, 0.12)"
-  line-strong-light: "#d5dde8"
-  line-strong-dark: "rgba(226, 232, 240, 0.18)"
-  text-primary-light: "#1e293b"
-  text-primary-dark: "#e5e7eb"
-  text-secondary-light: "#64748b"
-  text-secondary-dark: "#aab3c2"
-  text-tertiary-light: "#94a3b8"
-  text-tertiary-dark: "#788396"
-  text-on-brand: "#ffffff"
-  danger: "#ef4444"
+  surface-sunken: "#eeedea"
+  surface-canvas: "#f5f5f3"
+  surface-base: "#fcfcfb"
+  surface-raised: "#ffffff"
+  surface-canvas-dark: "#0b0b0a"
+  surface-base-dark: "#131312"
+  surface-raised-dark: "#1a1a19"
+  surface-overlay-dark: "#20201e"
+  text-primary-light: "#1c1b19"
+  text-secondary-light: "#56534b"
+  text-tertiary-light: "#6f6b62"
+  text-primary-dark: "#e8e6e1"
+  text-secondary-dark: "#a8a49b"
+  text-tertiary-dark: "#8d8981"
+  accent-fill-light: "#2563eb"
+  accent-fill-dark: "#4f8cff"
+  accent-text-light: "#1d4ed8"
+  accent-text-dark: "#6ea3ff"
+  label-on-accent-light: "#ffffff"
+  label-on-accent-dark: "#0b0b0a"
 typography:
   body:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif"
-    fontSize: "14px"
-    fontWeight: 400
-    lineHeight: 1.6
-  label:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif"
-    fontSize: "12px"
-    fontWeight: 600
-    lineHeight: 1.35
-  title:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif"
-    fontSize: "13px"
-    fontWeight: 600
-    lineHeight: 1.35
+    fontFamily: "system-ui stack: -apple-system, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', sans-serif"
+    size: "14px UI / 16px content"
+    weight: "400 (dark 360)"
+    lineHeight: "1.6 UI / 1.68 content"
+  heading:
+    scale: "1.25 modular: 32 / 26 / 22 / 18 / 16 / 14"
+    weight: "620 (dark 580)"
 rounded:
   sm: "4px"
   md: "6px"
   lg: "8px"
-  xl: "12px"
-spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
-components:
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.text-on-brand}"
-    rounded: "{rounded.md}"
-    padding: "8px 16px"
-  button-primary-hover:
-    backgroundColor: "{colors.primary-hover}"
-  button-ghost:
-    backgroundColor: "transparent"
-    textColor: "{colors.text-secondary-light}"
-    rounded: "{rounded.md}"
-    padding: "8px 16px"
-  button-ghost-hover:
-    backgroundColor: "{colors.surface-hover-light}"
-    textColor: "{colors.text-primary-light}"
-  input:
-    backgroundColor: "{colors.surface-base-light}"
-    textColor: "{colors.text-primary-light}"
-    rounded: "{rounded.md}"
-    padding: "8px 12px"
-  input-focus:
-    borderColor: "{colors.primary-active}"
-  card:
-    backgroundColor: "{colors.surface-raised-light}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.md}"
-  card-hover:
-    backgroundColor: "{colors.surface-hover-light}"
+  xl: "10px"
+motion:
+  ease-out-quart: "cubic-bezier(.215,.61,.355,1)"
+  ease-drag: "linear(...) · spring k=1200 c=80 · 366ms · 0% overshoot"
+  ease-spring: "linear(...) · spring k=380 c=18 · 775ms · 19.5% overshoot"
+  durations: "140 / 180 / 320 / 366 / 420 / 2500 ms"
 ---
 
-# Design System: Velox
+# Design System: Velox v2
+
+> v1 used borders and a blue-slate palette. v2 replaces both: **hierarchy comes
+> from 1–3% lightness steps**, and the brand colour is a calm, warm neutral
+> canvas with a single saturated accent.
 
 ## 1. Overview
 
-**Creative North Star: "The Efficient Workspace"**
+**Creative North Star: "The Quiet Desk"**
 
-Velox is a clean, professional Markdown editor designed for developers, writers, students, and general users who need to focus on content creation without distractions. The interface prioritizes efficiency and simplicity, providing a professional-grade editing experience while maintaining a clean, uncluttered appearance.
+Velox is a Markdown editor for people who write for hours. The interface should
+disappear into the paper: no boxes, no outlines around everything, no chrome
+competing with the text. Depth is implied by light, not by strokes.
 
-The system explicitly rejects overly simplistic notepad interfaces that lack professional features, as well as overly complex IDE interfaces that overwhelm users with too many options and visual noise.
+**Non-negotiables**
 
-**Key Characteristics:**
-- Content-first design that prioritizes the editing experience
-- Clean, professional interface with minimal visual distractions
-- Efficient workflows with intuitive controls and shortcuts
-- Flexible editing modes to accommodate different user preferences
+1. **Borders are banned for hierarchy.** Surfaces separate by 1–3% L\* steps.
+   A line may exist only as a 1px inset hairline inside a single component
+   (`box-shadow: inset 0 0 0 1px var(--hairline)`).
+2. **Pure black is banned.** The darkest surface is `#0b0b0a` (L\* 3.0).
+3. **Focus is a double ring, never an outline.** Inner 1.5px accent ring + 3px
+   halo at 15% — it must read as the field "biting" into the page.
+4. **Dark mode drops every weight by 40** (400→360, 620→580, 700→660). White
+   text on black visually thickens; the compensation keeps density constant.
 
-## 2. Colors
+## 2. Colour
 
-The palette is built around a restrained, professional blue accent with neutral backgrounds that adapt to light and dark modes.
+### Surface ladder (measured L\*)
 
-### Primary
-- **Brand Blue** (#1260cf): The primary accent color used for interactive elements, selections, and active states. Provides professional visual hierarchy without overwhelming the interface.
-- **Brand Blue Active** (#1677ff): Used for hover and active states of interactive elements.
-- **Brand Blue Soft** (rgba(22, 119, 255, 0.12)): Subtle background tint for selected items and active states.
+| Mode | Token | Value | L\* | Δ |
+|---|---|---|---|---|
+| light | `--surface-sunken` | `#eeedea` | 93.75 | — |
+| light | `--surface-canvas` | `#f5f5f3` | 96.49 | +2.74 |
+| light | `--surface-base` | `#fcfcfb` | 98.94 | +2.45 |
+| light | `--surface-raised` | `#ffffff` | 100.00 | +1.06 |
+| dark | `--surface-canvas` | `#0b0b0a` | 3.00 | — |
+| dark | `--surface-base` | `#131312` | 5.85 | +2.85 |
+| dark | `--surface-raised` | `#1a1a19` | 9.23 | +3.38 |
+| dark | `--surface-overlay` | `#20201e` | 12.18 | +2.95 |
 
-### Neutral
-- **Surface Base** (#ffffff light / #151821 dark): Primary background for content areas and main interface surfaces.
-- **Surface Muted** (#f8fafc light / #10131a dark): Secondary background for less prominent areas like sidebars and toolbars.
-- **Surface Raised** (#ffffff light / #1b1f2a dark): Background for elevated elements like cards and modals.
-- **Surface Hover** (#f1f5f9 light / #242936 dark): Background for hover states on interactive elements.
-- **Line Soft** (#e2e8f0 light / rgba(226, 232, 240, 0.12) dark): Subtle borders and dividers.
-- **Line Strong** (#d5dde8 light / rgba(226, 232, 240, 0.18) dark): More prominent borders for emphasis.
-- **Text Primary** (#1e293b light / #e5e7eb dark): Main text color for primary content.
-- **Text Secondary** (#64748b light / #aab3c2 dark): Secondary text for labels and less important information.
-- **Text Tertiary** (#94a3b8 light / #788396 dark): Tertiary text for hints and placeholder content.
+Interaction states are **derived**, never hand-picked:
 
-### Named Rules
-**The Content-First Rule.** The primary accent is used sparingly (≤10% of any given screen) to maintain focus on content. Its rarity is intentional.
+```css
+--surface-hover:  color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 3.2%);
+--surface-active: color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 6%);
+```
+
+### Text contrast (WCAG)
+
+| Token | Light | on canvas | Dark | on base |
+|---|---|---|---|---|
+| primary | `#1c1b19` | **15.77** AAA | `#e8e6e1` | **14.64** AAA |
+| secondary | `#56534b` | **7.03** AAA | `#a8a49b` | **7.35** AAA |
+| tertiary | `#6f6b62` | 4.86 AA | `#8d8981` | 5.24 AA |
+
+`#5a574f` (6.61 on canvas) and `#8b877d` (3.49) fail the AAA target — do not use
+them for body text.
+
+### Accent
+
+Fill and text are **separate tokens**, because one colour cannot be both a
+button background and a legible link:
+
+- Light: fill `#2563eb` + `#ffffff` label (5.15:1) · text `#1d4ed8` (6.53:1)
+- Dark: fill `#4f8cff` + `#0b0b0a` label (6.12:1) · text `#6ea3ff` (6.92:1)
+
+Accent covers ≤ 10% of any screen. **The Content-First Rule** still holds.
 
 ## 3. Typography
 
-**Body Font:** Inter (with system-ui fallback)
-**Label Font:** Inter (with system-ui fallback)
+**UI font:** system stack (`-apple-system / Segoe UI / PingFang SC / Noto Sans SC`).
+**Code font:** `ui-monospace, SF Mono, Cascadia Mono, Menlo, Consolas`.
 
-**Character:** Clean, modern, and highly readable. The typography system prioritizes clarity and efficiency, with clear hierarchy through size and weight contrast.
+### Scale (fixed, not viewport-interpolated)
 
-### Hierarchy
-- **Title** (600, 13px, 1.35): Used for section headers and important labels.
-- **Body** (400, 14px, 1.6): Main content text with optimal readability. Max line length: 65-75ch.
-- **Label** (600, 12px, 1.35): Used for UI labels, buttons, and secondary information.
+| Level | Size | Line-height | Weight (light/dark) |
+|---|---|---|---|
+| h1 | 32px | 1.16 | 620 / 580 |
+| h2 | 26px | 1.20 | 620 / 580 |
+| h3 | 22px | 1.26 | 600 / 560 |
+| h4 | 18px | 1.35 | 600 / 560 |
+| h5 | 16px | 1.40 | 600 / 560 |
+| h6 | 14px | 1.40 | 560 / 520 |
+| body | 16px (content) / 14px (UI) | 1.68 / 1.60 | 400 / 360 |
 
-### Named Rules
-**The Efficiency Rule.** Typography choices prioritize readability and quick scanning. No decorative fonts that sacrifice legibility.
+**Reading measure:** `68ch` (~720px at 16px). Never exceed 75ch.
+
+**Named rules**
+
+- **The Weight Compensation Rule.** Dark mode subtracts 40 from every weight;
+  the tokens (`--w-body`, `--w-heading`, …) are the only place weights live.
+  Never hard-code `font-weight: 700`.
+- **The Orphan Rule.** Body copy uses `text-wrap: pretty`; headings use
+  `text-wrap: balance`; CJK punctuation squeezing via `text-spacing-trim`.
+- **The Tabular Rule.** Any number that can change in place (counters, line
+  numbers, tables, timers) uses `font-variant-numeric: tabular-nums`.
 
 ## 4. Elevation
 
-The system uses a flat-by-default approach with subtle elevation changes for interactive states. Depth is conveyed through surface color differentiation rather than shadows.
+No drop shadows at rest. Elevation = surface step + (for floating layers) one
+soft, large-radius shadow that reads as ambient occlusion, plus a hairline:
 
-### Shadow Vocabulary
-- **Subtle Lift** (`box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12)`): Used sparingly for floating elements like tooltips and dropdowns.
-- **Modal Shadow** (`box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15)`): Used for modal dialogs and overlays.
-
-### Named Rules
-**The Flat-By-Default Rule.** Surfaces are flat at rest. Shadows appear only as a response to state (hover, elevation, focus) and are kept minimal.
+```css
+.surface--float {
+  background: var(--surface-overlay);
+  box-shadow: inset 0 0 0 1px var(--hairline),
+              0 14px 34px -14px rgba(15, 14, 12, 0.32);
+}
+```
 
 ## 5. Components
 
 ### Buttons
-- **Shape:** Gently curved edges (6px radius)
-- **Primary:** Brand blue background with white text, 8px 16px padding
-- **Hover / Focus:** Lighter blue background with smooth transition
-- **Ghost:** Transparent background with secondary text, becomes visible on hover
+`theme`: solid · light · borderless · outline. `type`: primary · danger · warning.
+30px tall (24 small / 34 large), 6px radius, label weight 600 (dark 560).
 
-### Inputs / Fields
-- **Style:** Clean stroke with subtle background, 6px radius
-- **Focus:** Blue border glow to indicate active state
-- **Error / Disabled:** Red for errors, muted appearance for disabled states
+### Inputs / fields
+Borderless tray: `background: color-mix(canvas, #1c1b19 3%)` with a 1px inner
+shadow at rest. **Focus adds the double ring** — never `outline`.
 
-### Cards / Containers
-- **Corner Style:** Gently curved edges (8px radius)
-- **Background:** Surface raised color with subtle border
-- **Shadow Strategy:** Minimal shadows, primarily using surface color differentiation
-- **Border:** Soft line border for definition
-- **Internal Padding:** 16px standard padding
+### Menus / selects / tooltips
+Floating surface (`--surface-overlay`), 8px radius, 4px inner padding, items are
+6px-radius rows that highlight with `currentColor` at 8%. Menus close on item
+activation, outside pointer-down, Esc, resize and window blur.
 
-### Navigation
-- **Style:** Clean, minimal navigation with clear hierarchy
-- **Typography:** Title weight for active items, body weight for inactive
-- **Default/Hover/Active States:** Subtle background changes with smooth transitions
+### Code blocks
+`--code-bg` (canvas −3.5%), 10px radius, 1px inset hairline, headers hold the
+language label and a copy action. Syntax colours come from a single shiki
+instance (dual light/dark themes resolved through CSS variables).
 
-## 6. Do's and Don'ts
+### Feedback
+- Copy → check morphs with an under-damped pop (**420ms, ≈6% overshoot**) and
+  fades itself out after **2.5s**; no toast on top of it.
+- Toasts enter with the spring curve and retract after 3.2s.
+- Every feedback channel has exactly one signal.
 
-### Do:
-- **Do** use the primary accent color sparingly (≤10% of screen) to maintain focus on content
-- **Do** maintain consistent 8px spacing grid for layout alignment
-- **Do** use clear visual hierarchy through typography weight and size
-- **Do** provide smooth transitions (140ms ease) for interactive state changes
-- **Do** support both light and dark modes with appropriate color adaptation
-- **Do** ensure WCAG AAA compliance for all text and interactive elements
+## 6. Motion
 
-### Don't:
-- **Don't** use overly simplistic notepad interfaces that lack professional features (anti-reference from PRODUCT.md)
-- **Don't** create overly complex IDE interfaces that overwhelm users with visual noise (anti-reference from PRODUCT.md)
-- **Don't** use decorative fonts that sacrifice readability
-- **Don't** use excessive shadows or gradients that distract from content
-- **Don't** use color as the only means of conveying information
-- **Don't** use animations that are bouncy, elastic, or distracting (use only exponential ease-out curves)
+| Token | Curve | Duration | Use |
+|---|---|---|---|
+| `--ease-out-quart` | `cubic-bezier(.215,.61,.355,1)` | 140–180ms | hover, focus, colour |
+| `--ease-drag` | overdamped spring (k=1200, c=80) | 366ms | panel resize release, tab settle, collapse |
+| `--ease-spring` | underdamped spring (k=380, c=18) | 775ms | toast/entrance |
+| glyph reveal | `--ease-out-quart` | 90ms per glyph, 30ms stagger | streaming text |
+
+Principles:
+
+- Drags follow the pointer 1:1 while moving; the spring applies only to the
+  settle. Never ease a value the cursor is directly controlling.
+- `prefers-reduced-motion: reduce` removes all of the above.
+- Nothing bounces except confirmations, and nothing overshoots more than ~6%.
+
+## 7. Do's and Don'ts
+
+**Do**
+- Separate regions with a lightness step; verify by converting a screenshot to
+  greyscale — the hierarchy must survive.
+- Keep one accent, used sparingly, always with a contrast-checked label.
+- Let the caret and the text be the brightest thing on screen.
+
+**Don't**
+- Don't add a border to "fix" a spacing problem.
+- Don't write `#000`, `#fff` for dark text, or `outline: none` without a ring.
+- Don't hand-pick hover colours; derive them with `color-mix`.
+- Don't animate anything the user is dragging.
+- Don't stack two confirmations for one action (toast + checkmark + colour).

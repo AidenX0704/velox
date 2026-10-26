@@ -10,6 +10,7 @@ import type {
   SaveDocumentInput
 } from '../../shared/types'
 import { VeloxError } from '../shared/errors'
+import type { FileWatchService } from './file-watch-service'
 import { HistoryService } from './history-service'
 import { RecentService } from './recent-service'
 import { SettingsService } from './settings-service'
@@ -28,7 +29,8 @@ export class DocumentService {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly recentService?: RecentService,
-    private readonly historyService?: HistoryService
+    private readonly historyService?: HistoryService,
+    private readonly fileWatchService?: FileWatchService
   ) {}
 
   createUntitled(): DocumentData {
@@ -60,6 +62,8 @@ export class DocumentService {
     this.recentService?.addFile(filePath)
     this.historyService?.recordOpen(filePath)
     this.historyService?.recordImport(filePath, content)
+    // Track this document so external edits reach the renderer.
+    this.fileWatchService?.watchDocument(filePath)
 
     return {
       path: filePath,
@@ -149,6 +153,7 @@ export class DocumentService {
 
   async save(input: SaveDocumentInput): Promise<DocumentData> {
     await writeFile(input.path, input.content, 'utf8')
+    await this.recordOwnWrite(input.path)
     this.settingsService.addRecentFile(input.path)
     this.recentService?.addFile(input.path)
     this.historyService?.recordSave(input.path, input.content)
@@ -159,6 +164,37 @@ export class DocumentService {
       title: basename(input.path),
       dirty: false,
       updatedAt: new Date().toISOString()
+    }
+  }
+
+  /**
+   * The renderer asks for the on-disk text after an external modification.
+   * Returns null when the file is gone, so the UI can offer "save as".
+   */
+  async reloadFromDisk(filePath: string): Promise<string | null> {
+    try {
+      return await readFile(filePath, 'utf8')
+    } catch {
+      return null
+    }
+  }
+
+  unwatch(filePath: string): void {
+    this.fileWatchService?.unwatchDocument(filePath)
+  }
+
+  private async recordOwnWrite(filePath: string): Promise<void> {
+    if (!this.fileWatchService) {
+      return
+    }
+
+    this.fileWatchService.watchDocument(filePath)
+
+    try {
+      const stats = await stat(filePath)
+      this.fileWatchService.markSelfWrite(filePath, stats.mtimeMs)
+    } catch {
+      this.fileWatchService.markSelfWrite(filePath)
     }
   }
 

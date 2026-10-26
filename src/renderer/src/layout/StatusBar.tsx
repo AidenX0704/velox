@@ -1,4 +1,4 @@
-import { Typography } from '@douyinfe/semi-ui'
+import { Typography } from '../ui'
 import type { CursorPosition } from '../modules/editor/model/types'
 import type { EditorMode } from '../modules/editor/model/types'
 import { editorModeLabels } from '../modules/editor/model/types'

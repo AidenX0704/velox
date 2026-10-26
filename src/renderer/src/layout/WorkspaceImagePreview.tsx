@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Tooltip } from '@douyinfe/semi-ui'
+import { Tooltip } from '../ui'
 import {
   IconMinusCircleStroked,
   IconPlusCircleStroked,

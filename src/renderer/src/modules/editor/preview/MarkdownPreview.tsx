@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { renderMarkdownReact } from '../markdown/renderMarkdownReact'
+import { useEffect, useRef, useState } from 'react'
+import { useMarkdownRender } from '../markdown/useMarkdownRender'
 import {
   isLocalDocumentHref,
   openEditorLink,
@@ -38,15 +38,13 @@ export function MarkdownPreview({
 }: MarkdownPreviewProps): React.JSX.Element {
   const rootRef = useRef<HTMLElement | null>(null)
   const previewRequestRef = useRef(0)
-  const renderedContent = useMemo(
-    () =>
-      renderMarkdownReact(content, {
-        currentPath,
-        workspaceRoot,
-        showCodeBlockLineNumbers
-      }),
-    [content, currentPath, showCodeBlockLineNumbers, workspaceRoot]
-  )
+  // Parsing runs in a worker (see useMarkdownRender); only element creation
+  // happens here, so typing stays responsive on long documents.
+  const renderedContent = useMarkdownRender(content, {
+    currentPath,
+    workspaceRoot,
+    showCodeBlockLineNumbers
+  })
   const [linkPreview, setLinkPreview] = useState<LinkPreviewCardState | null>(null)
 
   useEffect(() => {

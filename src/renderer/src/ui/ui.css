@@ -1,0 +1,756 @@
+/*
+ * Velox UI primitives — replaces @douyinfe/semi-ui (1.14 MB JS + 777 KB CSS
+ * for 11 components). Everything below follows the design rules:
+ *   · no borders for hierarchy, only 1px inset hairlines where a line is needed
+ *   · focus = double ring (inner accent + outer halo), never outline
+ *   · numbers use tabular figures
+ *   · transitions use the shared easing/duration tokens
+ */
+
+/* ── button ────────────────────────────────────────────────────────────── */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: var(--w-label);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    color var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-base) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.ui-button[data-size='small'] {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.ui-button[data-size='large'] {
+  height: 34px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.ui-button[data-block='true'] {
+  width: 100%;
+}
+
+.ui-button[data-icon-only='true'] {
+  width: 30px;
+  padding: 0;
+}
+
+.ui-button[data-size='small'][data-icon-only='true'] {
+  width: 24px;
+}
+
+.ui-button[data-type='primary'][data-theme='solid'] {
+  background: var(--accent-fill);
+  color: var(--label-on-accent);
+}
+
+.ui-button[data-type='primary'][data-theme='solid']:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+}
+
+.ui-button[data-type='primary'][data-theme='solid']:active:not(:disabled) {
+  background: var(--accent-fill-active);
+}
+
+.ui-button[data-theme='light'] {
+  background: color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 4%);
+  color: var(--text-primary);
+}
+
+.ui-button[data-theme='light']:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--local-surface, var(--surface-base)), #1c1b19 7%);
+}
+
+.ui-button[data-theme='borderless'] {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.ui-button[data-theme='borderless']:hover:not(:disabled) {
+  background: color-mix(in oklab, currentColor 9%, transparent);
+  color: var(--text-primary);
+}
+
+.ui-button[data-theme='outline'] {
+  background: transparent;
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--hairline-strong);
+}
+
+.ui-button[data-theme='outline']:hover:not(:disabled) {
+  background: color-mix(in oklab, currentColor 7%, transparent);
+}
+
+.ui-button[data-type='danger'] {
+  color: var(--danger);
+}
+
+.ui-button[data-type='danger'][data-theme='solid'] {
+  background: var(--danger);
+  color: var(--label-on-accent);
+}
+
+.ui-button[data-type='warning'] {
+  color: var(--warning);
+}
+
+.ui-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-button:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in oklab, var(--accent-fill) 60%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--accent-fill) 16%, transparent);
+}
+
+.ui-button:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.ui-button-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: ui-spin 700ms linear infinite;
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── fields ────────────────────────────────────────────────────────────── */
+.ui-field {
+  --local-surface: var(--surface-canvas);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-canvas), #1c1b19 3%);
+  box-shadow: inset 0 1px 1.5px color-mix(in oklab, #1c1b19 5%, transparent);
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-base) var(--ease-out-quart);
+}
+
+.ui-field[data-size='small'] {
+  height: 24px;
+}
+
+.ui-field[data-size='large'] {
+  height: 34px;
+}
+
+.ui-field:hover {
+  background: color-mix(in oklab, var(--surface-canvas), #1c1b19 5%);
+}
+
+/* Rule 2: focus adds bite — bright inner ring, dark inner shadow, soft halo. */
+.ui-field:focus-within {
+  background: var(--surface-base);
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in oklab, var(--accent-fill) 62%, transparent),
+    inset 0 1px 2px color-mix(in oklab, #1c1b19 8%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--accent-fill) 15%, transparent);
+}
+
+.ui-input,
+.ui-textarea {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: var(--w-body);
+  line-height: 1.4;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-input::placeholder,
+.ui-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.ui-input::-webkit-outer-spin-button,
+.ui-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.ui-field-affix {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-field--area {
+  height: auto;
+  align-items: stretch;
+  padding: 6px 9px;
+}
+
+.ui-textarea {
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.55;
+}
+
+.ui-field--number {
+  width: 108px;
+}
+
+/* ── select ────────────────────────────────────────────────────────────── */
+.ui-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 30px;
+  min-width: 120px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-canvas), #1c1b19 3%);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: var(--w-body);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-base) var(--ease-out-quart);
+}
+
+.ui-select[data-size='small'] {
+  height: 24px;
+  font-size: 12px;
+}
+
+.ui-select:hover {
+  background: color-mix(in oklab, var(--surface-canvas), #1c1b19 5%);
+}
+
+.ui-select[data-open='true'],
+.ui-select:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in oklab, var(--accent-fill) 62%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--accent-fill) 15%, transparent);
+}
+
+.ui-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-value[data-placeholder='true'] {
+  color: var(--text-tertiary);
+}
+
+.ui-select-chevron {
+  width: 0;
+  height: 0;
+  flex: none;
+  border-top: 4px solid currentColor;
+  border-right: 3.5px solid transparent;
+  border-left: 3.5px solid transparent;
+  opacity: 0.55;
+}
+
+.ui-select-menu {
+  position: fixed;
+  z-index: 4000;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 14px 34px -14px rgba(15, 14, 12, 0.32);
+  animation: ui-menu-in 120ms var(--ease-out-quart);
+}
+
+.ui-select-item {
+  display: block;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-select-item:hover,
+.ui-select-item[data-active='true'] {
+  background: color-mix(in oklab, currentColor 8%, transparent);
+}
+
+.ui-select-item[data-active='true'] {
+  font-weight: var(--w-label);
+}
+
+/* ── dropdown ──────────────────────────────────────────────────────────── */
+.ui-dropdown-menu {
+  position: fixed;
+  z-index: 4000;
+  min-width: 168px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 16px 36px -16px rgba(15, 14, 12, 0.34);
+  animation: ui-menu-in 120ms var(--ease-out-quart);
+}
+
+.ui-dropdown-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ui-dropdown-item:hover:not(:disabled) {
+  background: color-mix(in oklab, currentColor 8%, transparent);
+}
+
+.ui-dropdown-item[data-active='true'],
+.ui-dropdown-item-active {
+  background: color-mix(in oklab, currentColor 8%, transparent);
+  font-weight: var(--w-label);
+}
+
+.ui-dropdown-item[data-active='true']::after,
+.ui-dropdown-item-active::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex: none;
+  margin-inline-start: 4px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+}
+
+.ui-dropdown-item[data-type='danger'] {
+  color: var(--danger);
+}
+
+.ui-dropdown-item[data-type='warning'] {
+  color: var(--warning);
+}
+
+.ui-dropdown-item[data-type='danger'] .ui-dropdown-item-icon,
+.ui-dropdown-item[data-type='warning'] .ui-dropdown-item-icon {
+  color: inherit;
+}
+
+.ui-dropdown-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ui-dropdown-item-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.ui-dropdown-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-dropdown-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--hairline);
+}
+
+@keyframes ui-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── tooltip ───────────────────────────────────────────────────────────── */
+.ui-tooltip {
+  position: fixed;
+  z-index: 5000;
+  max-width: 260px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-float);
+  color: var(--text-primary);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 10px 24px -12px rgba(15, 14, 12, 0.3);
+  font-size: 11.5px;
+  line-height: 1.45;
+  pointer-events: none;
+  animation: ui-tooltip-in 110ms var(--ease-out-quart);
+}
+
+.ui-tooltip[data-position='top'] {
+  transform: translate(-50%, -100%);
+}
+
+.ui-tooltip[data-position='bottom'] {
+  transform: translate(-50%, 0);
+}
+
+.ui-tooltip[data-position='left'] {
+  transform: translate(-100%, -50%);
+}
+
+.ui-tooltip[data-position='right'] {
+  transform: translate(0, -50%);
+}
+
+@keyframes ui-tooltip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── modal ─────────────────────────────────────────────────────────────── */
+.ui-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.ui-modal-scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, #0b0b0a 42%, transparent);
+  animation: ui-fade-in 160ms var(--ease-out-quart);
+}
+
+.ui-modal {
+  position: relative;
+  z-index: 1;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 18px 20px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-overlay);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 28px 64px -24px rgba(15, 14, 12, 0.45);
+  animation: ui-modal-in 200ms var(--ease-out-quart);
+}
+
+.ui-modal-title {
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: var(--w-heading);
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.ui-modal-body {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.ui-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── toast ─────────────────────────────────────────────────────────────── */
+.ui-toaster {
+  position: fixed;
+  z-index: 7000;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.ui-toast {
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-float);
+  color: var(--text-primary);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 14px 32px -14px rgba(15, 14, 12, 0.36);
+  font-size: 12.5px;
+  font-weight: var(--w-label);
+  animation: ui-toast-in 260ms var(--ease-spring);
+}
+
+.ui-toast[data-kind='success'] {
+  color: var(--success);
+}
+
+.ui-toast[data-kind='error'] {
+  color: var(--danger);
+}
+
+.ui-toast[data-kind='warning'] {
+  color: var(--warning);
+}
+
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── progress ──────────────────────────────────────────────────────────── */
+.ui-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ui-progress-track {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--text-primary) 9%, transparent);
+}
+
+.ui-progress[data-size='small'] .ui-progress-track {
+  height: 3px;
+}
+
+.ui-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-fill);
+  transition: width var(--dur-base) var(--ease-out-quart);
+}
+
+.ui-progress-info {
+  flex: none;
+  min-width: 4ch;
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ── typography ────────────────────────────────────────────────────────── */
+.ui-text {
+  margin: 0;
+  line-height: inherit;
+}
+
+.ui-text[data-type='primary'] {
+  color: var(--text-primary);
+}
+
+.ui-text[data-type='secondary'] {
+  color: var(--text-secondary);
+}
+
+.ui-text[data-type='tertiary'],
+.ui-text[data-type='quaternary'] {
+  color: var(--text-tertiary);
+}
+
+.ui-text[data-type='warning'] {
+  color: var(--warning);
+}
+
+.ui-text[data-type='danger'] {
+  color: var(--danger);
+}
+
+.ui-text[data-type='success'] {
+  color: var(--success);
+}
+
+.ui-text[data-size='small'] {
+  font-size: 11.5px;
+}
+
+.ui-text[data-size='large'] {
+  font-size: 14px;
+}
+
+.ui-text[data-weight='medium'] {
+  font-weight: var(--w-medium);
+}
+
+.ui-text[data-weight='semibold'] {
+  font-weight: var(--w-label);
+}
+
+.ui-text[data-weight='bold'] {
+  font-weight: var(--w-strong);
+}
+
+.ui-text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── rule 4 · streaming reveal ─────────────────────────────────────────── */
+.stream-glyph {
+  display: inline-block;
+  white-space: pre;
+  /* 90 ms blur→sharp, 30 ms stagger between neighbours. */
+  animation: stream-glyph-in 90ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+  animation-delay: calc(var(--glyph-index, 0) * 30ms);
+}
+
+.stream-text-bulk {
+  animation: stream-bulk-in 180ms var(--ease-out-quart) both;
+}
+
+@keyframes stream-glyph-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(1px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+@keyframes stream-bulk-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── rule 7 · height-free collapse (grid 0fr → 1fr) ───────────────────── */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-slow) var(--ease-drag);
+}
+
+.collapsible[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.collapsible > .collapsible-inner {
+  min-height: 0; /* required, otherwise 0fr does not collapse */
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out-quart);
+}
+
+.collapsible[data-open='true'] > .collapsible-inner {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible,
+  .collapsible > .collapsible-inner,
+  .stream-glyph,
+  .stream-text-bulk {
+    transition: none;
+    animation: none;
+  }
+}

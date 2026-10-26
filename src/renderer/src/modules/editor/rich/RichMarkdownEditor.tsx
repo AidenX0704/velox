@@ -46,6 +46,8 @@ import {
 interface RichMarkdownEditorProps {
   dirty: boolean
   content: string
+  /** Incremented when the buffer was replaced from disk rather than by typing. */
+  externalRevision?: number
   settings: MarkdownEditorPreferences
   currentPath?: string
   workspaceRoot?: string | null
@@ -67,6 +69,7 @@ interface RichMarkdownEditorProps {
 export function RichMarkdownEditor({
   dirty,
   content,
+  externalRevision = 0,
   settings,
   currentPath,
   workspaceRoot,
@@ -87,6 +90,7 @@ export function RichMarkdownEditor({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const contentRef = useRef(content)
+  const externalRevisionRef = useRef(externalRevision)
   const initialContentRef = useRef(content)
   const initialScrollTopRef = useRef(initialScrollTop)
   const onChangeRef = useRef(onChange)
@@ -239,6 +243,14 @@ export function RichMarkdownEditor({
       return
     }
 
+    const isExternalReplace = externalRevision !== externalRevisionRef.current
+    externalRevisionRef.current = externalRevision
+    // Remember where the caret was before the buffer is swapped, so an external
+    // reload does not throw the user back to the top of the document.
+    const previousLine = isExternalReplace
+      ? getCursorPosition(view.state.doc, view.state.selection.from).line
+      : 1
+
     view.updateState(
       createEditorState(
         content,
@@ -248,11 +260,20 @@ export function RichMarkdownEditor({
       )
     )
     contentRef.current = content
+
+    if (isExternalReplace) {
+      const state = view.state
+      const position = positionAtLine(state.doc, previousLine)
+      // Selection-only transactions never enter the undo history, so the user
+      // cannot "undo" their way back into the stale external buffer.
+      view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, position)))
+    }
+
     onSearchMatchCountChangeRef.current?.(
       richSearchPluginKey.getState(view.state)?.matches.length ?? 0
     )
     onCursorChangeRef.current(getCursorPosition(view.state.doc, view.state.selection.from))
-  }, [content])
+  }, [content, externalRevision])
 
   useEffect(() => {
     const view = viewRef.current
@@ -632,4 +653,26 @@ function getCursorPosition(doc: ProseMirrorNode, position: number): CursorPositi
     line: Math.max(lines.length, 1),
     column: (lines.at(-1)?.length ?? 0) + 1
   }
+}
+
+/** Inverse of {@link getCursorPosition}: start of the Nth textblock. */
+function positionAtLine(doc: ProseMirrorNode, line: number): number {
+  let currentLine = 1
+  let found = 0
+
+  doc.descendants((node, position) => {
+    if (!node.isTextblock) {
+      return true
+    }
+
+    if (currentLine === line) {
+      found = position + 1
+      return false
+    }
+
+    currentLine += 1
+    return true
+  })
+
+  return Math.min(Math.max(found, 0), doc.content.size)
 }

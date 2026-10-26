@@ -18,6 +18,10 @@ export interface TabState {
   cursorColumn: number
   scrollTop: number
   pinned: boolean
+  /** Bumped whenever the buffer was replaced from disk, so editors resync. */
+  externalRevision?: number
+  /** Set when the file disappeared from disk while the tab stayed open. */
+  missingOnDisk?: boolean
 }
 
 export interface TabBarProps {

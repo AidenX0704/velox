@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
+import { Button, Dropdown, Tooltip } from '../../../ui'
 import { IconMoreStroked } from '@douyinfe/semi-icons'
 import type { EditorView } from 'prosemirror-view'
 import type { MarkType, NodeType } from 'prosemirror-model'
@@ -458,12 +458,16 @@ export function FormatToolbar({
     <div className="format-toolbar" onMouseDown={preventFocusLoss}>
       <div className="format-toolbar-group">
         <Dropdown
-          render={
+          render={() => (
             <Dropdown.Menu>
               {headingMenu.map((item) => (
                 <Dropdown.Item
                   key={`${item.nodeType}-${item.level}`}
-                  active={isBlockActive(item.nodeType, item.level || undefined)}
+                  className={
+                    isBlockActive(item.nodeType, item.level || undefined)
+                      ? 'ui-dropdown-item-active'
+                      : undefined
+                  }
                   onClick={() => {
                     if (item.level === 0) {
                       if (view) {
@@ -484,7 +488,7 @@ export function FormatToolbar({
                 </Dropdown.Item>
               ))}
             </Dropdown.Menu>
-          }
+          )}
         >
           <Button
             size="small"
@@ -624,7 +628,7 @@ export function FormatToolbar({
 
       <div className="format-toolbar-group">
         <Dropdown
-          render={
+          render={() => (
             <Dropdown.Menu>
               <Dropdown.Item onClick={handleTaskList}>任务列表</Dropdown.Item>
               <Dropdown.Item onClick={handleHorizontalRule}>分隔线</Dropdown.Item>
@@ -632,7 +636,7 @@ export function FormatToolbar({
               <Dropdown.Item onClick={() => handleHeading(5)}>标题 5</Dropdown.Item>
               <Dropdown.Item onClick={() => handleHeading(6)}>标题 6</Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <Button
             size="small"
@@ -651,19 +655,19 @@ export function FormatToolbar({
 
           <div className="format-toolbar-group">
             <Dropdown
-              render={
+              render={() => (
                 <Dropdown.Menu>
                   {FONT_SIZES.map((size) => (
                     <Dropdown.Item
                       key={size}
-                      active={fontSize === size}
+                      className={fontSize === size ? 'ui-dropdown-item-active' : undefined}
                       onClick={() => onFontSizeChange(size)}
                     >
                       {size}px
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>
-              }
+              )}
             >
               <Button
                 size="small"

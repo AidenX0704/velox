@@ -28,5 +28,24 @@ export default defineConfig(
       ...eslintPluginReactRefresh.configs.vite.rules
     }
   },
+  {
+    /**
+     * The UI primitive layer intentionally co-locates imperative APIs (Toast,
+     * Modal.confirm, Select.Option) with components, and clones a ref onto a
+     * caller-provided trigger to avoid layout wrappers. Fast-refresh purity and
+     * the ref-in-render heuristic do not apply to this library boundary.
+     */
+    files: ['src/renderer/src/ui/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/refs': 'off'
+    }
+  },
+  {
+    files: ['**/*.mjs'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
   eslintConfigPrettier
 )

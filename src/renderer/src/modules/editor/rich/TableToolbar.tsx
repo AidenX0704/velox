@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Dropdown, Tooltip } from '@douyinfe/semi-ui'
+import { Button, Dropdown, Tooltip } from '../../../ui'
 import { toggleMark } from 'prosemirror-commands'
 import type { MarkType } from 'prosemirror-model'
 import { type Command } from 'prosemirror-state'
@@ -191,7 +191,7 @@ export function TableToolbar({ view }: TableToolbarProps): React.JSX.Element {
 
       <div className="format-toolbar-group">
         <Dropdown
-          render={
+          render={() => (
             <Dropdown.Menu>
               <Dropdown.Item onClick={() => execCommand(addRowBefore)}>上方插入行</Dropdown.Item>
               <Dropdown.Item onClick={() => execCommand(addRowAfter)}>下方插入行</Dropdown.Item>
@@ -199,7 +199,7 @@ export function TableToolbar({ view }: TableToolbarProps): React.JSX.Element {
               <Dropdown.Item onClick={() => execCommand(addColumnBefore)}>左侧插入列</Dropdown.Item>
               <Dropdown.Item onClick={() => execCommand(addColumnAfter)}>右侧插入列</Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <Button
             size="small"
@@ -210,20 +210,20 @@ export function TableToolbar({ view }: TableToolbarProps): React.JSX.Element {
           </Button>
         </Dropdown>
         <Dropdown
-          render={
+          render={() => (
             <Dropdown.Menu>
-              <Dropdown.Item type="danger" onClick={() => execCommand(deleteRow)}>
-                删除所在行
+              <Dropdown.Item onClick={() => execCommand(deleteRow)}>
+                <span style={{ color: 'var(--danger)' }}>删除所在行</span>
               </Dropdown.Item>
-              <Dropdown.Item type="danger" onClick={() => execCommand(deleteColumn)}>
-                删除所在列
+              <Dropdown.Item onClick={() => execCommand(deleteColumn)}>
+                <span style={{ color: 'var(--danger)' }}>删除所在列</span>
               </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item type="danger" onClick={() => execCommand(deleteTable)}>
-                删除表格
+              <Dropdown.Item onClick={() => execCommand(deleteTable)}>
+                <span style={{ color: 'var(--danger)' }}>删除表格</span>
               </Dropdown.Item>
             </Dropdown.Menu>
-          }
+          )}
         >
           <Button
             size="small"

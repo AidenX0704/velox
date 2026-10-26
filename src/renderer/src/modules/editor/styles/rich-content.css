@@ -1,5 +1,5 @@
 .preview-edit-prosemirror .ProseMirror strong {
-  font-weight: 700;
+  font-weight: var(--w-strong);
 }
 
 .preview-edit-prosemirror .ProseMirror em {
@@ -11,23 +11,62 @@
   text-decoration: line-through;
 }
 
+/* Mirrors markdown-content.css so live editing and read-only preview share one
+   type scale. Ratio ≈ 1.25, weights drop 40 in dark mode via the tokens. */
 .preview-edit-prosemirror .ProseMirror h1,
 .preview-edit-prosemirror .ProseMirror h2,
 .preview-edit-prosemirror .ProseMirror h3,
-.preview-edit-prosemirror .ProseMirror h4 {
+.preview-edit-prosemirror .ProseMirror h4,
+.preview-edit-prosemirror .ProseMirror h5,
+.preview-edit-prosemirror .ProseMirror h6 {
   position: relative;
-  margin: 1.5em 0 0.72em;
-  font-weight: 760;
+  margin: 2em 0 0.6em;
+  font-weight: var(--w-heading);
   line-height: 1.22;
-  letter-spacing: 0;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
 }
 
 .preview-edit-prosemirror .ProseMirror h1 {
-  font-size: 2.25em;
+  margin-top: 0;
+  font-size: 2rem;
+  line-height: 1.16;
+  letter-spacing: -0.012em;
 }
 
 .preview-edit-prosemirror .ProseMirror h2 {
-  font-size: 1.58em;
+  margin-top: 1.9em;
+  padding-bottom: 0.28em;
+  font-size: 1.625rem;
+  line-height: 1.2;
+  box-shadow: inset 0 -1px 0 var(--markdown-soft-line, var(--hairline));
+}
+
+.preview-edit-prosemirror .ProseMirror h3 {
+  margin-top: 1.7em;
+  font-size: 1.375rem;
+  line-height: 1.26;
+}
+
+.preview-edit-prosemirror .ProseMirror h4 {
+  margin-top: 1.5em;
+  font-size: 1.125rem;
+  line-height: 1.35;
+}
+
+.preview-edit-prosemirror .ProseMirror h5 {
+  margin-top: 1.35em;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.preview-edit-prosemirror .ProseMirror h6 {
+  margin-top: 1.3em;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
 }
 
 .preview-edit-prosemirror .ProseMirror p,
@@ -35,7 +74,12 @@
 .preview-edit-prosemirror .ProseMirror ol,
 .preview-edit-prosemirror .ProseMirror blockquote,
 .preview-edit-prosemirror .ProseMirror pre {
-  margin: 0.85em 0;
+  margin: 0.78em 0;
+}
+
+.preview-edit-prosemirror .ProseMirror p {
+  text-wrap: pretty;
+  font-variant-numeric: tabular-nums;
 }
 
 .preview-edit-prosemirror .ProseMirror ul,
@@ -74,32 +118,31 @@
 
 .preview-edit-prosemirror .ProseMirror blockquote {
   position: relative;
-  padding: 0.9em 1.05em 0.9em 1.2em;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-left: 4px solid rgba(var(--theme-accent-rgb, 22, 119, 255), 0.5);
-  border-radius: 8px;
+  padding: 0.7em 1em 0.7em 1.15em;
+  border: 0;
+  border-inline-start: 2px solid color-mix(in oklab, var(--accent-fill) 42%, transparent);
+  border-radius: 0 8px 8px 0;
   color: var(--text-secondary);
-  background:
-    linear-gradient(90deg, rgba(var(--theme-accent-rgb, 22, 119, 255), 0.08), transparent 58%),
-    var(--surface-raised);
+  background: color-mix(in oklab, var(--surface-canvas) 72%, var(--surface-base));
   font-style: normal;
 }
 
 .preview-edit-prosemirror .ProseMirror code {
-  padding: 0.1em 0.34em;
+  padding: 0.12em 0.36em;
   border: 0;
   border-radius: 4px;
-  color: #0550ae;
-  background: rgba(175, 184, 193, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.12);
+  color: color-mix(in oklab, var(--text-primary) 82%, var(--accent-text));
+  background: color-mix(in oklab, var(--surface-canvas), #1c1b19 6%);
+  box-shadow: none;
   font-family: var(--code-font-family);
   font-size: 0.9em;
+  font-variant-ligatures: none;
 }
 
 [data-color-mode='dark'] .preview-edit-prosemirror .ProseMirror code {
-  color: #79c0ff;
-  background: rgba(110, 118, 129, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(139, 148, 158, 0.14);
+  color: #d6d3cc;
+  background: color-mix(in oklab, var(--surface-raised), #ffffff 9%);
+  box-shadow: none;
 }
 
 .preview-edit-prosemirror .ProseMirror pre {

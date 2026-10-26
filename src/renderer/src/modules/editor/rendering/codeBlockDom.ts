@@ -69,5 +69,5 @@ export function applyCodeLayerLanguage(
   baseClassName: string,
   meta: CodeLanguageMeta
 ): void {
-  element.className = `${baseClassName} hljs language-${meta.cssLanguage}`
+  element.className = `${baseClassName} language-${meta.cssLanguage}`
 }

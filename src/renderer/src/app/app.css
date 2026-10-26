@@ -1,0 +1,178 @@
+/* App-level surfaces: inline notices and the crash screen.
+   Layer rules: no borders, hierarchy comes from ~2% lightness steps. */
+
+.inline-notice {
+  --notice-accent: var(--accent-fill, #2563eb);
+
+  display: flex;
+  position: relative;
+  z-index: 5;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px;
+  border: 0;
+  background: color-mix(in oklab, var(--surface-canvas, #f5f5f3), var(--notice-accent) 4%);
+  box-shadow: inset 0 -1px 0 color-mix(in oklab, currentColor 6%, transparent);
+  color: var(--text-primary, #1c1b19);
+  font-size: 12.5px;
+  animation: notice-in 180ms var(--ease-out-quart, cubic-bezier(0.215, 0.61, 0.355, 1)) both;
+}
+
+.inline-notice[data-tone='success'] {
+  --notice-accent: var(--success, #15803d);
+}
+
+.inline-notice[data-tone='warning'] {
+  --notice-accent: var(--warning, #b45309);
+  background: color-mix(in oklab, var(--surface-canvas, #f5f5f3), var(--warning, #b45309) 7%);
+}
+
+.inline-notice[data-tone='danger'] {
+  --notice-accent: var(--danger, #b4432f);
+  background: color-mix(in oklab, var(--surface-canvas, #f5f5f3), var(--danger, #b4432f) 7%);
+}
+
+.inline-notice-body {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.inline-notice-title {
+  font-weight: var(--w-label, 600);
+  letter-spacing: 0.01em;
+}
+
+.inline-notice-desc {
+  overflow: hidden;
+  color: var(--text-secondary, #56534b);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inline-notice-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.inline-notice-action {
+  appearance: none;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #56534b);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: var(--w-label, 600);
+  cursor: pointer;
+  transition:
+    background 140ms var(--ease-out-quart, cubic-bezier(0.215, 0.61, 0.355, 1)),
+    color 140ms var(--ease-out-quart, cubic-bezier(0.215, 0.61, 0.355, 1));
+}
+
+.inline-notice-action:hover {
+  background: color-mix(in oklab, currentColor 8%, transparent);
+  color: var(--text-primary, #1c1b19);
+}
+
+.inline-notice-action:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in oklab, var(--notice-accent) 60%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--notice-accent) 16%, transparent);
+}
+
+.inline-notice-action[data-primary='true'] {
+  color: var(--notice-accent);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.crash-screen {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  place-items: center;
+  padding: 32px;
+  background: var(--surface-canvas, #f5f5f3);
+  color: var(--text-primary, #1c1b19);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  user-select: text;
+}
+
+.crash-card {
+  max-width: 56ch;
+  padding: 24px 26px;
+  border-radius: 12px;
+  background: var(--surface-base, #fcfcfb);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 7%, transparent);
+}
+
+.crash-card h1 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: var(--w-heading, 620);
+}
+
+.crash-card p {
+  margin: 0 0 14px;
+  color: var(--text-secondary, #56534b);
+  font-size: 13px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.crash-card pre {
+  overflow: auto;
+  max-height: 200px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-canvas, #f5f5f3), #1c1b19 4%);
+  color: var(--text-secondary, #56534b);
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+}
+
+.crash-actions button {
+  appearance: none;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--accent-fill, #2563eb);
+  color: var(--label-on-accent, #ffffff);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: var(--w-label, 600);
+  cursor: pointer;
+}
+
+.crash-actions button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-fill, #2563eb) 28%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inline-notice {
+    animation: none;
+  }
+}

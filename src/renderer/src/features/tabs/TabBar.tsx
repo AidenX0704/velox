@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Dropdown, Tooltip } from '@douyinfe/semi-ui'
+import { Dropdown, Tooltip } from '../../ui'
 import { IconClose, IconPlus, IconLockStroked } from '@douyinfe/semi-icons'
 import type { TabBarProps, TabState } from './types'
 
@@ -40,11 +40,55 @@ export function TabBar({
     (e: React.DragEvent, toIndex: number) => {
       e.preventDefault()
       const fromIndex = dragIndex
+      const container = tabBarRef.current
+      // Capture positions before React reorders so we can FLIP them back into
+      // place: the settle uses the overdamped spring (366 ms, zero overshoot),
+      // which is what makes a drag feel like it "bites" instead of sliding.
+      const before = new Map<string, number>()
+
+      container
+        ?.querySelectorAll<HTMLElement>('[data-tab-id]')
+        .forEach((element) => before.set(element.dataset.tabId ?? '', element.offsetLeft))
+
       if (fromIndex !== null && fromIndex !== toIndex) {
         onReorder(fromIndex, toIndex)
       }
+
       setDragIndex(null)
       setDropIndex(null)
+
+      if (!container || before.size === 0) {
+        return
+      }
+
+      window.requestAnimationFrame(() => {
+        const easing =
+          getComputedStyle(container).getPropertyValue('--ease-drag').trim() ||
+          'cubic-bezier(0.215, 0.61, 0.355, 1)'
+        const duration =
+          Number.parseFloat(
+            getComputedStyle(container).getPropertyValue('--dur-drag').trim() || '366'
+          ) || 366
+
+        container.querySelectorAll<HTMLElement>('[data-tab-id]').forEach((element) => {
+          const previousLeft = before.get(element.dataset.tabId ?? '')
+
+          if (previousLeft === undefined) {
+            return
+          }
+
+          const delta = previousLeft - element.offsetLeft
+
+          if (Math.abs(delta) < 1) {
+            return
+          }
+
+          element.animate(
+            [{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }],
+            { duration, easing, composite: 'replace' }
+          )
+        })
+      })
     },
     [dragIndex, onReorder]
   )
@@ -103,12 +147,13 @@ export function TabBar({
         {tabs.map((tab, index) => (
           <Dropdown
             key={tab.id}
-            render={getTabContextMenu(tab)}
+            render={() => getTabContextMenu(tab)}
             trigger="contextMenu"
             position="bottomLeft"
           >
             <div
               className={`tabbar-tab${tab.id === activeTabId ? ' tabbar-tab--active' : ''}${tab.pinned ? ' tabbar-tab--pinned' : ''}${dragIndex === index ? ' tabbar-tab--dragging' : ''}${dropIndex === index ? ' tabbar-tab--drop-target' : ''}`}
+              data-tab-id={tab.id}
               role="tab"
               aria-selected={tab.id === activeTabId}
               aria-label={`${tab.document.title}${tab.document.dirty ? ' (未保存)' : ''}`}

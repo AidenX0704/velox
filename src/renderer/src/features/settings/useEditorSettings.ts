@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Toast } from '@douyinfe/semi-ui'
+import { Toast } from '../../ui'
 import {
   defaultEditorPreferences,
   type EditorPreferences,

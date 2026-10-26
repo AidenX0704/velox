@@ -2,13 +2,16 @@ export const ipcChannels = {
   app: {
     getInfo: 'app:get-info',
     openFile: 'app:open-file',
-    getPendingOpenFile: 'app:get-pending-open-file'
+    getPendingOpenFile: 'app:get-pending-open-file',
+    reportReady: 'app:report-ready',
+    getLaunchOptions: 'app:get-launch-options'
   },
   window: {
     getIsMaximized: 'window:get-is-maximized',
     minimize: 'window:minimize',
     toggleMaximize: 'window:toggle-maximize',
     close: 'window:close',
+    setAppearance: 'window:set-appearance',
     maximizedChanged: 'window:maximized-changed'
   },
   settings: {
@@ -45,7 +48,11 @@ export const ipcChannels = {
     save: 'document:save',
     saveAs: 'document:save-as',
     export: 'document:export',
-    exportProgress: 'document:export-progress'
+    exportProgress: 'document:export-progress',
+    unwatch: 'document:unwatch',
+    reloadFromDisk: 'document:reload-from-disk',
+    externalChange: 'document:external-change',
+    externalRemoved: 'document:external-removed'
   },
   workspace: {
     openFolder: 'workspace:open-folder',

@@ -6,24 +6,21 @@
 
 .markdown-preview,
 .preview-edit-shell {
-  --markdown-font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Noto Sans SC', 'Microsoft YaHei', sans-serif;
-  --code-font-family:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --markdown-font-family: var(--font-ui);
+  --code-font-family: var(--font-code);
 }
 
 .markdown-preview {
   --color-text: var(--text-primary);
   --color-text-light: var(--text-secondary);
   --color-text-3: var(--text-tertiary);
-  --color-border: var(--line-soft);
+  --color-border: var(--hairline);
   --color-background-soft: var(--brand-softer);
-  --color-background-mute: var(--surface-muted);
-  --color-primary: var(--brand-active);
-  --color-link: var(--brand-active);
+  --color-background-mute: var(--surface-canvas);
+  --color-primary: var(--accent-text);
+  --color-link: var(--accent-text);
   --color-reference: var(--brand-soft);
-  --color-reference-text: var(--brand-active);
+  --color-reference-text: var(--accent-text);
   --color-reference-background: var(--brand-softer);
   --markdown-color-text: var(--color-text);
   --markdown-color-text-muted: var(--color-text-3);
@@ -40,13 +37,20 @@
   max-width: none;
   min-height: 100%;
   margin: 0;
-  padding: 24px clamp(20px, 4vw, 32px) 96px;
+  padding: 28px clamp(24px, 4vw, 40px) 96px;
   color: var(--markdown-color-text);
   font-family: var(--markdown-font-family);
   font-size: var(--preview-font-size, 16px);
-  line-height: var(--preview-line-height, 1.72);
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  line-height: var(--preview-line-height, 1.68);
+  letter-spacing: 0.01em;
+  /* Rule 8: no orphans / widows at the end of a paragraph. */
+  text-wrap: pretty;
+  /* CJK punctuation squeezing — Chromium 123+, ignored elsewhere. */
+  text-spacing-trim: space-all;
+  line-break: strict;
+  overflow-wrap: break-word;
+  word-break: normal;
+  font-variant-numeric: tabular-nums;
   user-select: text;
 }
 

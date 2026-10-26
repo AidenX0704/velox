@@ -8,8 +8,11 @@ import type {
   DocumentLinkPreview,
   DocumentSessionRecord,
   DocumentData,
+  ExternalDocumentChange,
+  ExternalDocumentRemoval,
   HistoryBranchRecord,
   HistoryDocumentActivity,
+  LaunchOptions,
   HistoryTimelineEntry,
   MenuCommand,
   RecentFileRecord,
@@ -34,14 +37,35 @@ import type {
 import type { ExportDocumentInput, ExportDocumentResult, ExportProgress } from '../shared/export'
 import type { EditorPreferences } from '../shared/preferences'
 
-function invoke<T>(channel: string, payload?: unknown): Promise<Result<T>> {
-  return ipcRenderer.invoke(channel, payload)
+/**
+ * The main process registers IPC handlers on the tick after the window is
+ * created (see bootstrap/create-app.ts). The renderer normally loses that race
+ * anyway, but this retry keeps the handshake deterministic on slow disks and in
+ * dev mode where the bundle can be served from cache.
+ */
+async function invokeWhenReady<T>(channel: string, payload?: unknown): Promise<Result<T>> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await ipcRenderer.invoke(channel, payload)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      if (attempt >= 40 || !message.includes('No handler registered')) {
+        throw error
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+  }
 }
 
 const api: VeloxAPI = {
   app: {
-    getInfo: () => invoke<AppInfo>(ipcChannels.app.getInfo),
-    getPendingOpenFile: () => invoke<string | null>(ipcChannels.app.getPendingOpenFile),
+    getInfo: () => invokeWhenReady<AppInfo>(ipcChannels.app.getInfo),
+    getPendingOpenFile: () => invokeWhenReady<string | null>(ipcChannels.app.getPendingOpenFile),
+    reportReady: () => invokeWhenReady<void>(ipcChannels.app.reportReady),
+    // Parsed in the main process: a sandboxed preload cannot see the app argv.
+    getLaunchOptions: () => invokeWhenReady<LaunchOptions>(ipcChannels.app.getLaunchOptions),
     getPathForFile: (file) => webUtils.getPathForFile(file),
     onOpenFile: (callback) => {
       const listener = (_event: IpcRendererEvent, filePath: string): void => {
@@ -56,10 +80,12 @@ const api: VeloxAPI = {
     }
   },
   window: {
-    getIsMaximized: () => invoke<boolean>(ipcChannels.window.getIsMaximized),
-    minimize: () => invoke<void>(ipcChannels.window.minimize),
-    toggleMaximize: () => invoke<void>(ipcChannels.window.toggleMaximize),
-    close: () => invoke<void>(ipcChannels.window.close),
+    getIsMaximized: () => invokeWhenReady<boolean>(ipcChannels.window.getIsMaximized),
+    minimize: () => invokeWhenReady<void>(ipcChannels.window.minimize),
+    toggleMaximize: () => invokeWhenReady<void>(ipcChannels.window.toggleMaximize),
+    close: () => invokeWhenReady<void>(ipcChannels.window.close),
+    setAppearance: (appearance) =>
+      invokeWhenReady<void>(ipcChannels.window.setAppearance, appearance),
     onMaximizedChange: (callback) => {
       const listener = (_event: IpcRendererEvent, isMaximized: boolean): void => {
         callback(isMaximized)
@@ -73,17 +99,18 @@ const api: VeloxAPI = {
     }
   },
   settings: {
-    get: () => invoke<AppSettings>(ipcChannels.settings.get),
-    update: (patch) => invoke<AppSettings>(ipcChannels.settings.update, patch)
+    get: () => invokeWhenReady<AppSettings>(ipcChannels.settings.get),
+    update: (patch) => invokeWhenReady<AppSettings>(ipcChannels.settings.update, patch)
   },
   preferences: {
-    getEditor: () => invoke<EditorPreferences>(ipcChannels.preferences.getEditor),
-    updateEditor: (patch) => invoke<EditorPreferences>(ipcChannels.preferences.updateEditor, patch),
-    resetEditor: () => invoke<EditorPreferences>(ipcChannels.preferences.resetEditor)
+    getEditor: () => invokeWhenReady<EditorPreferences>(ipcChannels.preferences.getEditor),
+    updateEditor: (patch) =>
+      invokeWhenReady<EditorPreferences>(ipcChannels.preferences.updateEditor, patch),
+    resetEditor: () => invokeWhenReady<EditorPreferences>(ipcChannels.preferences.resetEditor)
   },
   backup: {
-    run: (sourcePath) => invoke<BackupRunResult>(ipcChannels.backup.run, { sourcePath }),
-    getLastRun: () => invoke<BackupRunResult | null>(ipcChannels.backup.getLastRun),
+    run: (sourcePath) => invokeWhenReady<BackupRunResult>(ipcChannels.backup.run, { sourcePath }),
+    getLastRun: () => invokeWhenReady<BackupRunResult | null>(ipcChannels.backup.getLastRun),
     onProgress: (callback) => {
       const listener = (_event: IpcRendererEvent, status: BackupFileStatus): void =>
         callback(status)
@@ -92,33 +119,35 @@ const api: VeloxAPI = {
     }
   },
   recent: {
-    listFiles: () => invoke<RecentFileRecord[]>(ipcChannels.recent.listFiles),
-    listWorkspaces: () => invoke<RecentWorkspaceRecord[]>(ipcChannels.recent.listWorkspaces),
-    clear: () => invoke<void>(ipcChannels.recent.clear)
+    listFiles: () => invokeWhenReady<RecentFileRecord[]>(ipcChannels.recent.listFiles),
+    listWorkspaces: () =>
+      invokeWhenReady<RecentWorkspaceRecord[]>(ipcChannels.recent.listWorkspaces),
+    clear: () => invokeWhenReady<void>(ipcChannels.recent.clear)
   },
   history: {
     listTimeline: (path?: string) =>
-      invoke<HistoryTimelineEntry[]>(ipcChannels.history.listTimeline, path),
+      invokeWhenReady<HistoryTimelineEntry[]>(ipcChannels.history.listTimeline, path),
     listBranches: (path?: string) =>
-      invoke<HistoryBranchRecord[]>(ipcChannels.history.listBranches, path),
+      invokeWhenReady<HistoryBranchRecord[]>(ipcChannels.history.listBranches, path),
     getDocumentActivity: (path: string) =>
-      invoke<HistoryDocumentActivity>(ipcChannels.history.getDocumentActivity, path)
+      invokeWhenReady<HistoryDocumentActivity>(ipcChannels.history.getDocumentActivity, path)
   },
   document: {
-    createUntitled: () => invoke<DocumentData>(ipcChannels.document.createUntitled),
-    open: () => invoke<DocumentData | null>(ipcChannels.document.open),
-    openPath: (path: string) => invoke<DocumentData>(ipcChannels.document.openPath, path),
+    createUntitled: () => invokeWhenReady<DocumentData>(ipcChannels.document.createUntitled),
+    open: () => invokeWhenReady<DocumentData | null>(ipcChannels.document.open),
+    openPath: (path: string) => invokeWhenReady<DocumentData>(ipcChannels.document.openPath, path),
     resolveLink: (input: ResolveDocumentLinkInput) =>
-      invoke<ResolvedDocumentLink | null>(ipcChannels.document.resolveLink, input),
+      invokeWhenReady<ResolvedDocumentLink | null>(ipcChannels.document.resolveLink, input),
     previewLink: (input: ResolveDocumentLinkInput) =>
-      invoke<DocumentLinkPreview | null>(ipcChannels.document.previewLink, input),
+      invokeWhenReady<DocumentLinkPreview | null>(ipcChannels.document.previewLink, input),
     resolveImage: (input: ResolveDocumentImageInput) =>
-      invoke<string | null>(ipcChannels.document.resolveImage, input),
-    save: (input: SaveDocumentInput) => invoke<DocumentData>(ipcChannels.document.save, input),
+      invokeWhenReady<string | null>(ipcChannels.document.resolveImage, input),
+    save: (input: SaveDocumentInput) =>
+      invokeWhenReady<DocumentData>(ipcChannels.document.save, input),
     saveAs: (input: SaveDocumentAsInput) =>
-      invoke<DocumentData | null>(ipcChannels.document.saveAs, input),
+      invokeWhenReady<DocumentData | null>(ipcChannels.document.saveAs, input),
     export: (input: ExportDocumentInput) =>
-      invoke<ExportDocumentResult | null>(ipcChannels.document.export, input),
+      invokeWhenReady<ExportDocumentResult | null>(ipcChannels.document.export, input),
     onExportProgress: (callback) => {
       const listener = (_event: IpcRendererEvent, progress: ExportProgress): void => {
         callback(progress)
@@ -129,22 +158,47 @@ const api: VeloxAPI = {
       return () => {
         ipcRenderer.removeListener(ipcChannels.document.exportProgress, listener)
       }
+    },
+    unwatch: (path: string) => invokeWhenReady<void>(ipcChannels.document.unwatch, path),
+    reloadFromDisk: (path: string) =>
+      invokeWhenReady<string | null>(ipcChannels.document.reloadFromDisk, path),
+    onExternalChange: (callback) => {
+      const listener = (_event: IpcRendererEvent, change: ExternalDocumentChange): void => {
+        callback(change)
+      }
+
+      ipcRenderer.on(ipcChannels.document.externalChange, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.document.externalChange, listener)
+      }
+    },
+    onExternalRemoval: (callback) => {
+      const listener = (_event: IpcRendererEvent, change: ExternalDocumentRemoval): void => {
+        callback(change)
+      }
+
+      ipcRenderer.on(ipcChannels.document.externalRemoved, listener)
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.document.externalRemoved, listener)
+      }
     }
   },
   workspace: {
-    openFolder: () => invoke<string | null>(ipcChannels.workspace.openFolder),
-    getTree: (input) => invoke<WorkspaceEntry[]>(ipcChannels.workspace.getTree, input),
+    openFolder: () => invokeWhenReady<string | null>(ipcChannels.workspace.openFolder),
+    getTree: (input) => invokeWhenReady<WorkspaceEntry[]>(ipcChannels.workspace.getTree, input),
     getState: (rootPath: string) =>
-      invoke<WorkspaceStateRecord | null>(ipcChannels.workspace.getState, rootPath),
+      invokeWhenReady<WorkspaceStateRecord | null>(ipcChannels.workspace.getState, rootPath),
     updateState: (input: UpdateWorkspaceStateInput) =>
-      invoke<WorkspaceStateRecord>(ipcChannels.workspace.updateState, input),
-    createEntry: (input) => invoke<string>(ipcChannels.workspace.createEntry, input),
-    renameEntry: (input) => invoke<string>(ipcChannels.workspace.renameEntry, input),
-    deleteEntry: (input) => invoke<void>(ipcChannels.workspace.deleteEntry, input),
+      invokeWhenReady<WorkspaceStateRecord>(ipcChannels.workspace.updateState, input),
+    createEntry: (input) => invokeWhenReady<string>(ipcChannels.workspace.createEntry, input),
+    renameEntry: (input) => invokeWhenReady<string>(ipcChannels.workspace.renameEntry, input),
+    deleteEntry: (input) => invokeWhenReady<void>(ipcChannels.workspace.deleteEntry, input),
     search: (input: WorkspaceSearchInput) =>
-      invoke<WorkspaceSearchResult>(ipcChannels.workspace.search, input),
+      invokeWhenReady<WorkspaceSearchResult>(ipcChannels.workspace.search, input),
     replaceAll: (input: WorkspaceReplaceInput) =>
-      invoke<WorkspaceReplaceResult>(ipcChannels.workspace.replaceAll, input),
+      invokeWhenReady<WorkspaceReplaceResult>(ipcChannels.workspace.replaceAll, input),
     onDidChange: (callback) => {
       const listener = (): void => {
         callback()
@@ -159,21 +213,22 @@ const api: VeloxAPI = {
   },
   session: {
     getDocument: (path: string) =>
-      invoke<DocumentSessionRecord | null>(ipcChannels.session.getDocument, path),
+      invokeWhenReady<DocumentSessionRecord | null>(ipcChannels.session.getDocument, path),
     getLastDocument: () =>
-      invoke<DocumentSessionRecord | null>(ipcChannels.session.getLastDocument),
+      invokeWhenReady<DocumentSessionRecord | null>(ipcChannels.session.getLastDocument),
     updateDocument: (input: UpdateDocumentSessionInput) =>
-      invoke<DocumentSessionRecord>(ipcChannels.session.updateDocument, input)
+      invokeWhenReady<DocumentSessionRecord>(ipcChannels.session.updateDocument, input)
   },
   shell: {
-    openExternal: (url: string) => invoke<void>(ipcChannels.shell.openExternal, url),
-    showItemInFolder: (path: string) => invoke<void>(ipcChannels.shell.showItemInFolder, path)
+    openExternal: (url: string) => invokeWhenReady<void>(ipcChannels.shell.openExternal, url),
+    showItemInFolder: (path: string) =>
+      invokeWhenReady<void>(ipcChannels.shell.showItemInFolder, path)
   },
   updater: {
-    getStatus: () => invoke<UpdaterStatus>(ipcChannels.updater.getStatus),
-    checkForUpdates: () => invoke<UpdaterStatus>(ipcChannels.updater.checkForUpdates),
-    downloadUpdate: () => invoke<UpdaterStatus>(ipcChannels.updater.downloadUpdate),
-    quitAndInstall: () => invoke<void>(ipcChannels.updater.quitAndInstall),
+    getStatus: () => invokeWhenReady<UpdaterStatus>(ipcChannels.updater.getStatus),
+    checkForUpdates: () => invokeWhenReady<UpdaterStatus>(ipcChannels.updater.checkForUpdates),
+    downloadUpdate: () => invokeWhenReady<UpdaterStatus>(ipcChannels.updater.downloadUpdate),
+    quitAndInstall: () => invokeWhenReady<void>(ipcChannels.updater.quitAndInstall),
     onStatusChange: (callback) => {
       const listener = (_event: IpcRendererEvent, status: UpdaterStatus): void => {
         callback(status)

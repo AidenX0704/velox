@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react'
-import 'highlight.js/styles/github.css'
 import 'katex/dist/katex.min.css'
 import 'markdown-it-texmath/css/texmath.css'
 import 'prosemirror-view/style/prosemirror.css'
@@ -18,6 +17,7 @@ interface MarkdownEditorProps {
   mode: EditorMode
   dirty: boolean
   content: string
+  externalRevision?: number
   settings: MarkdownEditorPreferences
   currentPath?: string
   workspaceRoot?: string | null
@@ -39,6 +39,7 @@ export function MarkdownEditor({
   mode,
   dirty,
   content,
+  externalRevision = 0,
   settings,
   currentPath,
   workspaceRoot,
@@ -102,6 +103,7 @@ export function MarkdownEditor({
     <RichMarkdownEditor
       dirty={dirty}
       content={content}
+      externalRevision={externalRevision}
       settings={settings}
       currentPath={currentPath}
       workspaceRoot={workspaceRoot}

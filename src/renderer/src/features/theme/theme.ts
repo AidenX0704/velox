@@ -49,6 +49,7 @@ export function applyThemeToDocument(options: {
   const accentRgb = hexToRgb(accentColor)
   const root = document.documentElement
   const body = document.body
+  const isDark = options.resolvedMode === 'dark'
 
   root.dataset.colorMode = options.resolvedMode
   root.dataset.appearanceMode = options.appearanceMode
@@ -57,36 +58,43 @@ export function applyThemeToDocument(options: {
   body.dataset.colorMode = options.resolvedMode
   body.dataset.appearanceMode = options.appearanceMode
 
-  const hoverColor =
-    options.resolvedMode === 'dark'
-      ? mixHex(accentColor, '#ffffff', 0.12)
-      : mixHex(accentColor, '#000000', 0.08)
-  const strongColor =
-    options.resolvedMode === 'dark'
-      ? mixHex(accentColor, '#ffffff', 0.18)
-      : mixHex(accentColor, '#000000', 0.18)
-  const activeColor =
-    options.resolvedMode === 'dark'
-      ? mixHex(accentColor, '#ffffff', 0.08)
-      : mixHex(accentColor, '#000000', 0.18)
+  // Fills stay saturated; text-on-accent flips so the label keeps AAA contrast
+  // against a light-blue fill in dark mode.
+  const fillHover = isDark
+    ? mixHex(accentColor, '#ffffff', 0.14)
+    : mixHex(accentColor, '#000000', 0.1)
+  const fillActive = isDark
+    ? mixHex(accentColor, '#ffffff', 0.24)
+    : mixHex(accentColor, '#000000', 0.2)
+  // Accent used as *text* must be legible on the surface, not just a fill.
+  const accentText = isDark
+    ? mixHex(accentColor, '#ffffff', 0.4)
+    : mixHex(accentColor, '#000000', 0.26)
 
-  if (options.resolvedMode === 'dark') {
+  if (isDark) {
     body.setAttribute('theme-mode', 'dark')
   } else {
     body.removeAttribute('theme-mode')
   }
 
   for (const element of [root, body]) {
+    element.style.setProperty('--accent-fill', accentColor)
+    element.style.setProperty('--accent-fill-hover', fillHover)
+    element.style.setProperty('--accent-fill-active', fillActive)
+    element.style.setProperty('--accent-text', accentText)
+    element.style.setProperty('--label-on-accent', isDark ? '#0b0b0a' : '#ffffff')
+
     element.style.setProperty('--theme-accent', accentColor)
     element.style.setProperty('--theme-accent-rgb', accentRgb)
-    element.style.setProperty('--theme-accent-strong', strongColor)
-    element.style.setProperty('--theme-accent-hover', hoverColor)
-    element.style.setProperty('--theme-accent-active', activeColor)
+    element.style.setProperty('--theme-accent-strong', accentText)
+    element.style.setProperty('--theme-accent-hover', fillHover)
+    element.style.setProperty('--theme-accent-active', fillActive)
     element.style.setProperty('--theme-accent-soft', `rgba(${accentRgb}, 0.12)`)
     element.style.setProperty('--theme-accent-softer', `rgba(${accentRgb}, 0.07)`)
+
     element.style.setProperty('--semi-color-primary', accentColor)
-    element.style.setProperty('--semi-color-primary-hover', hoverColor)
-    element.style.setProperty('--semi-color-primary-active', activeColor)
+    element.style.setProperty('--semi-color-primary-hover', fillHover)
+    element.style.setProperty('--semi-color-primary-active', fillActive)
     element.style.setProperty('--semi-color-primary-light-default', `rgba(${accentRgb}, 0.12)`)
     element.style.setProperty('--semi-color-primary-light-hover', `rgba(${accentRgb}, 0.18)`)
     element.style.setProperty('--semi-color-primary-light-active', `rgba(${accentRgb}, 0.24)`)
